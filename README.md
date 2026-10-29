@@ -6,6 +6,7 @@ Web-App (PWA) für das Kleingewerbe *Toths Reinigungsservice*. Läuft auf Androi
 
 - **Kunden** – Kontaktdaten, Privat-/Geschäftskunde, Reinigungsintervall, Stundensatz, Standard-Aufgaben, Notizen (Schlüssel, Zugang …)
 - **Einsätze** – Datum, Uhrzeit/Stunden, Checkliste „was wurde gereinigt“, Notiz, **Vorher-/Nachher-Fotos** (direkt mit der Kamera)
+- **Zusatzleistungen** – Katalog mit Preisen (Müll rausbringen, Mülltonnen, Fenster, Bügeln …), beim Einsatz abhaken, wird automatisch zusätzlich zur Pauschale/zu den Stunden berechnet; Katalog unter *Einstellungen → Leistungen & Preise* änderbar
 - **Termine** – geplante Reinigungen mit Aufgaben; nächste Fälligkeit wird automatisch aus dem Intervall berechnet; Export in den Handy-Kalender (.ics)
 - **Startseite** – überfällig / heute / nächste 7 Tage, nicht abgerechnete Einsätze, offene Rechnungen
 - **Rechnungen** für Kleinunternehmer (§ 19 UStG):

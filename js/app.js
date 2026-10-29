@@ -137,7 +137,24 @@ const DEFAULT_SETTINGS = {
   zahlungsziel: 14,
   nrPrefix: 'RE',
   nrStart: 1,
+  // Zusatzleistungen mit Richtpreisen (frei änderbar unter Einstellungen → Leistungen & Preise)
+  leistungen: [
+    { id: 'muell', name: 'Müll rausbringen', preis: 250, einheit: 'Mal', art: 'arbeit' },
+    { id: 'tonnen', name: 'Mülltonnen an die Straße & zurück', preis: 300, einheit: 'Tonne', art: 'arbeit' },
+    { id: 'fenster', name: 'Fenster putzen', preis: 2500, einheit: 'Std.', art: 'arbeit' },
+    { id: 'buegeln', name: 'Bügeln', preis: 2200, einheit: 'Std.', art: 'arbeit' },
+    { id: 'waesche', name: 'Wäsche waschen & aufhängen', preis: 600, einheit: 'Maschine', art: 'arbeit' },
+    { id: 'betten', name: 'Betten neu beziehen', preis: 500, einheit: 'Bett', art: 'arbeit' },
+    { id: 'kuehlschrank', name: 'Kühlschrank reinigen', preis: 2000, einheit: 'pauschal', art: 'arbeit' },
+    { id: 'backofen', name: 'Backofen reinigen', preis: 3000, einheit: 'pauschal', art: 'arbeit' },
+    { id: 'balkon', name: 'Balkon / Terrasse reinigen', preis: 1500, einheit: 'pauschal', art: 'arbeit' },
+    { id: 'pflanzen', name: 'Blumen gießen', preis: 300, einheit: 'Mal', art: 'arbeit' },
+    { id: 'einkauf', name: 'Einkaufen', preis: 1000, einheit: 'Mal', art: 'arbeit' },
+    { id: 'anfahrt', name: 'Anfahrt', preis: 30, einheit: 'km', art: 'fahrt' },
+  ],
 };
+const UNITS = ['Monat', 'Std.', 'pauschal', 'Mal', 'Stk.', 'Tonne', 'Maschine', 'Bett', 'km'];
+const unitPrice = (l) => `${money(l.preis)}${l.einheit === 'pauschal' ? ' pauschal' : `/${l.einheit}`}`;
 let S = { ...DEFAULT_SETTINGS };
 async function loadSettings() {
   S = { ...DEFAULT_SETTINGS, ...(await DB.get('settings', 'main')) };
@@ -602,6 +619,7 @@ function visitCard(v, kmap, showName = true) {
     </div>
     <div class="muted small">${showName ? fmtDateLong(v.datum) + ' · ' : ''}${v.stunden ? fmtNum(v.stunden) + ' Std.' : ''}${v.fotoAnzahl ? ` · 📷 ${v.fotoAnzahl}` : ''}</div>
     ${done.length ? `<div class="small">${esc(done.join(' · '))}</div>` : ''}
+    ${v.extras?.length ? `<div class="small">➕ ${esc(v.extras.map((x) => (x.menge > 1 ? `${fmtNum(x.menge)}× ` : '') + x.name).join(' · '))}</div>` : ''}
   </a>`;
 }
 
@@ -636,6 +654,7 @@ async function visitForm(v, q) {
     v = { id: DB.uid(), kundeId, datum: today(), von: termin?.uhrzeit || '', bis: '', stunden: '', aufgaben: vorlage.map((text) => ({ text, erledigt: true })), notiz: '', rechnungId: null };
   }
   const tasks = v.aufgaben.map((t) => ({ ...t }));
+  const extras = (v.extras || []).map((x) => ({ ...x }));
   const existing = isNew ? [] : await DB.by('photos', 'visitId', v.id);
   const pending = [];
 
@@ -650,6 +669,8 @@ async function visitForm(v, q) {
       </div>
       <div class="label">Was wurde gereinigt?</div>
       <ul class="tasks" id="tasks"></ul>
+      <div class="label">Zusatzleistungen <span class="muted small">(werden extra berechnet)</span></div>
+      <ul class="tasks extras" id="extras"></ul>
       <div class="label">Fotos</div>
       <div id="photos"></div>
       <label>Notiz<textarea name="notiz" rows="3" placeholder="z. B. Besonderheiten, Schäden, Material verbraucht…">${esc(v.notiz)}</textarea></label>
@@ -659,6 +680,7 @@ async function visitForm(v, q) {
   `);
 
   const editor = taskEditor($('#tasks'), tasks, true);
+  extrasEditor($('#extras'), extras);
   photoEditor($('#photos'), existing, pending);
 
   const f = $('#f');
@@ -687,6 +709,7 @@ async function visitForm(v, q) {
       bis: fd.get('bis'),
       stunden: num(fd.get('stunden')) || '',
       aufgaben: tasks,
+      extras: extras.filter((x) => num(x.menge) > 0).map((x) => ({ ...x, menge: num(x.menge) })),
       notiz: fd.get('notiz').trim(),
     });
     for (const p of pending) {
@@ -710,6 +733,36 @@ async function visitForm(v, q) {
     toast('✓ Einsatz gespeichert');
     go(`#/einsatz/${v.id}`, true);
   });
+}
+
+// Zusatzleistungen aus dem Katalog abhaken, Menge angeben
+function extrasEditor(el, extras) {
+  const catalog = [...S.leistungen];
+  for (const x of extras) if (!catalog.some((l) => l.name === x.name)) catalog.push(x);
+  const draw = () => {
+    el.innerHTML = catalog.map((l, i) => {
+      const x = extras.find((e) => e.name === l.name);
+      return `<li class="task ${x ? 'on' : ''}">
+        <label><input type="checkbox" data-x="${i}" ${x ? 'checked' : ''}>
+          <span>${esc(l.name)}<br><span class="muted small">${unitPrice(x || l)}</span></span></label>
+        ${x ? `<input type="number" class="qty" data-q="${i}" min="0" step="0.5" inputmode="decimal" value="${esc(x.menge)}" aria-label="Menge">` : ''}
+      </li>`;
+    }).join('') || '<li class="task muted small">Keine Zusatzleistungen im Katalog.</li>';
+  };
+  el.addEventListener('change', (e) => {
+    const i = e.target.dataset.x;
+    if (i === undefined) return;
+    const l = catalog[i];
+    if (e.target.checked) extras.push({ name: l.name, preis: l.preis, einheit: l.einheit, art: l.art || 'arbeit', menge: 1 });
+    else extras.splice(extras.findIndex((x) => x.name === l.name), 1);
+    draw();
+  });
+  el.addEventListener('input', (e) => {
+    const i = e.target.dataset.q;
+    if (i === undefined) return;
+    extras.find((x) => x.name === catalog[i].name).menge = e.target.value;
+  });
+  draw();
 }
 
 function photoEditor(el, existing, pending) {
@@ -771,6 +824,7 @@ route('/einsatz/:id', async ({ id }) => {
         ${inv ? `<a class="badge ok" href="#/rechnung/${inv.id}">Rechnung ${esc(inv.nummer)}</a>` : '<span class="badge warn">nicht abgerechnet</span>'}</div>
       <div class="muted">${fmtDateLong(v.datum)}${v.von ? ` · ${esc(v.von)}${v.bis ? '–' + esc(v.bis) : ''} Uhr` : ''}${v.stunden ? ` · ${fmtNum(v.stunden)} Std.` : ''}</div>
       <ul class="done-list mt">${(v.aufgaben || []).map((t) => `<li class="${t.erledigt ? 'ok' : 'no'}">${t.erledigt ? '✓' : '✗'} ${esc(t.text)}</li>`).join('')}</ul>
+      ${v.extras?.length ? `<div class="small muted mt">Zusatzleistungen</div><ul class="done-list">${v.extras.map((x) => `<li class="ok">➕ ${esc(x.name)} · ${fmtNum(x.menge)} ${esc(x.einheit)} à ${money(x.preis)}</li>`).join('')}</ul>` : ''}
       ${v.notiz ? `<div class="mt">📝 ${nl2br(v.notiz)}</div>` : ''}
       ${gallery('vorher', 'Vorher')}${gallery('nachher', 'Nachher')}
     </div>
@@ -833,6 +887,34 @@ route('/rechnungen', async (_, q) => {
   `, { tab: 'rechnungen', back: false });
 });
 
+// Gleiche Zusatzleistungen mehrerer Einsätze zu einer Rechnungsposition zusammenfassen
+function extraPositions(visits) {
+  const groups = new Map();
+  for (const v of visits) {
+    for (const x of v.extras || []) {
+      const key = `${x.name}|${x.preis}|${x.einheit}`;
+      const g = groups.get(key) || { ...x, menge: 0, dates: [] };
+      g.menge += num(x.menge);
+      g.dates.push(v.datum);
+      groups.set(key, g);
+    }
+  }
+  return [...groups.values()].map(({ dates, ...x }) => {
+    dates.sort();
+    const many = dates.length > 1;
+    return {
+      auto: true,
+      beschreibung: x.name + (many ? ` (am ${dates.map((d) => fmtDate(d).slice(0, 6)).join(', ')})` : ''),
+      datum: dates[0],
+      ...(many ? { datumBis: dates[dates.length - 1] } : {}),
+      menge: x.menge,
+      einheit: x.einheit,
+      preis: x.preis,
+      art: x.art || 'arbeit',
+    };
+  });
+}
+
 function visitToPosition(v, k) {
   const done = (v.aufgaben || []).filter((t) => t.erledigt).map((t) => t.text);
   return {
@@ -883,7 +965,14 @@ route('/rechnung/neu', async (_, q) => {
       <div id="visits"></div>
       <div class="label">Positionen</div>
       <div id="positions"></div>
-      <button type="button" class="btn ghost small" id="addPos">+ Position hinzufügen</button>
+      <datalist id="units">${UNITS.map((u) => `<option value="${u}">`).join('')}</datalist>
+      <div class="row gap">
+        <select id="addExtra" class="add-extra">
+          <option value="">➕ Zusatzleistung hinzufügen…</option>
+          ${S.leistungen.map((l, i) => `<option value="${i}">${esc(l.name)} – ${unitPrice(l)}</option>`).join('')}
+        </select>
+        <button type="button" class="btn ghost small" id="addPos">+ Freie Position</button>
+      </div>
       <div class="total" id="total"></div>
       <label>Zusätzlicher Text (optional)<textarea name="notiz" rows="2" placeholder="z. B. Vielen Dank für Ihren Auftrag!"></textarea></label>
       <p class="muted small">Die Rechnungsnummer wird beim Erstellen automatisch fortlaufend vergeben. Der Hinweis nach § 19 UStG (Kleinunternehmer) wird automatisch eingefügt.</p>
@@ -905,7 +994,7 @@ route('/rechnung/neu', async (_, q) => {
     const k = kunde();
     if (!k) return [];
     const sel = openVisits().filter((v) => selected.has(v.id));
-    if (!isMonthly(k)) return sel.map((v) => ({ ...visitToPosition(v, k), auto: true }));
+    if (!isMonthly(k)) return [...sel.map((v) => ({ ...visitToPosition(v, k), auto: true })), ...extraPositions(sel)];
     const m = f.monat.value;
     if (!m) return [];
     const old = positions.find((p) => p.pauschale);
@@ -921,7 +1010,7 @@ route('/rechnung/neu', async (_, q) => {
       einheit: 'Monat',
       preis: old ? old.preis : k.monatspauschale || S.monatspauschale || 0,
       art: 'arbeit',
-    }];
+    }, ...extraPositions(sel)];
   };
   const rebuild = () => {
     positions = [...autoPositions(), ...positions.filter((p) => !p.auto)];
@@ -940,9 +1029,7 @@ route('/rechnung/neu', async (_, q) => {
       </div>
       <div class="grid3">
         <label>Menge<input type="number" step="0.25" min="0" inputmode="decimal" data-k="menge" value="${esc(p.menge)}"></label>
-        <label>Einheit<select data-k="einheit">
-          ${['Monat', 'Std.', 'pauschal', 'km', 'Stk.'].map((u) => `<option ${p.einheit === u ? 'selected' : ''}>${u}</option>`).join('')}
-        </select></label>
+        <label>Einheit<input data-k="einheit" list="units" value="${esc(p.einheit)}"></label>
         <label>Preis (€)<input type="number" step="0.01" min="0" inputmode="decimal" data-k="preis" value="${centsInput(p.preis)}"></label>
       </div>
       <div class="right small">Betrag: <b data-sum>${money(positionTotal(p))}</b></div>
@@ -996,6 +1083,14 @@ route('/rechnung/neu', async (_, q) => {
       }
       drawPositions();
     }, 200);
+  });
+  $('#addExtra').addEventListener('change', (e) => {
+    const l = S.leistungen[e.target.value];
+    e.target.value = '';
+    if (!l) return;
+    positions.push({ beschreibung: l.name, datum: today(), menge: 1, einheit: l.einheit, preis: l.preis, art: l.art || 'arbeit' });
+    drawPositions();
+    $('#positions .pos:last-child').scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   $('#addPos').addEventListener('click', () => {
     positions.push({ beschreibung: '', datum: today(), menge: 1, einheit: 'pauschal', preis: 0, art: 'arbeit' });
@@ -1077,7 +1172,7 @@ function invoiceDoc(inv) {
     <table class="inv-items">
       <thead><tr><th>Pos.</th><th>Datum</th><th>Leistung</th><th class="r">Menge</th><th class="r">Einzelpreis</th><th class="r">Betrag</th></tr></thead>
       <tbody>${inv.positionen.map((p, i) => `<tr>
-        <td>${i + 1}</td><td>${fmtDate(p.datum)}${p.datumBis && p.datumBis !== p.datum ? ` –<br>${fmtDate(p.datumBis)}` : ''}</td><td>${nl2br(p.beschreibung)}</td>
+        <td>${i + 1}</td><td class="nowrap">${fmtDate(p.datum)}${p.datumBis && p.datumBis !== p.datum ? `&nbsp;–<br>${fmtDate(p.datumBis)}` : ''}</td><td>${nl2br(p.beschreibung)}</td>
         <td class="r">${fmtNum(p.menge)} ${esc(p.einheit)}</td><td class="r">${money(p.preis)}</td><td class="r">${money(p.betrag)}</td></tr>`).join('')}
       </tbody>
       <tfoot><tr><td colspan="5" class="r"><b>Gesamtbetrag</b></td><td class="r"><b>${money(inv.summe)}</b></td></tr></tfoot>
@@ -1183,6 +1278,9 @@ route('/einstellungen', async () => {
       <button class="btn block" type="submit">Speichern</button>
     </form>
 
+    <a class="card link mt" href="#/leistungen"><div class="row between"><b>💶 Leistungen & Preise</b><span class="muted">›</span></div>
+      <div class="muted small">${S.leistungen.length} Zusatzleistungen, z. B. Müll rausbringen, Fenster putzen, Bügeln</div></a>
+
     <h3 class="section">Datensicherung</h3>
     <div class="card">
       <p class="small">Alle Daten und Fotos liegen <b>nur auf diesem Handy</b>. Erstelle regelmäßig eine Sicherung (z. B. in Google Drive / iCloud speichern) – Rechnungen musst du 10 Jahre aufbewahren.</p>
@@ -1198,7 +1296,7 @@ route('/einstellungen', async () => {
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
     </div>`}
-    <p class="muted small center">Toths Reinigungsservice · Version 1.1</p>
+    <p class="muted small center">Toths Reinigungsservice · Version 1.2</p>
   `);
 
   $('#f').addEventListener('submit', async (e) => {
@@ -1216,6 +1314,59 @@ route('/einstellungen', async () => {
   });
   $('#export').addEventListener('click', exportBackup);
   $('#import').addEventListener('change', (e) => e.target.files[0] && importBackup(e.target.files[0]));
+});
+
+route('/leistungen', () => {
+  const list = S.leistungen.map((l) => ({ ...l }));
+  const draw = () => {
+    $('#items').innerHTML = list.map((l, i) => `<div class="card pos" data-i="${i}">
+      <div class="row between"><input data-k="name" value="${esc(l.name)}" placeholder="Bezeichnung" aria-label="Bezeichnung">
+        <button type="button" class="icon-btn" data-rm="${i}" aria-label="Leistung entfernen">✕</button></div>
+      <div class="grid3">
+        <label>Preis (€)<input type="number" step="0.01" min="0" inputmode="decimal" data-k="preis" value="${centsInput(l.preis)}"></label>
+        <label>pro<input data-k="einheit" list="units" value="${esc(l.einheit)}"></label>
+        <label>Art<select data-k="art">
+          ${[['arbeit', 'Arbeit'], ['fahrt', 'Fahrt'], ['material', 'Material']].map(([v, t]) => `<option value="${v}" ${l.art === v ? 'selected' : ''}>${t}</option>`).join('')}
+        </select></label>
+      </div>
+    </div>`).join('') || '<div class="empty small">Noch keine Leistungen.</div>';
+  };
+  render('Leistungen & Preise', `
+    <p class="muted small">Diese Zusatzleistungen kannst du beim Einsatz abhaken. Sie werden dann automatisch zusätzlich zur Pauschale bzw. zu den Stunden berechnet.</p>
+    <datalist id="units">${UNITS.map((u) => `<option value="${u}">`).join('')}</datalist>
+    <div id="items" class="form"></div>
+    <button type="button" class="btn ghost block" id="add">+ Leistung hinzufügen</button>
+    <button type="button" class="btn block" id="save">Speichern</button>
+    <details class="mt"><summary>💡 Woher kommen die Vorschlagspreise?</summary>
+      <div class="card small mt">Richtwerte für ein Kleingewerbe ohne Umsatzsteuer, zwischen privater Putzhilfe (ca. 15–20 €/Std.) und Reinigungsfirma (ca. 23–35 €/Std.).
+      Müll rausbringen ca. 2–3 € pro Mal, Mülltonnen-Service ca. 2–4 € pro Tonne und Leerung. Passe die Preise an deine Region und deine Kunden an.</div>
+    </details>
+  `);
+  draw();
+  $('#items').addEventListener('input', (e) => {
+    const key = e.target.dataset.k;
+    if (!key) return;
+    const l = list[e.target.closest('[data-i]').dataset.i];
+    l[key] = key === 'preis' ? Math.round(num(e.target.value) * 100) : e.target.value;
+  });
+  $('#items').addEventListener('change', (e) => { if (e.target.dataset.k === 'art') list[e.target.closest('[data-i]').dataset.i].art = e.target.value; });
+  $('#items').addEventListener('click', (e) => {
+    const rm = e.target.closest('[data-rm]');
+    if (!rm) return;
+    rm.closest('.pos').classList.add('leaving');
+    setTimeout(() => { list.splice(Number(rm.dataset.rm), 1); draw(); }, 200);
+  });
+  $('#add').addEventListener('click', () => {
+    list.push({ id: DB.uid(), name: '', preis: 0, einheit: 'pauschal', art: 'arbeit' });
+    draw();
+    $('#items .pos:last-child input').focus();
+  });
+  $('#save').addEventListener('click', async () => {
+    S.leistungen = list.filter((l) => l.name.trim()).map((l) => ({ ...l, name: l.name.trim(), einheit: l.einheit.trim() || 'pauschal' }));
+    await DB.put('settings', S);
+    toast('✓ Leistungen gespeichert');
+    history.back();
+  });
 });
 
 async function exportBackup() {
