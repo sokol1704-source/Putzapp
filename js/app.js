@@ -122,6 +122,7 @@ const blobToDataUrl = (blob) => new Promise((res, rej) => {
 const DEFAULT_SETTINGS = {
   id: 'main',
   firma: 'Toths Reinigungsservice',
+  slogan: 'Sauber · Zuverlässig · Persönlich',
   inhaber: '',
   strasse: '',
   plzOrt: '',
@@ -228,15 +229,34 @@ const routes = [];
 const route = (pattern, fn) => routes.push([new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), fn]);
 
 let navDirection = 'forward';
+const TABS = [
+  { name: 'start', hash: '#/', label: 'Start', icon: '🏠' },
+  { name: 'kunden', hash: '#/kunden', label: 'Kunden', icon: '👥' },
+  { name: 'termine', hash: '#/termine', label: 'Termine', icon: '📅' },
+  { name: 'einsaetze', hash: '#/einsaetze', label: 'Einsätze', icon: '🧽' },
+  { name: 'rechnungen', hash: '#/rechnungen', label: 'Rechnungen', icon: '🧾' },
+];
+let currentTab = -1; // Index des Tabs, wenn eine Hauptseite angezeigt wird, sonst -1
+const vibrate = (ms = 10) => navigator.vibrate?.(ms);
 const ANIMATED = '.card, .stat, .section, .quick, .seg, .empty, .form > label, .form > .grid2, .form > .grid3, .form > .tasks, .form > .btn, .doc-wrap';
 
 function render(title, html, { tab = '', back = true } = {}) {
   const view = $('#view');
-  $('#title').textContent = title;
+  const titleEl = $('#title');
+  if (titleEl.textContent !== title) {
+    titleEl.textContent = title;
+    titleEl.classList.remove('swap');
+    void titleEl.offsetWidth;
+    titleEl.classList.add('swap');
+  }
   $('#backBtn').hidden = !back;
+  $('#brandLogo').hidden = back;
   $$('#tabbar a').forEach((a) => a.classList.toggle('active', a.dataset.tab === tab));
+  currentTab = back ? -1 : TABS.findIndex((t) => t.name === tab);
+  moveTabIndicator(TABS.findIndex((t) => t.name === tab));
   view.innerHTML = html;
-  view.classList.remove('enter-forward', 'enter-back', 'enter-tab');
+  view.style.transform = view.style.opacity = view.style.transition = '';
+  view.classList.remove('enter-forward', 'enter-back', 'enter-tab', 'enter-next', 'enter-prev');
   void view.offsetWidth; // Animation neu starten
   view.classList.add(`enter-${navDirection}`);
   navDirection = 'forward';
@@ -1122,7 +1142,7 @@ route('/rechnung/neu', async (_, q) => {
       monat,
       kundeId: k.id,
       kunde: { name: k.name, strasse: k.strasse, plzOrt: k.plzOrt, privat: !!k.privat },
-      absender: Object.fromEntries(['firma', 'inhaber', 'strasse', 'plzOrt', 'telefon', 'email', 'steuernummer', 'bank', 'iban', 'bic'].map((key) => [key, S[key]])),
+      absender: Object.fromEntries(['firma', 'slogan', 'inhaber', 'strasse', 'plzOrt', 'telefon', 'email', 'steuernummer', 'bank', 'iban', 'bic'].map((key) => [key, S[key]])),
       positionen,
       summe: positionen.reduce((s, p) => s + p.betrag, 0),
       arbeitskosten: positionen.filter((p) => p.art !== 'material').reduce((s, p) => s + p.betrag, 0),
@@ -1149,12 +1169,19 @@ function invoiceDoc(inv) {
   const von = inv.positionen.map((p) => p.datum).sort()[0];
   const bis = inv.positionen.map((p) => p.datumBis || p.datum).sort().pop();
   const zeitraum = von === bis ? fmtDate(von) : `${fmtDate(von)} – ${fmtDate(bis)}`;
+  const [first, ...rest] = (a.firma || '').split(' ');
+  const slogan = a.slogan ?? S.slogan;
   return `<article class="invoice-doc ${inv.status === 'storniert' ? 'cancelled' : ''}">
     <header class="inv-head">
-      <div class="inv-brand">${esc(a.firma)}</div>
+      <img class="inv-logo" src="icons/icon.svg" alt="">
+      <div class="inv-brandbox">
+        <div class="inv-brand"><b>${esc(first)}</b> ${esc(rest.join(' '))}</div>
+        ${slogan ? `<div class="inv-slogan">${esc(slogan)}</div>` : ''}
+      </div>
       <div class="inv-contact">${esc(a.inhaber)}<br>${esc(a.strasse)}<br>${esc(a.plzOrt)}
         ${a.telefon ? `<br>Tel. ${esc(a.telefon)}` : ''}${a.email ? `<br>${esc(a.email)}` : ''}</div>
     </header>
+    <div class="inv-accent"></div>
     <div class="inv-row">
       <div class="inv-recipient">
         <div class="inv-sender">${esc([a.firma, a.inhaber, a.strasse, a.plzOrt].filter(Boolean).join(' · '))}</div>
@@ -1167,7 +1194,7 @@ function invoiceDoc(inv) {
         <tr><td>Steuernummer</td><td>${esc(a.steuernummer)}</td></tr>
       </table>
     </div>
-    <h2 class="inv-title">Rechnung${inv.status === 'storniert' ? ' – STORNIERT' : ''}</h2>
+    <h2 class="inv-title">${inv.monat ? `Monatsrechnung <span>${esc(monthLabel(inv.monat))}</span>` : 'Rechnung'}${inv.status === 'storniert' ? ' – STORNIERT' : ''}</h2>
     <p>Für die erbrachten Leistungen stelle ich Ihnen folgende Beträge in Rechnung:</p>
     <table class="inv-items">
       <thead><tr><th>Pos.</th><th>Datum</th><th>Leistung</th><th class="r">Menge</th><th class="r">Einzelpreis</th><th class="r">Betrag</th></tr></thead>
@@ -1175,7 +1202,7 @@ function invoiceDoc(inv) {
         <td>${i + 1}</td><td class="nowrap">${fmtDate(p.datum)}${p.datumBis && p.datumBis !== p.datum ? `&nbsp;–<br>${fmtDate(p.datumBis)}` : ''}</td><td>${nl2br(p.beschreibung)}</td>
         <td class="r">${fmtNum(p.menge)} ${esc(p.einheit)}</td><td class="r">${money(p.preis)}</td><td class="r">${money(p.betrag)}</td></tr>`).join('')}
       </tbody>
-      <tfoot><tr><td colspan="5" class="r"><b>Gesamtbetrag</b></td><td class="r"><b>${money(inv.summe)}</b></td></tr></tfoot>
+      <tfoot><tr><td colspan="4"></td><td class="r inv-total-label">Gesamtbetrag</td><td class="r inv-total">${money(inv.summe)}</td></tr></tfoot>
     </table>
     <p class="inv-note">Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung).</p>
     ${k.privat ? `<p class="inv-note">Im Rechnungsbetrag sind Arbeits- und Fahrtkosten in Höhe von <b>${money(inv.arbeitskosten)}</b> enthalten (haushaltsnahe Dienstleistung, § 35a EStG). Die Steuerermäßigung setzt eine Zahlung per Überweisung voraus.</p>
@@ -1218,7 +1245,9 @@ route('/rechnung/:id', async ({ id }) => {
   $('#paid')?.addEventListener('click', async () => {
     Object.assign(inv, { status: 'bezahlt', bezahltAm: today() });
     await DB.put('invoices', inv);
-    toast('✓ Als bezahlt markiert');
+    confetti();
+    vibrate([15, 60, 15]);
+    toast('🎉 Bezahlt – sehr gut!');
     router();
   });
   $('#unpaid')?.addEventListener('click', async () => {
@@ -1248,6 +1277,7 @@ route('/einstellungen', async () => {
     <form id="f" class="form">
       <h3 class="section">Firma (erscheint auf Rechnungen)</h3>
       ${field('firma', 'Firmenname *', 'required')}
+      ${field('slogan', 'Slogan (unter dem Namen auf der Rechnung)')}
       ${field('inhaber', 'Inhaber/in (Vor- und Nachname) *')}
       ${field('strasse', 'Straße & Hausnr. *')}
       ${field('plzOrt', 'PLZ & Ort *')}
@@ -1296,13 +1326,13 @@ route('/einstellungen', async () => {
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
     </div>`}
-    <p class="muted small center">Toths Reinigungsservice · Version 1.2</p>
+    <p class="muted small center">Toths Reinigungsservice · Version 1.3</p>
   `);
 
   $('#f').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    for (const key of ['firma', 'inhaber', 'strasse', 'plzOrt', 'telefon', 'email', 'steuernummer', 'bank', 'iban', 'bic', 'nrPrefix']) S[key] = fd.get(key).trim();
+    for (const key of ['firma', 'slogan', 'inhaber', 'strasse', 'plzOrt', 'telefon', 'email', 'steuernummer', 'bank', 'iban', 'bic', 'nrPrefix']) S[key] = fd.get(key).trim();
     S.iban = S.iban.toUpperCase();
     S.stundensatz = Math.round(num(fd.get('stundensatz')) * 100);
     S.abrechnung = fd.get('abrechnung');
@@ -1402,7 +1432,151 @@ $('#backBtn').addEventListener('click', () => {
   if (history.length > 1) history.back();
   else go('#/');
 });
-$('#tabbar').addEventListener('click', (e) => { if (e.target.closest('a')) navDirection = 'tab'; });
+$('#tabbar').addEventListener('click', (e) => {
+  const a = e.target.closest('a');
+  if (!a) return;
+  const i = TABS.findIndex((t) => t.name === a.dataset.tab);
+  const from = TABS.findIndex((t) => t.name === $('#tabbar a.active')?.dataset.tab);
+  navDirection = from < 0 || i === from ? 'tab' : i > from ? 'next' : 'prev';
+});
+
+/* ---------- Tab-Markierung & Wischgesten ---------- */
+const tabIndicator = document.createElement('div');
+tabIndicator.className = 'tab-indicator';
+$('#tabbar').appendChild(tabIndicator);
+
+function moveTabIndicator(index, offset = 0) {
+  tabIndicator.style.opacity = index < 0 ? 0 : 1;
+  if (index >= 0) tabIndicator.style.transform = `translateX(${(index + offset) * 100}%)`;
+}
+
+// Hinweise am Rand: zeigen beim Wischen, welcher Tab links/rechts kommt
+const swipeHints = ['left', 'right'].map((side) => {
+  const el = document.createElement('div');
+  el.className = `swipe-hint ${side}`;
+  document.body.appendChild(el);
+  return el;
+});
+
+(function setupSwipe() {
+  const view = $('#view');
+  const THRESHOLD = 90;
+  let startX = 0;
+  let startY = 0;
+  let dx = 0;
+  let tracking = false;
+  let decided = false;
+  let target = null;
+  let ready = false;
+
+  const targetFor = (dir) => {
+    if (currentTab >= 0) {
+      const t = TABS[currentTab + (dir < 0 ? 1 : -1)];
+      return t ? { ...t, dir: dir < 0 ? 'next' : 'prev' } : null;
+    }
+    return dir > 0 ? { label: 'Zurück', icon: '‹', dir: 'back', back: true } : null;
+  };
+  const resetHints = () => swipeHints.forEach((h) => { h.classList.remove('show', 'ready'); h.style.transform = ''; });
+
+  view.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1 || $('.lightbox')) return;
+    if (e.target.closest('input, textarea, select, .doc-wrap, .thumbs')) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+    decided = false;
+    dx = 0;
+  }, { passive: true });
+
+  view.addEventListener('touchmove', (e) => {
+    if (!tracking) return;
+    const x = e.touches[0].clientX - startX;
+    const y = e.touches[0].clientY - startY;
+    if (!decided) {
+      if (Math.abs(x) < 12 && Math.abs(y) < 12) return;
+      decided = true;
+      if (Math.abs(x) < Math.abs(y) * 1.4) { tracking = false; return; }
+      target = targetFor(x);
+    }
+    if (Math.sign(x) !== Math.sign(dx || x)) target = targetFor(x);
+    dx = target ? x : x / 4; // ohne Ziel nur mit Widerstand bewegen
+    const progress = Math.min(Math.abs(dx) / THRESHOLD, 1);
+    view.style.transition = 'none';
+    view.style.transform = `translateX(${dx * 0.6}px)`;
+    view.style.opacity = 1 - progress * 0.25;
+    if (currentTab >= 0) moveTabIndicator(currentTab, target ? -dx / window.innerWidth : 0);
+    const hint = swipeHints[dx > 0 ? 0 : 1];
+    swipeHints[dx > 0 ? 1 : 0].classList.remove('show', 'ready');
+    if (target) {
+      hint.innerHTML = `<span class="ico">${target.icon}</span><span>${esc(target.label)}</span>`;
+      hint.classList.add('show');
+      hint.style.transform = `translateY(-50%) translateX(${(dx > 0 ? -1 : 1) * (1 - progress) * 110}%)`;
+      if (progress >= 1 && !ready) vibrate(8);
+      ready = progress >= 1;
+      hint.classList.toggle('ready', ready);
+    }
+  }, { passive: true });
+
+  const end = () => {
+    if (!tracking) return;
+    tracking = false;
+    if (decided && target && Math.abs(dx) >= THRESHOLD) {
+      const t = target;
+      view.style.transition = 'transform .16s ease-in, opacity .16s ease-in';
+      view.style.transform = `translateX(${dx > 0 ? 40 : -40}%)`;
+      view.style.opacity = 0;
+      setTimeout(() => {
+        resetHints();
+        navDirection = t.dir;
+        if (t.back) history.length > 1 ? history.back() : go('#/');
+        else go(t.hash);
+      }, 140);
+    } else {
+      view.style.transition = 'transform .3s cubic-bezier(.2, .8, .2, 1), opacity .3s';
+      view.style.transform = '';
+      view.style.opacity = '';
+      if (currentTab >= 0) moveTabIndicator(currentTab);
+      resetHints();
+    }
+    ready = false;
+    target = null;
+  };
+  view.addEventListener('touchend', end);
+  view.addEventListener('touchcancel', end);
+})();
+
+/* ---------- Wellen-Effekt beim Tippen ---------- */
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('.btn, .stat, .card.link, .tabbar a');
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const size = Math.max(r.width, r.height) * 2;
+  const ripple = document.createElement('span');
+  ripple.className = 'ripple';
+  ripple.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
+  el.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 600);
+});
+
+/* ---------- Konfetti, wenn eine Rechnung bezahlt ist ---------- */
+function confetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#14b8a6', '#0f766e', '#fcd34d', '#f472b6', '#60a5fa', '#ffffff'];
+  for (let i = 0; i < 70; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.background = colors[i % colors.length];
+    c.style.left = `${50 + (Math.random() - 0.5) * 20}vw`;
+    document.body.appendChild(c);
+    const angle = (Math.random() - 0.5) * Math.PI * 0.9;
+    const power = 300 + Math.random() * 350;
+    c.animate([
+      { transform: 'translate(0, 0) rotate(0)', opacity: 1 },
+      { transform: `translate(${Math.sin(angle) * power}px, ${-Math.cos(angle) * power * 0.9}px) rotate(${Math.random() * 720}deg)`, opacity: 1, offset: 0.45 },
+      { transform: `translate(${Math.sin(angle) * power * 1.3}px, ${window.innerHeight * 0.6}px) rotate(${Math.random() * 1440}deg)`, opacity: 0 },
+    ], { duration: 1600 + Math.random() * 900, easing: 'cubic-bezier(.2, .6, .4, 1)' }).onfinish = () => c.remove();
+  }
+}
 window.addEventListener('hashchange', router);
 
 (async () => {

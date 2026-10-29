@@ -1,4 +1,4 @@
-// Erzeugt App-Icons und Splash-Screens für Android aus icons/icon.svg
+// Erzeugt App-Icons (Web + Android) und Splash-Screens aus icons/icon.svg
 // Aufruf: node scripts/android-icons.js   (benötigt playwright)
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -6,8 +6,12 @@ const path = require('path');
 
 const res = path.join(__dirname, '..', 'android/app/src/main/res');
 const svg = fs.readFileSync(path.join(__dirname, '..', 'icons/icon.svg'), 'utf8');
-// Nur das Motiv (ohne grünen Hintergrund) für das adaptive Icon
-const glyph = svg.replace(/<rect[^>]*\/>/, '');
+// Eckiges Icon (Android/iOS runden selbst ab)
+const square = svg.replace('rx="112"', 'rx="0"');
+// Adaptives Icon: Hintergrund randlos, Motiv etwas kleiner in der sicheren Zone
+const bgGroup = square.match(/<g id="bg">[\s\S]*?<\/g>/)[0];
+const adaptive = square.replace(bgGroup, '§BG§').replace(/(<\/defs>)([\s\S]*)(<\/svg>)/, (m, a, body, z) =>
+  `${a}${body.replace('§BG§', '§BG§<g transform="translate(64 64) scale(.75)">')}</g>${z}`).replace('§BG§', bgGroup);
 const dens = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
 
 (async () => {
@@ -19,15 +23,17 @@ const dens = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
       .c{width:100%;height:100%;display:flex;align-items:center;justify-content:center}</style>${html}`);
     await page.screenshot({ path: file, omitBackground: true });
   };
+  for (const size of [192, 512]) {
+    await shot(path.join(__dirname, '..', `icons/icon-${size}.png`), size, size, square.replace('<svg', `<svg width="${size}" height="${size}"`));
+  }
   for (const [d, f] of Object.entries(dens)) {
     const dir = path.join(res, `mipmap-${d}`);
     const s = Math.round(48 * f);
     await shot(path.join(dir, 'ic_launcher.png'), s, s, `<div class="c">${svg.replace('<svg', `<svg width="${s}" height="${s}"`)}</div>`);
     await shot(path.join(dir, 'ic_launcher_round.png'), s, s,
-      `<div class="c" style="border-radius:50%;overflow:hidden">${svg.replace('rx="96"', 'rx="0"').replace('<svg', `<svg width="${s}" height="${s}"`)}</div>`);
+      `<div class="c" style="border-radius:50%;overflow:hidden">${square.replace('<svg', `<svg width="${s}" height="${s}"`)}</div>`);
     const fg = Math.round(108 * f);
-    const inner = Math.round(fg * 0.62);
-    await shot(path.join(dir, 'ic_launcher_foreground.png'), fg, fg, `<div class="c">${glyph.replace('<svg', `<svg width="${inner}" height="${inner}"`)}</div>`);
+    await shot(path.join(dir, 'ic_launcher_foreground.png'), fg, fg, `<div class="c">${adaptive.replace('<svg', `<svg width="${fg}" height="${fg}"`)}</div>`);
   }
   // Splash-Screens: Markenfarbe mit Logo und Namen
   for (const dir of fs.readdirSync(res).filter((n) => n.startsWith('drawable'))) {
@@ -37,7 +43,7 @@ const dens = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
     const w = buf.readUInt32BE(16);
     const h = buf.readUInt32BE(20);
     const logo = Math.round(Math.min(w, h) * 0.3);
-    await shot(file, w, h, `<div class="c" style="background:#0f766e;flex-direction:column;gap:${logo * 0.15}px;font-family:sans-serif;color:#fff">
+    await shot(file, w, h, `<div class="c" style="background:linear-gradient(160deg,#14b8a6,#0f766e 45%,#134e4a);flex-direction:column;gap:${logo * 0.15}px;font-family:sans-serif;color:#fff">
       ${svg.replace('<svg', `<svg width="${logo}" height="${logo}"`)}
       <div style="font-size:${logo * 0.16}px;font-weight:600">Toths Reinigungsservice</div></div>`);
   }
