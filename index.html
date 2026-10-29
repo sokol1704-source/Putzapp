@@ -24,17 +24,26 @@
 
   <main id="view" class="view"></main>
 
+  <button class="timer-pill" id="timerPill" hidden aria-label="Zeitmessung beenden"></button>
+
   <nav class="tabbar" id="tabbar">
     <a href="#/" data-tab="start"><span class="ico">🏠</span>Start</a>
-    <a href="#/kunden" data-tab="kunden"><span class="ico">👥</span>Kunden</a>
+    <a href="#/objekte" data-tab="objekte"><span class="ico">🏢</span>Häuser</a>
     <a href="#/termine" data-tab="termine"><span class="ico">📅</span>Termine</a>
-    <a href="#/einsaetze" data-tab="einsaetze"><span class="ico">🧽</span>Einsätze</a>
     <a href="#/rechnungen" data-tab="rechnungen"><span class="ico">🧾</span>Rechnungen</a>
+    <a href="#/mehr" data-tab="mehr"><span class="ico">✨</span>Mehr</a>
   </nav>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="js/db.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/v-start.js"></script>
+  <script src="js/v-objekte.js"></script>
+  <script src="js/v-einsaetze.js"></script>
+  <script src="js/v-rechnungen.js"></script>
+  <script src="js/v-berichte.js"></script>
+  <script src="js/v-einstellungen.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

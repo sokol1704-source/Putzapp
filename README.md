@@ -4,21 +4,23 @@ Web-App (PWA) für das Kleingewerbe *Toths Reinigungsservice*. Läuft auf Androi
 
 ## Funktionen
 
-- **Kunden** – Kontaktdaten, Privat-/Geschäftskunde, Reinigungsintervall, Stundensatz, Standard-Aufgaben, Notizen (Schlüssel, Zugang …)
-- **Einsätze** – Datum, Uhrzeit/Stunden, Checkliste „was wurde gereinigt“, Notiz, **Vorher-/Nachher-Fotos** (direkt mit der Kamera)
-- **Zusatzleistungen** – Katalog mit Preisen (Müll rausbringen, Mülltonnen, Fenster, Bügeln …), beim Einsatz abhaken, wird automatisch zusätzlich zur Pauschale/zu den Stunden berechnet; Katalog unter *Einstellungen → Leistungen & Preise* änderbar
-- **Reinigungsplan** – pro Kunde Rhythmus (z. B. alle 2 Wochen, dienstags 9 Uhr) und für jede Aufgabe, wie oft sie anfällt (jedes Mal, alle 4 Wochen, alle 3 Monate …). Die App erstellt daraus den Plan, verteilt große Aufgaben gleichmäßig, trägt ihn als Termine ein und kann ihn per WhatsApp an den Kunden schicken
-- **Termine** – geplante Reinigungen mit Aufgaben; nächste Fälligkeit wird automatisch aus dem Intervall berechnet; Export in den Handy-Kalender (.ics)
-- **Startseite** – überfällig / heute / nächste 7 Tage, nicht abgerechnete Einsätze, offene Rechnungen
-- **Rechnungen** für Kleinunternehmer (§ 19 UStG):
-  - Abrechnung je Kunde als **Monatspauschale** (Standard 250 €, mit Auflistung der Einsätze im Monat) oder **nach Stunden**; die Startseite erinnert an fällige Monatsrechnungen
-  - Pflichtangaben nach § 14 UStG: Name & Anschrift beider Parteien, Steuernummer, Rechnungsdatum, fortlaufende Rechnungsnummer (`RE-2026-001`), Leistungsdatum, Menge & Art der Leistung, Entgelt
-  - Hinweis „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet“
-  - Für Privatkunden: Ausweis der Arbeits- und Fahrtkosten nach § 35a EStG (haushaltsnahe Dienstleistung) und Aufbewahrungshinweis
-  - Drucken bzw. „Als PDF sichern“, Status offen/bezahlt/storniert, Umsatzanzeige gegenüber der Kleinunternehmergrenze
-- **Datensicherung** – Export/Import aller Daten inkl. Fotos als Datei
+Gemacht für die **Treppenhaus- und Objektreinigung in Mehrfamilienhäusern**.
 
-> Alle Daten liegen **nur auf dem Handy** (kein Server, keine Cloud). Bitte regelmäßig unter *Einstellungen → Sicherung erstellen* sichern. Rechnungen müssen 10 Jahre aufbewahrt werden. Das ist keine Steuerberatung: Die Rechnungsvorlage bitte einmal vom Steuerbüro oder Finanzamt prüfen lassen.
+- **Auftraggeber & Häuser** – Hausverwaltungen/Eigentümer mit beliebig vielen Häusern (Etagen, Eingänge, Aufzug, Zugang/Schlüssel, Ansprechpartner vor Ort)
+- **Reinigungsplan** pro Haus – Rhythmus, Wochentag, Uhrzeit und für jede Aufgabe, wie oft sie anfällt (jedes Mal, alle 4 Wochen, alle 3 Monate …). Große Aufgaben werden gleichmäßig verteilt, der Plan wird als Termine eingetragen oder per WhatsApp verschickt
+- **Tagestour** – alle Häuser des Tages mit Zugangscode, Navigation und ganzer Route in Google Maps
+- **Stoppuhr** – beim Ankommen „Start“, beim Gehen „Fertig“: Zeiten landen automatisch im Einsatz; pro Haus wird der tatsächliche Stundenlohn angezeigt
+- **Einsätze** – erledigte Arbeiten, Zusatzleistungen, Vorher-/Nachher-Fotos
+- **Mängelmeldung** – Foto + Beschreibung direkt per WhatsApp/E-Mail an die Hausverwaltung, offene Mängel pro Haus
+- **Winterdienst** – Räum- und Streuprotokoll mit Uhrzeit, Wetter, Flächen, Streumittel und Fotos; Abrechnung pro Einsatz oder in der Pauschale
+- **Leistungsnachweis** pro Haus und Monat (mit Fotos, Winterdienst und Mängeln) und **Aushang** fürs Treppenhaus mit den nächsten Terminen
+- **Angebote** – Preisrechner (Etagen × Rhythmus + Extras, mit Marktvergleich), Angebot als PDF; bei Annahme werden Auftraggeber und Haus automatisch angelegt
+- **Rechnungen** für Kleinunternehmer (§ 19 UStG) – Monatspauschale oder Stunden, Zusatzleistungen und Winterdienst automatisch, Sammelrechnung für mehrere Häuser, Pflichtangaben nach § 14 UStG, Arbeitskostenanteil nach § 35a EStG (für die Betriebskostenabrechnung), Zahlungserinnerung
+- **Datensicherung** – Export/Import aller Daten inkl. Fotos, Erinnerung auf der Startseite
+
+> Alle Daten liegen **nur auf dem Handy** (kein Server, keine Cloud). Bitte regelmäßig unter *Einstellungen → Sicherung erstellen* sichern. Rechnungen müssen 10 Jahre aufbewahrt werden. Das ist keine Steuer- oder Rechtsberatung: Vorlagen bitte einmal vom Steuerbüro prüfen lassen.
+
+Daten aus Version 1.x werden beim ersten Start automatisch übernommen (jeder frühere Kunde wird zu Auftraggeber + Haus).
 
 ## Installation auf dem Handy
 
@@ -61,4 +63,4 @@ python3 -m http.server 8000
 
 ## Technik
 
-Reines HTML/CSS/JavaScript ohne Build-Schritt. Daten in IndexedDB (`js/db.js`), Oberfläche und Logik in `js/app.js`, Offline-Cache in `sw.js`. Nach Änderungen an Dateien die Cache-Version in `sw.js` erhöhen.
+Reines HTML/CSS/JavaScript ohne Build-Schritt. Daten in IndexedDB (`js/db.js`), gemeinsame Bausteine und Plan-Logik in `js/core.js`, die Seiten in `js/v-*.js`, Start, Gesten und Datenübernahme in `js/main.js`, Offline-Cache in `sw.js`. Nach Änderungen an Dateien die Cache-Version in `sw.js` erhöhen.

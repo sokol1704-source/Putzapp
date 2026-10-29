@@ -1,14 +1,19 @@
 // Kleiner Wrapper um IndexedDB. Alle Daten bleiben lokal auf dem Gerät.
 const DB = (() => {
   const NAME = 'toths-reinigung';
-  const VERSION = 1;
+  const VERSION = 2;
+  // Tabelle → Indizes. Fotos gehören über "visitId" zu einem Einsatz, Mangel oder Winterdienst-Eintrag.
   const STORES = {
     customers: [],
-    visits: ['kundeId'],
+    objects: ['kundeId'],
+    visits: ['kundeId', 'objektId'],
     photos: ['visitId'],
-    appointments: ['kundeId'],
+    appointments: ['kundeId', 'objektId'],
     invoices: ['kundeId'],
     settings: [],
+    maengel: ['objektId'],
+    winter: ['objektId'],
+    angebote: [],
   };
   let dbPromise;
 
@@ -19,22 +24,16 @@ const DB = (() => {
       req.onupgradeneeded = () => {
         const db = req.result;
         for (const [name, indexes] of Object.entries(STORES)) {
-          if (db.objectStoreNames.contains(name)) continue;
-          const store = db.createObjectStore(name, { keyPath: 'id' });
-          indexes.forEach((i) => store.createIndex(i, i));
+          const store = db.objectStoreNames.contains(name)
+            ? req.transaction.objectStore(name)
+            : db.createObjectStore(name, { keyPath: 'id' });
+          indexes.filter((i) => !store.indexNames.contains(i)).forEach((i) => store.createIndex(i, i));
         }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
     return dbPromise;
-  }
-
-  function wrap(req) {
-    return new Promise((resolve, reject) => {
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
   }
 
   async function tx(store, mode, fn) {
@@ -64,6 +63,5 @@ const DB = (() => {
     del: (store, id) => tx(store, 'readwrite', (s) => s.delete(id)),
     by: (store, index, value) => tx(store, 'readonly', (s) => s.index(index).getAll(value)),
     clear: (store) => tx(store, 'readwrite', (s) => s.clear()),
-    wrap,
   };
 })();

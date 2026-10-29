@@ -1,0 +1,138 @@
+'use strict';
+
+/* ---------- Start ---------- */
+route('/', async () => {
+  const data = await loadAll();
+  const plan = planning(data);
+  const t = today();
+  const week = addDays(t, 7);
+  const overdue = plan.filter((p) => p.datum < t);
+  const heute = plan.filter((p) => p.datum === t);
+  const woche = plan.filter((p) => p.datum > t && p.datum <= week);
+  const spaeter = plan.filter((p) => p.datum > week).slice(0, 3);
+  const unbilled = data.visits.filter((v) => !v.rechnungId).length;
+  const offen = data.invoices.filter((i) => i.status === 'offen');
+  const offenSumme = offen.reduce((s, i) => s + i.summe, 0);
+  const maengelOffen = data.maengel.filter((m) => m.status !== 'erledigt').length;
+  const umsatzMonat = data.invoices.filter((i) => i.status !== 'storniert' && i.datum.startsWith(t.slice(0, 7))).reduce((s, i) => s + i.summe, 0);
+
+  // Auftraggeber mit nicht abgerechneten Einsätzen im Vormonat → Monatsrechnung fällig
+  const pm = prevMonth();
+  const dueCustomers = data.customers.filter((c) => data.visits.some((v) => v.kundeId === c.id && !v.rechnungId && v.datum.startsWith(pm))
+    || data.winter.some((w) => data.omap[w.objektId]?.kundeId === c.id && !w.rechnungId && w.datum.startsWith(pm) && data.omap[w.objektId]?.winterAbrechnung === 'einsatz'));
+
+  const backupDue = data.visits.length > 0 && (!S.letzteSicherung || daysBetween(S.letzteSicherung, t) > 7);
+  const hour = new Date().getHours();
+  const greet = hour < 11 ? 'Guten Morgen' : hour < 17 ? 'Hallo' : 'Guten Abend';
+  const firstName = (S.inhaber || '').split(' ')[0];
+  const todayCount = heute.length + overdue.length;
+  const section = (title, items) => (items.length ? `<h3 class="section">${title}</h3>${items.map((i) => planCard(i, data)).join('')}` : '');
+
+  render(S.firma, `
+    <div class="hero">
+      <div class="hero-bubbles"><span></span><span></span><span></span><span></span></div>
+      <div class="hero-date">${new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+      <div class="hero-title">${greet}${firstName ? `, ${esc(firstName)}` : ''} 👋</div>
+      <div class="hero-sub">${todayCount ? `Heute stehen <b>${todayCount} ${todayCount === 1 ? 'Haus' : 'Häuser'}</b> an${overdue.length ? ` (davon ${overdue.length} überfällig)` : ''}.` : 'Heute ist nichts geplant – Zeit für Büroarbeit ☕'}</div>
+      <div class="row gap mt">
+        <a class="btn light" href="#/tour">🚐 Tour heute</a>
+        <a class="btn glass" href="#/einsatz/neu">🧽 Einsatz erfassen</a>
+      </div>
+    </div>
+    ${backupDue ? `<a class="card hint" href="#/einstellungen">💾 <b>Zeit für eine Datensicherung!</b> ${S.letzteSicherung ? `Die letzte ist vom ${fmtDate(S.letzteSicherung)}.` : 'Du hast noch keine erstellt.'} Alle Daten liegen nur auf diesem Handy.</a>` : ''}
+    ${settingsComplete() ? '' : `<a class="card hint" href="#/einstellungen">⚠️ <b>Firmendaten fehlen.</b> Für korrekte Rechnungen bitte Name, Anschrift und Steuernummer eintragen.</a>`}
+    <div class="qa">
+      <a href="#/mangel/neu"><span>⚠️</span>Mangel melden</a>
+      <a href="#/winter/neu"><span>❄️</span>Winterdienst</a>
+      <a href="#/objekt/neu"><span>🏢</span>Neues Haus</a>
+      <a href="#/angebot/neu"><span>📝</span>Angebot</a>
+    </div>
+    <div class="stats">
+      <a class="stat" href="#/einsaetze?filter=offen"><b data-count="${unbilled}">${unbilled}</b><span>Einsätze nicht abgerechnet</span></a>
+      <a class="stat" href="#/rechnungen?filter=offen"><b data-count="${offenSumme}" data-money>${money(offenSumme)}</b><span>${offen.length} offene Rechnung${offen.length === 1 ? '' : 'en'}</span></a>
+      <a class="stat" href="#/maengel"><b data-count="${maengelOffen}">${maengelOffen}</b><span>offene Mängel</span></a>
+      <a class="stat" href="#/rechnungen"><b data-count="${umsatzMonat}" data-money>${money(umsatzMonat)}</b><span>Umsatz ${new Date().toLocaleDateString('de-DE', { month: 'long' })}</span></a>
+    </div>
+    ${dueCustomers.length ? `<h3 class="section">🧾 Rechnungen für ${esc(monthLabel(pm))}</h3>
+      ${dueCustomers.map((c) => `<div class="card plan">
+        <div class="row between"><a class="strong" href="#/kunde/${c.id}">👥 ${esc(c.name)}</a><span class="badge warn">fällig</span></div>
+        <div class="row gap mt"><a class="btn small" href="#/rechnung/neu?kunde=${c.id}&monat=${pm}">Rechnung erstellen</a></div>
+      </div>`).join('')}` : ''}
+    ${section('⚠️ Überfällig', overdue)}
+    ${section('📍 Heute', heute)}
+    ${section('🗓️ Nächste 7 Tage', woche)}
+    ${section('Später', spaeter)}
+    ${plan.length ? '' : `<div class="empty">
+      <p>Noch keine anstehenden Reinigungen.</p>
+      <p class="muted small">Lege Häuser mit Reinigungsplan an – dann siehst du hier, wann du wo putzen musst.</p>
+      <a class="btn" href="#/objekt/neu">+ Erstes Haus anlegen</a>
+    </div>`}
+  `, { tab: 'start', back: false });
+});
+
+/* ---------- Mehr ---------- */
+route('/mehr', async () => {
+  const data = await loadAll();
+  const maengelOffen = data.maengel.filter((m) => m.status !== 'erledigt').length;
+  const season = seasonOf(today());
+  const winterCount = data.winter.filter((w) => seasonOf(w.datum) === season).length;
+  const angeboteOffen = data.angebote.filter((a) => a.status === 'offen').length;
+  const unbilled = data.visits.filter((v) => !v.rechnungId).length;
+  const tile = (href, icon, title, sub, badge = '') => `<a class="tile" href="${href}">
+    <span class="tile-icon">${icon}</span><b>${title}</b><span class="muted small">${sub}</span>${badge ? `<span class="tile-badge">${badge}</span>` : ''}</a>`;
+  render('Mehr', `
+    <div class="tiles">
+      ${tile('#/kunden', '👥', 'Auftraggeber', `${data.customers.length} Hausverwaltungen & Eigentümer`)}
+      ${tile('#/einsaetze', '🧽', 'Einsätze', `${data.visits.length} erfasst`, unbilled || '')}
+      ${tile('#/maengel', '⚠️', 'Mängel', 'Schäden melden & verfolgen', maengelOffen || '')}
+      ${tile('#/winter', '❄️', 'Winterdienst', `Saison ${season}: ${winterCount} Einsätze`)}
+      ${tile('#/nachweise', '📄', 'Leistungsnachweise', 'Monatsberichte für Verwaltungen')}
+      ${tile('#/angebote', '📝', 'Angebote', 'Preise berechnen & anbieten', angeboteOffen || '')}
+      ${tile('#/tour', '🚐', 'Tagestour', 'Alle Häuser von heute')}
+      ${tile('#/leistungen', '💶', 'Leistungen & Preise', `${S.leistungen.length} Zusatzleistungen`)}
+      ${tile('#/einstellungen', '⚙️', 'Einstellungen', 'Firma, Rechnungen, Sicherung')}
+    </div>
+  `, { tab: 'mehr', back: false });
+});
+
+/* ---------- Tagestour ---------- */
+route('/tour', async (_, q) => {
+  const data = await loadAll();
+  const datum = q.datum || today();
+  const items = planning(data)
+    .filter((p) => p.datum === datum || (datum === today() && p.datum < datum))
+    .sort((a, b) => (a.uhrzeit || '99').localeCompare(b.uhrzeit || '99'));
+  const done = (oid) => data.visits.some((v) => v.objektId === oid && v.datum === datum);
+  const stops = items.map((it) => ({ it, o: data.omap[it.objektId] })).filter((s) => s.o);
+  const addrs = stops.map((s) => objAddress(s.o)).filter(Boolean);
+  const routeUrl = addrs.length
+    ? `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(addrs[addrs.length - 1])}${addrs.length > 1 ? `&waypoints=${encodeURIComponent(addrs.slice(0, -1).join('|'))}` : ''}`
+    : '';
+  const doneCount = stops.filter((s) => done(s.o.id)).length;
+
+  render('Tagestour', `
+    <div class="card tour-head">
+      <div class="row between">
+        <a class="icon-btn" href="#/tour?datum=${addDays(datum, -1)}" aria-label="Vorheriger Tag">‹</a>
+        <div class="center"><b>${datum === today() ? 'Heute' : fmtDateLong(datum)}</b><div class="muted small">${stops.length} ${stops.length === 1 ? 'Haus' : 'Häuser'} · ${doneCount} erledigt</div></div>
+        <a class="icon-btn" href="#/tour?datum=${addDays(datum, 1)}" aria-label="Nächster Tag">›</a>
+      </div>
+      ${stops.length ? `<div class="bar"><div style="width:${(doneCount / stops.length) * 100}%"></div></div>` : ''}
+      ${routeUrl ? `<a class="btn block" href="${routeUrl}" target="_blank" rel="noopener">🧭 Ganze Route in Google Maps</a>` : ''}
+    </div>
+    <div class="timeline">
+      ${stops.map(({ it, o }, i) => `<div class="card plan-entry tour-stop ${done(o.id) ? 'done' : ''}">
+        <div class="row between"><b>${i + 1}. ${esc(objLabel(o))}</b>${done(o.id) ? '<span class="badge ok">✓ erledigt</span>' : it.uhrzeit ? `<span class="badge">${esc(it.uhrzeit)} Uhr</span>` : ''}</div>
+        <div class="muted small">${esc(objAddress(o))}${it.datum < datum ? ` · <span class="danger-text">${esc(whenLabel(it.datum))}</span>` : ''}</div>
+        ${o.zugang ? `<div class="small">🔑 ${esc(o.zugang)}</div>` : ''}
+        ${o.vorOrtName || o.vorOrtTelefon ? `<div class="small">👤 ${esc(o.vorOrtName || 'Ansprechpartner')}${o.vorOrtTelefon ? ` · <a href="tel:${esc(o.vorOrtTelefon.replace(/\s/g, ''))}">${esc(o.vorOrtTelefon)}</a>` : ''}</div>` : ''}
+        ${taskSummary(o, it.aufgaben)}
+        ${done(o.id) ? '' : `<div class="row gap mt">
+          ${objAddress(o) ? `<a class="btn small ghost" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(objAddress(o))}" target="_blank" rel="noopener">🧭 Hinfahren</a>` : ''}
+          <button class="btn small" data-start="${o.id}" data-termin="${it.type === 'termin' ? it.id : ''}">▶️ Start</button>
+          <a class="btn small ghost" href="#/einsatz/neu?objekt=${o.id}${it.type === 'termin' ? `&termin=${it.id}` : ''}">✓ Erledigt</a>
+        </div>`}
+      </div>`).join('') || '<div class="empty">Für diesen Tag ist nichts geplant.</div>'}
+    </div>
+  `);
+});
