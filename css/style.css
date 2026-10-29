@@ -392,3 +392,36 @@ details[open] > :not(summary) { animation: rise .3s ease both; }
 
 /* Nichts darf seitlich überstehen (Konfetti, Wischen), sonst zoomt das Handy die Seite */
 html, body { overflow-x: clip; }
+
+/* ---------- Reinigungsplan ---------- */
+.plan-tasks .task { gap: 6px; padding: 6px 4px 6px 8px; }
+.plan-tasks .t-text { flex: 1; min-width: 0; margin: 0; border-color: transparent; background: transparent; padding: 8px 6px; }
+.plan-tasks .t-text:focus { background: var(--card); border-color: var(--border); }
+.plan-tasks .t-freq, .plan-tasks .t-newfreq { width: auto; max-width: 42%; margin: 0; padding: 8px 6px; font-size: 14px; }
+.plan-tasks .t-new { flex: 1; min-width: 0; margin: 0; }
+.plan-tasks .task.periodic { background: linear-gradient(90deg, rgba(252, 211, 77, .18), transparent 70%); }
+.plan-tasks .task.periodic .t-freq { border-color: #f5c451; color: #92400e; font-weight: 600; }
+
+.chips, .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 16px; align-items: center; }
+.chips .muted { width: 100%; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px;
+  border: 1px dashed var(--brand); background: transparent; color: var(--brand); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: transform .15s ease, background-color .2s;
+}
+.chip span { font-weight: 400; opacity: .75; font-size: 12px; }
+.chip:active { transform: scale(.94); background: var(--brand-soft); }
+.chips .chip { animation: pop .3s ease both; }
+.chip.static { border-style: solid; border-color: transparent; background: var(--brand-soft); cursor: default; margin: 2px 4px 2px 0; }
+.chip.static.hot { background: #fef3c7; color: #92400e; }
+@media (prefers-color-scheme: dark) { .chip.static.hot { background: #422c06; color: #fcd34d; } }
+
+.timeline { position: relative; padding-left: 18px; }
+.timeline::before { content: ''; position: absolute; left: 5px; top: 8px; bottom: 8px; width: 2px; border-radius: 2px; background: linear-gradient(var(--brand), var(--border)); }
+.plan-entry { position: relative; }
+.plan-entry::before {
+  content: ''; position: absolute; left: -18px; top: 18px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--card); border: 3px solid var(--brand);
+}
+.plan-entry.big::before { background: #fcd34d; border-color: #f59e0b; }
+.plan-entry.big { border-color: #f5c451; }

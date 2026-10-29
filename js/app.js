@@ -72,6 +72,17 @@ async function shareFiles(files, title) {
   return true;
 }
 
+async function shareText(text, title) {
+  try {
+    if (NATIVE) return await native('Share', 'share', { title, text, dialogTitle: title });
+    if (navigator.share) return await navigator.share({ title, text });
+    await navigator.clipboard.writeText(text);
+    toast('Plan in die Zwischenablage kopiert');
+  } catch (e) {
+    if (!/cancel|abort/i.test(`${e.name} ${e.message}`)) toast('Teilen fehlgeschlagen: ' + e.message);
+  }
+}
+
 async function saveFile(blob, name) {
   if (!(await shareFiles([{ blob, name }], name))) download(blob, name);
 }
@@ -178,6 +189,89 @@ function lastVisit(visits, kundeId) {
   return visits.filter((v) => v.kundeId === kundeId).sort((a, b) => b.datum.localeCompare(a.datum))[0];
 }
 
+/* ---------- Reinigungsplan ---------- */
+const FREQS = [[0, 'jedes Mal'], [14, 'alle 2 Wochen'], [28, 'alle 4 Wochen'], [56, 'alle 2 Monate'], [91, 'alle 3 Monate'], [182, 'alle 6 Monate'], [365, 'einmal im Jahr']];
+const freqLabel = (d) => FREQS.find(([v]) => v === Number(d))?.[1] ?? `alle ${d} Tage`;
+const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+// Typische Aufgaben mit üblicher Häufigkeit (Vorschläge im Plan-Editor)
+const TASK_SUGGESTIONS = [
+  ['Böden saugen & wischen', 0], ['Bad reinigen', 0], ['Küche reinigen', 0], ['Staub wischen', 0], ['Müll rausbringen', 0],
+  ['Betten neu beziehen', 14], ['Kühlschrank auswischen', 28], ['Heizkörper & Fußleisten abwischen', 28],
+  ['Bad gründlich (Fugen, Entkalken)', 28], ['Backofen reinigen', 56], ['Fenster putzen', 91], ['Schränke auswischen', 91],
+  ['Dunstabzugshaube & Filter', 91], ['Gardinen waschen', 182], ['Lampen & Leuchten reinigen', 182], ['Matratzen absaugen', 182],
+];
+
+// Aufgaben eines Kunden als [{ text, alleTage, start }], auch aus dem alten Format (nur Text)
+const taskList = (c) => (c?.aufgaben || []).map((t) => (typeof t === 'string' ? { text: t, alleTage: 0 } : t));
+const planStep = (c) => (c.intervallTage > 0 ? c.intervallTage : 14);
+
+function snapWeekday(datum, wochentag) {
+  if (wochentag === '' || wochentag == null) return datum;
+  return addDays(datum, (Number(wochentag) - parseISO(datum).getDay() + 7) % 7);
+}
+
+// Termine im Rhythmus des Kunden, jeweils auf den Wunsch-Wochentag geschoben
+function planDates(c, from, count) {
+  const dates = [];
+  let d = snapWeekday(from, c.wochentag);
+  for (let i = 0; i < count; i++) {
+    dates.push(d);
+    d = snapWeekday(addDays(d, planStep(c)), c.wochentag);
+  }
+  return dates;
+}
+
+// Nächster Termin laut Rhythmus: letzter Einsatz + Intervall, frühestens heute
+function nextPlanStart(c, visits) {
+  const last = lastVisit(visits, c.id);
+  const base = last ? addDays(last.datum, planStep(c)) : today();
+  return base < today() ? today() : base;
+}
+
+function rhythmLabel(c) {
+  if (!(c.intervallTage > 0)) return 'kein fester Rhythmus';
+  const every = { 7: 'jede Woche', 14: 'alle 2 Wochen', 21: 'alle 3 Wochen', 28: 'alle 4 Wochen' }[c.intervallTage] || `alle ${c.intervallTage} Tage`;
+  const day = c.wochentag !== '' && c.wochentag != null ? ` · ${WEEKDAYS[c.wochentag].slice(0, 2)}.` : '';
+  return every + day + (c.uhrzeit ? ` · ${c.uhrzeit} Uhr` : '');
+}
+
+function lastDone(c, visits) {
+  const last = {};
+  for (const v of visits) {
+    if (v.kundeId !== c.id) continue;
+    for (const t of v.aufgaben || []) if (t.erledigt && !(last[t.text] >= v.datum)) last[t.text] = v.datum;
+  }
+  return last;
+}
+
+// Für jeden Termin die fälligen Aufgaben bestimmen. Eine Aufgabe ist fällig, wenn seit dem
+// letzten Erledigen ihr Abstand (mit halbem Termin-Intervall Spielraum) vergangen ist.
+function buildPlan(c, visits, dates) {
+  const tol = Math.floor(planStep(c) / 2);
+  const last = lastDone(c, visits);
+  const tasks = taskList(c);
+  for (const t of tasks) if (t.alleTage > 0 && !last[t.text] && t.start) last[t.text] = addDays(t.start, -t.alleTage);
+  return dates.map((datum) => {
+    const due = tasks.filter((t) => !(t.alleTage > 0) || !last[t.text] || daysBetween(last[t.text], datum) >= t.alleTage - tol);
+    due.forEach((t) => { last[t.text] = datum; });
+    return { datum, aufgaben: due };
+  });
+}
+const dueTasks = (c, visits, datum) => (c ? buildPlan(c, visits, [datum])[0].aufgaben.map((t) => t.text) : []);
+
+// Große Aufgaben, die noch nie erledigt wurden, gleichmäßig auf die ersten Termine verteilen
+function assignStarts(c, visits, oldTasks) {
+  const last = lastDone(c, visits);
+  const dates = planDates(c, nextPlanStart(c, visits), 30);
+  let k = 0;
+  for (const t of c.aufgaben) {
+    if (!(t.alleTage > 0) || last[t.text]) continue;
+    const old = oldTasks.find((o) => o.text === t.text);
+    if (old?.start && Number(old.alleTage) === Number(t.alleTage)) { t.start = old.start; continue; }
+    t.start = dates[k++ % Math.max(1, Math.round(t.alleTage / planStep(c)))];
+  }
+}
+
 // Offene Termine + automatisch berechnete Fälligkeiten aus dem Reinigungsintervall
 function planning({ customers, visits, appointments }) {
   const items = appointments
@@ -188,7 +282,8 @@ function planning({ customers, visits, appointments }) {
     if (items.some((i) => i.kundeId === c.id)) continue;
     const last = lastVisit(visits, c.id);
     if (!last) continue;
-    items.push({ type: 'faellig', datum: addDays(last.datum, c.intervallTage), kundeId: c.id, aufgaben: c.aufgaben || [] });
+    const datum = snapWeekday(addDays(last.datum, c.intervallTage), c.wochentag);
+    items.push({ type: 'faellig', datum, uhrzeit: c.uhrzeit, kundeId: c.id, aufgaben: dueTasks(c, visits, datum) });
   }
   return items.sort((a, b) => (a.datum + (a.uhrzeit || '')).localeCompare(b.datum + (b.uhrzeit || '')));
 }
@@ -378,9 +473,55 @@ route('/kunden', async (_, q) => {
 route('/kunde/neu', () => customerForm(null));
 route('/kunde/:id/bearbeiten', async ({ id }) => customerForm(await DB.get('customers', id)));
 
+// Aufgaben mit Häufigkeit bearbeiten, dazu Vorschläge zum Antippen
+function planTaskEditor(el, suggestEl, tasks) {
+  const freqSelect = (val, attrs) => `<select ${attrs}>${FREQS.map(([v, l]) => `<option value="${v}" ${Number(val) === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+  const draw = (fresh = -1) => {
+    el.innerHTML = tasks.map((t, i) => `<li class="task ${i === fresh ? 'new' : ''} ${t.alleTage > 0 ? 'periodic' : ''}">
+      <input class="t-text" data-i="${i}" value="${esc(t.text)}" aria-label="Aufgabe">
+      ${freqSelect(t.alleTage, `class="t-freq" data-i="${i}" aria-label="Wie oft"`)}
+      <button type="button" class="icon-btn" data-del="${i}" aria-label="Entfernen">✕</button></li>`).join('')
+      + `<li class="task add"><input class="t-new" placeholder="Neue Aufgabe…" enterkeyhint="done">${freqSelect(0, 'class="t-newfreq" aria-label="Wie oft"')}<button type="button" class="btn small" data-add>+</button></li>`;
+    const free = TASK_SUGGESTIONS.filter(([text]) => !tasks.some((t) => t.text === text));
+    suggestEl.innerHTML = free.length ? `<div class="muted small">Vorschläge antippen:</div>${free.map(([text, d]) => `<button type="button" class="chip" data-s="${TASK_SUGGESTIONS.findIndex(([x]) => x === text)}">+ ${esc(text)} <span>${freqLabel(d)}</span></button>`).join('')}` : '';
+  };
+  const add = () => {
+    const text = $('.t-new', el).value.trim();
+    if (!text) return;
+    tasks.push({ text, alleTage: Number($('.t-newfreq', el).value) });
+    draw(tasks.length - 1);
+    $('.t-new', el).focus();
+  };
+  el.addEventListener('input', (e) => { if (e.target.classList.contains('t-text')) tasks[e.target.dataset.i].text = e.target.value; });
+  el.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('t-freq')) return;
+    tasks[e.target.dataset.i].alleTage = Number(e.target.value);
+    e.target.closest('.task').classList.toggle('periodic', Number(e.target.value) > 0);
+  });
+  el.addEventListener('click', (e) => {
+    const d = e.target.closest('[data-del]');
+    if (d) {
+      d.closest('.task').classList.add('leaving');
+      setTimeout(() => { tasks.splice(Number(d.dataset.del), 1); draw(); }, 200);
+    }
+    if (e.target.closest('[data-add]')) add();
+  });
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.classList.contains('t-new')) { e.preventDefault(); add(); } });
+  suggestEl.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-s]');
+    if (!chip) return;
+    const [text, alleTage] = TASK_SUGGESTIONS[chip.dataset.s];
+    tasks.push({ text, alleTage });
+    draw(tasks.length - 1);
+  });
+  draw();
+}
+
 function customerForm(c) {
   const isNew = !c;
-  c = c || { name: '', strasse: '', plzOrt: '', telefon: '', email: '', privat: true, aktiv: true, intervallTage: 14, abrechnung: S.abrechnung, monatspauschale: S.monatspauschale, stundensatz: S.stundensatz, aufgaben: ['Böden saugen & wischen', 'Bad reinigen', 'Küche reinigen', 'Staub wischen'], notizen: '' };
+  c = c || { name: '', strasse: '', plzOrt: '', telefon: '', email: '', privat: true, aktiv: true, intervallTage: 14, wochentag: '', uhrzeit: '', abrechnung: S.abrechnung, monatspauschale: S.monatspauschale, stundensatz: S.stundensatz, aufgaben: TASK_SUGGESTIONS.slice(0, 4).map(([text, alleTage]) => ({ text, alleTage })), notizen: '' };
+  const oldTasks = taskList(c);
+  const tasks = oldTasks.map((t) => ({ ...t }));
   render(isNew ? 'Neuer Kunde' : 'Kunde bearbeiten', `
     <form id="f" class="form">
       <label>Name / Firma *<input name="name" required value="${esc(c.name)}" autocomplete="off"></label>
@@ -392,27 +533,36 @@ function customerForm(c) {
       </div>
       <label class="check"><input type="checkbox" name="privat" ${c.privat ? 'checked' : ''}> Privatkunde (Rechnung mit Hinweis nach § 35a EStG)</label>
       <div class="grid2">
-        <label>Reinigungsintervall
-          <select name="intervallTage">
-            ${[[0, 'kein festes Intervall'], [7, 'wöchentlich'], [14, 'alle 2 Wochen'], [21, 'alle 3 Wochen'], [28, 'alle 4 Wochen'], [30, 'monatlich (30 Tage)']]
-              .map(([v, l]) => `<option value="${v}" ${Number(c.intervallTage) === v ? 'selected' : ''}>${l}</option>`).join('')}
-            ${[0, 7, 14, 21, 28, 30].includes(Number(c.intervallTage)) ? '' : `<option value="${c.intervallTage}" selected>alle ${c.intervallTage} Tage</option>`}
-          </select>
-        </label>
         <label>Abrechnung
           <select name="abrechnung">
             <option value="monat" ${isMonthly(c) ? 'selected' : ''}>Monatspauschale</option>
             <option value="stunde" ${isMonthly(c) ? '' : 'selected'}>Nach Stunden</option>
           </select>
         </label>
-      </div>
-      <div class="grid2">
         <label id="pauschaleField" ${isMonthly(c) ? '' : 'hidden'}>Monatspauschale (€)<input name="monatspauschale" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(c.monatspauschale)}"></label>
-        <label>Stundensatz (€)<input name="stundensatz" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(c.stundensatz)}"></label>
       </div>
-      <label>Standard-Aufgaben <span class="muted small">(eine pro Zeile)</span>
-        <textarea name="aufgaben" rows="5">${esc((c.aufgaben || []).join('\n'))}</textarea>
-      </label>
+      <label>Stundensatz (€) <span class="muted small">(für Stunden- und Extra-Arbeiten)</span><input name="stundensatz" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(c.stundensatz)}"></label>
+
+      <h3 class="section">🗓️ Reinigungsplan</h3>
+      <div class="grid3">
+        <label>Wie oft?
+          <select name="intervallTage">
+            ${[[0, 'kein fester Rhythmus'], [7, 'jede Woche'], [14, 'alle 2 Wochen'], [21, 'alle 3 Wochen'], [28, 'alle 4 Wochen']]
+              .map(([v, l]) => `<option value="${v}" ${Number(c.intervallTage) === v ? 'selected' : ''}>${l}</option>`).join('')}
+            ${[0, 7, 14, 21, 28].includes(Number(c.intervallTage)) ? '' : `<option value="${c.intervallTage}" selected>alle ${c.intervallTage} Tage</option>`}
+          </select>
+        </label>
+        <label>Wochentag
+          <select name="wochentag">
+            <option value="">egal</option>
+            ${[1, 2, 3, 4, 5, 6, 0].map((d) => `<option value="${d}" ${String(c.wochentag) === String(d) ? 'selected' : ''}>${WEEKDAYS[d]}</option>`).join('')}
+          </select>
+        </label>
+        <label>Uhrzeit<input type="time" name="uhrzeit" value="${esc(c.uhrzeit || '')}"></label>
+      </div>
+      <div class="label">Aufgaben & wie oft</div>
+      <ul class="tasks plan-tasks" id="planTasks"></ul>
+      <div class="chips" id="suggest"></div>
       <label>Notizen <span class="muted small">(Schlüssel, Zugang, Besonderheiten…)</span>
         <textarea name="notizen" rows="3">${esc(c.notizen)}</textarea>
       </label>
@@ -422,6 +572,7 @@ function customerForm(c) {
     </form>
   `);
   $('#f [name=abrechnung]').addEventListener('change', (e) => { $('#pauschaleField').hidden = e.target.value !== 'monat'; });
+  planTaskEditor($('#planTasks'), $('#suggest'), tasks);
   $('#f').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -434,12 +585,15 @@ function customerForm(c) {
       privat: fd.has('privat'),
       aktiv: fd.has('aktiv'),
       intervallTage: Number(fd.get('intervallTage')) || 0,
+      wochentag: fd.get('wochentag'),
+      uhrzeit: fd.get('uhrzeit'),
       abrechnung: fd.get('abrechnung'),
       monatspauschale: Math.round(num(fd.get('monatspauschale')) * 100),
       stundensatz: Math.round(num(fd.get('stundensatz')) * 100),
-      aufgaben: fd.get('aufgaben').split('\n').map((s) => s.trim()).filter(Boolean),
+      aufgaben: tasks.filter((t) => t.text.trim()).map((t) => ({ text: t.text.trim(), alleTage: Number(t.alleTage) || 0 })),
       notizen: fd.get('notizen').trim(),
     });
+    assignStarts(c, isNew ? [] : await DB.by('visits', 'kundeId', c.id), oldTasks);
     await DB.put('customers', c);
     toast('✓ Kunde gespeichert');
     go(`#/kunde/${c.id}`, true);
@@ -464,15 +618,18 @@ route('/kunde/:id', async ({ id }) => {
   const visits = data.visits.filter((v) => v.kundeId === id).sort((a, b) => b.datum.localeCompare(a.datum));
   const invoices = data.invoices.filter((i) => i.kundeId === id).sort((a, b) => b.nummer.localeCompare(a.nummer));
   const addr = [c.strasse, c.plzOrt].filter(Boolean).join(', ');
-  const intervall = c.intervallTage > 0 ? `alle ${c.intervallTage} Tage` : 'kein festes Intervall';
+  const tl = taskList(c);
+  const regular = tl.filter((t) => !(t.alleTage > 0)).map((t) => t.text);
+  const periodic = tl.filter((t) => t.alleTage > 0);
 
   render(c.name, `
     <div class="card">
       ${addr ? `<div>📍 <a href="https://maps.google.com/?q=${encodeURIComponent(addr)}" target="_blank" rel="noopener">${esc(addr)}</a></div>` : ''}
       ${c.telefon ? `<div>📞 <a href="tel:${esc(c.telefon.replace(/\s/g, ''))}">${esc(c.telefon)}</a></div>` : ''}
       ${c.email ? `<div>✉️ <a href="mailto:${esc(c.email)}">${esc(c.email)}</a></div>` : ''}
-      <div class="muted small mt">${c.privat ? 'Privatkunde' : 'Geschäftskunde'} · ${esc(intervall)} · ${priceLabel(c)}</div>
-      ${c.aufgaben?.length ? `<div class="small mt"><b>Aufgaben:</b> ${esc(c.aufgaben.join(' · '))}</div>` : ''}
+      <div class="muted small mt">${c.privat ? 'Privatkunde' : 'Geschäftskunde'} · ${esc(rhythmLabel(c))} · ${priceLabel(c)}</div>
+      ${regular.length ? `<div class="small mt"><b>Jedes Mal:</b> ${esc(regular.join(' · '))}</div>` : ''}
+      ${periodic.length ? `<div class="small mt">${periodic.map((t) => `<span class="chip static">✨ ${esc(t.text)} <span>${freqLabel(t.alleTage)}</span></span>`).join('')}</div>` : ''}
       ${c.notizen ? `<div class="small mt">📝 ${nl2br(c.notizen)}</div>` : ''}
       <a class="btn small ghost mt" href="#/kunde/${id}/bearbeiten">Bearbeiten</a>
     </div>
@@ -480,6 +637,7 @@ route('/kunde/:id', async ({ id }) => {
       <a class="btn" href="#/einsatz/neu?kunde=${id}">🧽 Einsatz</a>
       <a class="btn ghost" href="#/termin/neu?kunde=${id}">📅 Termin</a>
       <a class="btn ghost" href="#/rechnung/neu?kunde=${id}">🧾 Rechnung</a>
+      <a class="btn ghost" href="#/kunde/${id}/plan">🗓️ Reinigungsplan</a>
     </div>
     <h3 class="section">Anstehend</h3>
     ${plan.map((p) => planCard(p, data.kmap)).join('') || '<div class="empty small">Nichts geplant.</div>'}
@@ -488,6 +646,71 @@ route('/kunde/:id', async ({ id }) => {
     <h3 class="section">Rechnungen (${invoices.length})</h3>
     ${invoices.map((i) => invoiceCard(i)).join('') || '<div class="empty small">Noch keine Rechnungen.</div>'}
   `);
+});
+
+route('/kunde/:id/plan', async ({ id }, q) => {
+  const [c, visits, appts] = await Promise.all([DB.get('customers', id), DB.all('visits'), DB.by('appointments', 'kundeId', id)]);
+  if (!c) return go('#/kunden', true);
+  const monate = Number(q.monate) || 3;
+  if (!(c.intervallTage > 0)) {
+    return render('Reinigungsplan', `<div class="card hint"><p><b>Für ${esc(c.name)} ist noch kein Rhythmus festgelegt.</b></p>
+      <p class="small">Lege beim Kunden fest, wie oft (z. B. alle 2 Wochen), an welchem Wochentag und welche Aufgaben wie oft anfallen – dann erstelle ich daraus den Plan.</p>
+      <a class="btn" href="#/kunde/${id}/bearbeiten">Plan einrichten</a></div>`);
+  }
+  const start = nextPlanStart(c, visits);
+  const end = addDays(start, Math.round(monate * 30.4));
+  const dates = planDates(c, start, 200).filter((d) => d <= end);
+  const entries = buildPlan(c, visits, dates);
+  const manual = appts.filter((a) => !a.erledigt && !a.ausPlan);
+  const counts = {};
+  entries.forEach((e) => e.aufgaben.forEach((t) => { if (t.alleTage > 0) counts[t.text] = (counts[t.text] || 0) + 1; }));
+
+  render('Reinigungsplan', `
+    <div class="card">
+      <div class="row between"><b>${esc(c.name)}</b><a class="small" href="#/kunde/${id}/bearbeiten">Plan ändern</a></div>
+      <div class="muted small">${esc(rhythmLabel(c))} · ${dates.length} Termine bis ${fmtDate(end)}</div>
+      ${Object.keys(counts).length ? `<div class="small mt">${Object.entries(counts).map(([t, n]) => `<span class="chip static">✨ ${esc(t)} <span>${n}×</span></span>`).join('')}</div>` : ''}
+    </div>
+    <div class="seg">${[1, 3, 6, 12].map((m) => `<a href="#/kunde/${id}/plan?monate=${m}" class="${m === monate ? 'active' : ''}">${m} ${m === 1 ? 'Monat' : 'Monate'}</a>`).join('')}</div>
+    <div class="timeline mt">
+      ${entries.map((e) => {
+        const reg = e.aufgaben.filter((t) => !(t.alleTage > 0));
+        const per = e.aufgaben.filter((t) => t.alleTage > 0);
+        const clash = manual.find((a) => Math.abs(daysBetween(a.datum, e.datum)) < 3);
+        return `<div class="card plan-entry ${per.length ? 'big' : ''}">
+          <div class="row between"><b>${fmtDateLong(e.datum)}</b>${c.uhrzeit ? `<span class="badge">${esc(c.uhrzeit)} Uhr</span>` : ''}</div>
+          ${reg.length ? `<div class="muted small">${esc(reg.map((t) => t.text).join(' · '))}</div>` : ''}
+          ${per.length ? `<div class="mt">${per.map((t) => `<span class="chip static hot">✨ ${esc(t.text)}</span>`).join('')}</div>` : ''}
+          ${clash ? `<div class="small muted mt">ℹ️ Eigener Termin am ${fmtDate(clash.datum)} vorhanden – wird nicht doppelt eingetragen.</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+    <button class="btn block" id="create">📅 Plan als Termine eintragen</button>
+    <button class="btn ghost block" id="share">💬 Plan an Kunden schicken</button>
+    <p class="muted small">Bereits aus dem Plan eingetragene Termine werden beim erneuten Eintragen ersetzt. Selbst angelegte Termine bleiben unverändert.</p>
+  `);
+
+  $('#create').addEventListener('click', async () => {
+    if (!confirm(`${entries.length} Termine bis ${fmtDate(end)} für ${c.name} eintragen?`)) return;
+    for (const a of appts) if (a.ausPlan && !a.erledigt) await DB.del('appointments', a.id);
+    let n = 0;
+    for (const e of entries) {
+      if (manual.some((a) => Math.abs(daysBetween(a.datum, e.datum)) < 3)) continue;
+      await DB.put('appointments', { kundeId: id, datum: e.datum, uhrzeit: c.uhrzeit || '', aufgaben: e.aufgaben.map((t) => t.text), notiz: '', erledigt: false, ausPlan: true });
+      n++;
+    }
+    vibrate(15);
+    toast(`✓ ${n} Termine eingetragen`);
+    navDirection = 'tab';
+    go('#/termine');
+  });
+  $('#share').addEventListener('click', () => {
+    const text = [`Reinigungsplan ${S.firma}`, `für ${c.name}`, '', ...entries.map((e) => {
+      const per = e.aufgaben.filter((t) => t.alleTage > 0).map((t) => t.text);
+      return `• ${fmtDateLong(e.datum)}${c.uhrzeit ? `, ${c.uhrzeit} Uhr` : ''}${per.length ? ` – zusätzlich: ${per.join(', ')}` : ''}`;
+    }), '', `Viele Grüße${S.inhaber ? `\n${S.inhaber}` : ''}`].join('\n');
+    shareText(text, 'Reinigungsplan');
+  });
 });
 
 /* ---------- Termine ---------- */
@@ -515,7 +738,12 @@ async function appointmentForm(a, q) {
   if (!customers.length) return noCustomers();
   const isNew = !a;
   const kmap = Object.fromEntries(customers.map((c) => [c.id, c]));
-  a = a || { kundeId: q.kunde || '', datum: q.datum || addDays(today(), 1), uhrzeit: '', aufgaben: [...(kmap[q.kunde]?.aufgaben || [])], notiz: '', erledigt: false };
+  const visits = await DB.all('visits');
+  if (!a) {
+    const k = kmap[q.kunde];
+    const datum = q.datum || (k ? snapWeekday(nextPlanStart(k, visits), k.wochentag) : addDays(today(), 1));
+    a = { kundeId: q.kunde || '', datum, uhrzeit: k?.uhrzeit || '', aufgaben: dueTasks(k, visits, datum), notiz: '', erledigt: false };
+  }
   const tasks = a.aufgaben.map((text) => ({ text }));
 
   render(isNew ? 'Termin planen' : 'Termin', `
@@ -537,7 +765,9 @@ async function appointmentForm(a, q) {
   `);
   const editor = taskEditor($('#tasks'), tasks, false);
   $('#f [name=kundeId]').addEventListener('change', (e) => {
-    editor.set((kmap[e.target.value]?.aufgaben || []).map((text) => ({ text })));
+    const k = kmap[e.target.value];
+    if (k?.uhrzeit && !$('#f [name=uhrzeit]').value) $('#f [name=uhrzeit]').value = k.uhrzeit;
+    editor.set(dueTasks(k, visits, $('#f [name=datum]').value || today()).map((text) => ({ text })));
   });
   $('#f').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -668,9 +898,10 @@ async function visitForm(v, q) {
   const kmap = Object.fromEntries(customers.map((c) => [c.id, c]));
   const isNew = !v;
   const termin = q.termin ? await DB.get('appointments', q.termin) : null;
+  const allVisits = await DB.all('visits');
   if (isNew) {
     const kundeId = q.kunde || termin?.kundeId || '';
-    const vorlage = termin?.aufgaben || kmap[kundeId]?.aufgaben || [];
+    const vorlage = termin?.aufgaben || dueTasks(kmap[kundeId], allVisits, today());
     v = { id: DB.uid(), kundeId, datum: today(), von: termin?.uhrzeit || '', bis: '', stunden: '', aufgaben: vorlage.map((text) => ({ text, erledigt: true })), notiz: '', rechnungId: null };
   }
   const tasks = v.aufgaben.map((t) => ({ ...t }));
@@ -705,7 +936,7 @@ async function visitForm(v, q) {
 
   const f = $('#f');
   f.kundeId.addEventListener('change', (e) => {
-    if (!termin) editor.set((kmap[e.target.value]?.aufgaben || []).map((text) => ({ text, erledigt: true })));
+    if (!termin) editor.set(dueTasks(kmap[e.target.value], allVisits, f.datum.value || today()).map((text) => ({ text, erledigt: true })));
   });
   const calcHours = () => {
     if (!f.von.value || !f.bis.value) return;
@@ -745,9 +976,9 @@ async function visitForm(v, q) {
     const k = kmap[v.kundeId];
     if (isNew && k?.intervallTage > 0) {
       const openAppts = (await DB.by('appointments', 'kundeId', k.id)).filter((a) => !a.erledigt);
-      const nextDate = addDays(v.datum, k.intervallTage);
+      const nextDate = snapWeekday(addDays(v.datum, k.intervallTage), k.wochentag);
       if (!openAppts.length && confirm(`Nächste Reinigung bei ${k.name} am ${fmtDateLong(nextDate)} als Termin eintragen?`)) {
-        await DB.put('appointments', { kundeId: k.id, datum: nextDate, uhrzeit: v.von || '', aufgaben: [...(k.aufgaben || [])], notiz: '', erledigt: false });
+        await DB.put('appointments', { kundeId: k.id, datum: nextDate, uhrzeit: k.uhrzeit || v.von || '', aufgaben: dueTasks(k, await DB.all('visits'), nextDate), notiz: '', erledigt: false });
       }
     }
     toast('✓ Einsatz gespeichert');
@@ -1326,7 +1557,7 @@ route('/einstellungen', async () => {
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
     </div>`}
-    <p class="muted small center">Toths Reinigungsservice · Version 1.3</p>
+    <p class="muted small center">Toths Reinigungsservice · Version 1.4</p>
   `);
 
   $('#f').addEventListener('submit', async (e) => {
