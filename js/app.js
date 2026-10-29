@@ -42,6 +42,35 @@ function download(blob, name) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
+// In der Android-App (Capacitor) laufen Drucken und Teilen über native Plugins
+const NATIVE = !!window.Capacitor?.isNativePlatform?.();
+const native = (plugin, method, options) => window.Capacitor.nativePromise(plugin, method, options);
+
+// Dateien teilen (WhatsApp, E-Mail, Drive …). Gibt false zurück, wenn das Gerät kein Teilen kann.
+async function shareFiles(files, title) {
+  try {
+    if (NATIVE) {
+      const uris = [];
+      for (const f of files) {
+        const data = (await blobToDataUrl(f.blob)).split(',')[1];
+        uris.push((await native('Filesystem', 'writeFile', { path: f.name, data, directory: 'CACHE' })).uri);
+      }
+      await native('Share', 'share', { title, dialogTitle: title, files: uris });
+      return true;
+    }
+    const list = files.map((f) => new File([f.blob], f.name, { type: f.blob.type }));
+    if (!navigator.canShare?.({ files: list })) return false;
+    await navigator.share({ files: list, title });
+  } catch (e) {
+    if (!/cancel|abort/i.test(`${e.name} ${e.message}`)) toast('Teilen fehlgeschlagen: ' + e.message);
+  }
+  return true;
+}
+
+async function saveFile(blob, name) {
+  if (!(await shareFiles([{ blob, name }], name))) download(blob, name);
+}
+
 let objectUrls = [];
 function objUrl(blob) {
   const u = URL.createObjectURL(blob);
@@ -462,7 +491,7 @@ function downloadIcs(a, k) {
     `DESCRIPTION:${icsEsc([...(a.aufgaben || []), a.notiz].filter(Boolean).join('\n'))}`,
     'END:VEVENT', 'END:VCALENDAR',
   ].join('\r\n');
-  download(new Blob([ics], { type: 'text/calendar' }), `termin-${a.datum}.ics`);
+  saveFile(new Blob([ics], { type: 'text/calendar' }), `termin-${a.datum}.ics`);
 }
 
 function customerSelect(customers, selected) {
@@ -634,7 +663,8 @@ function photoEditor(el, existing, pending) {
       <div class="thumbs">
         ${existing.filter((p) => p.typ === typ).map((p) => thumb(p, 'ex')).join('')}
         ${pending.filter((p) => p.typ === typ).map((p) => thumb(p, 'pe')).join('')}
-        <label class="thumb add">📷<span>Foto</span><input type="file" accept="image/*" multiple data-typ="${typ}" hidden></label>
+        <label class="thumb add">📷<span>Kamera</span><input type="file" accept="image/*" capture="environment" data-typ="${typ}" hidden></label>
+        <label class="thumb add">🖼️<span>Galerie</span><input type="file" accept="image/*" multiple data-typ="${typ}" hidden></label>
       </div></div>`).join('');
   };
   el.addEventListener('change', async (e) => {
@@ -687,16 +717,15 @@ route('/einsatz/:id', async ({ id }) => {
     </div>
     <div class="quick">
       <a class="btn ghost" href="#/einsatz/${id}/bearbeiten">Bearbeiten</a>
-      ${photos.length && navigator.canShare ? '<button class="btn ghost" id="share">Fotos teilen</button>' : ''}
+      ${photos.length && (NATIVE || navigator.canShare) ? '<button class="btn ghost" id="share">Fotos teilen</button>' : ''}
       ${v.rechnungId ? '' : `<a class="btn ghost" href="#/rechnung/neu?kunde=${v.kundeId}">🧾 Abrechnen</a>`}
     </div>
     ${v.rechnungId ? '' : '<button class="btn danger ghost block" id="del">Einsatz löschen</button>'}
   `);
   $('#view').addEventListener('click', (e) => { const img = e.target.closest('[data-view]'); if (img) lightbox(img.src); });
   $('#share')?.addEventListener('click', async () => {
-    const files = photos.map((p, i) => new File([p.blob], `${v.datum}_${p.typ}_${i + 1}.jpg`, { type: p.blob.type || 'image/jpeg' }));
-    if (!navigator.canShare({ files })) return toast('Teilen wird auf diesem Gerät nicht unterstützt');
-    try { await navigator.share({ files, title: `Reinigung ${fmtDate(v.datum)}` }); } catch { /* abgebrochen */ }
+    const files = photos.map((p, i) => ({ blob: p.blob, name: `${v.datum}_${p.typ}_${i + 1}.jpg` }));
+    if (!(await shareFiles(files, `Reinigung ${fmtDate(v.datum)}`))) toast('Teilen wird auf diesem Gerät nicht unterstützt');
   });
   $('#del')?.addEventListener('click', async () => {
     if (!confirm('Einsatz inkl. Fotos löschen?')) return;
@@ -967,7 +996,7 @@ route('/rechnung/:id', async ({ id }) => {
         ${inv.status === 'offen' ? '<button class="btn ghost" id="paid">✓ Bezahlt</button>' : ''}
         ${inv.status === 'bezahlt' ? '<button class="btn ghost" id="unpaid">Wieder offen</button>' : ''}
       </div>
-      <p class="muted small">Tipp: Im Druckdialog „Als PDF sichern“ wählen und dann per WhatsApp oder E-Mail an den Kunden senden.</p>
+      <p class="muted small">Tipp: Im Druckdialog als Drucker „Als PDF speichern“ wählen und die PDF dann per WhatsApp oder E-Mail an den Kunden senden.</p>
     </div>
     <div class="doc-wrap">${invoiceDoc(inv)}</div>
     ${inv.status !== 'storniert' ? '<button class="btn danger ghost block no-print" id="storno">Rechnung stornieren</button>' : ''}
@@ -975,7 +1004,8 @@ route('/rechnung/:id', async ({ id }) => {
   $('#print').addEventListener('click', () => {
     const old = document.title;
     document.title = `Rechnung ${inv.nummer}`;
-    window.print();
+    if (NATIVE) native('Printer', 'print', { name: `Rechnung ${inv.nummer}` }).catch((e) => toast(e.message));
+    else window.print();
     setTimeout(() => { document.title = old; }, 1000);
   });
   $('#paid')?.addEventListener('click', async () => {
@@ -1042,11 +1072,11 @@ route('/einstellungen', async () => {
       </div>
     </div>
 
-    <h3 class="section">App auf den Startbildschirm</h3>
+    ${NATIVE ? '' : `<h3 class="section">App auf den Startbildschirm</h3>
     <div class="card small">
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
-    </div>
+    </div>`}
     <p class="muted small center">Toths Reinigungsservice · Version 1.0</p>
   `);
 
@@ -1072,11 +1102,7 @@ async function exportBackup() {
   data.photos = await Promise.all(data.photos.map(async (p) => ({ ...p, blob: await blobToDataUrl(p.blob) })));
   const name = `toths-sicherung-${today()}.json`;
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  const file = new File([blob], name, { type: 'application/json' });
-  if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
-  }
-  download(blob, name);
+  await saveFile(blob, name);
 }
 
 async function importBackup(file) {
@@ -1104,7 +1130,7 @@ window.addEventListener('hashchange', router);
   await loadSettings();
   router();
   navigator.storage?.persist?.();
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  if (!NATIVE && 'serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 })();

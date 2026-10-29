@@ -25,6 +25,30 @@ Web-App (PWA) für das Kleingewerbe *Toths Reinigungsservice*. Läuft auf Androi
    - **Android (Chrome):** Menü ⋮ → „App installieren“
 3. In der App unter ⚙️ *Einstellungen* Name, Anschrift, Steuernummer und Bankverbindung eintragen.
 
+## Android-App (APK)
+
+Die gleiche App gibt es als installierbare Android-APK (Capacitor). Unterschiede zur Browser-Version:
+Rechnungen werden über den Android-Druckdialog gedruckt bzw. „Als PDF gespeichert“, Fotos, Sicherungen
+und Kalendertermine werden über das Android-Teilen-Menü weitergegeben.
+
+**Installieren:** APK aufs Handy laden, antippen und „Installation aus unbekannten Quellen“ für den
+Browser/Dateimanager erlauben.
+
+**Selbst bauen** (Node 20+, JDK 21, Android SDK mit Plattform 35):
+
+```bash
+npm install
+# Signaturschlüssel eintragen (Datei liegt NICHT im Repository):
+# android/keystore.properties mit storeFile, storePassword, keyAlias, keyPassword
+npm run apk
+# Ergebnis: android/app/build/outputs/apk/release/app-release.apk
+```
+
+Updates müssen immer mit demselben Schlüssel signiert werden, sonst lässt sich die App nur nach dem
+Deinstallieren neu installieren, und dabei gehen die Daten auf dem Handy verloren.
+Vor jedem neuen Build `versionCode` in `android/app/build.gradle` erhöhen.
+Icons und Splash-Screens neu erzeugen: `node scripts/android-icons.js`.
+
 ## Lokal starten
 
 ```bash

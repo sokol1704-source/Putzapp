@@ -1,0 +1,8 @@
+{
+  "appId": "de.toths.reinigung",
+  "appName": "Toths Reinigung",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}
