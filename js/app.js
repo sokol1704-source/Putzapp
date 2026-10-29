@@ -19,6 +19,11 @@ const num = (v) => parseFloat(String(v ?? '').replace(',', '.')) || 0;
 const fmtNum = (n) => Number(n).toLocaleString('de-DE', { maximumFractionDigits: 2 });
 const centsInput = (c) => (c ? (c / 100).toFixed(2) : '');
 const byName = (a, b) => a.name.localeCompare(b.name, 'de');
+const monthLabel = (m) => parseISO(`${m}-01`).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+const lastOfMonth = (m) => { const [y, mo] = m.split('-').map(Number); return isoDate(new Date(y, mo, 0)); };
+const prevMonth = () => { const d = new Date(); d.setDate(0); return isoDate(d).slice(0, 7); };
+const isMonthly = (k) => k?.abrechnung === 'monat';
+const priceLabel = (k) => (isMonthly(k) ? `${money(k.monatspauschale || 0)}/Monat` : `${money(k.stundensatz || 0)}/Std.`);
 
 function toast(msg) {
   const t = $('#toast');
@@ -82,7 +87,10 @@ function lightbox(src) {
   const box = document.createElement('div');
   box.className = 'lightbox';
   box.innerHTML = `<img src="${esc(src)}" alt="Foto">`;
-  box.addEventListener('click', () => box.remove());
+  box.addEventListener('click', () => {
+    box.classList.add('closing');
+    setTimeout(() => box.remove(), 200);
+  });
   document.body.appendChild(box);
 }
 
@@ -124,6 +132,8 @@ const DEFAULT_SETTINGS = {
   iban: '',
   bic: '',
   stundensatz: 2500,
+  abrechnung: 'monat',
+  monatspauschale: 25000,
   zahlungsziel: 14,
   nrPrefix: 'RE',
   nrStart: 1,
@@ -200,11 +210,36 @@ function planCard(it, kmap) {
 const routes = [];
 const route = (pattern, fn) => routes.push([new RegExp('^' + pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)') + '$'), fn]);
 
+let navDirection = 'forward';
+const ANIMATED = '.card, .stat, .section, .quick, .seg, .empty, .form > label, .form > .grid2, .form > .grid3, .form > .tasks, .form > .btn, .doc-wrap';
+
 function render(title, html, { tab = '', back = true } = {}) {
+  const view = $('#view');
   $('#title').textContent = title;
   $('#backBtn').hidden = !back;
   $$('#tabbar a').forEach((a) => a.classList.toggle('active', a.dataset.tab === tab));
-  $('#view').innerHTML = html;
+  view.innerHTML = html;
+  view.classList.remove('enter-forward', 'enter-back', 'enter-tab');
+  void view.offsetWidth; // Animation neu starten
+  view.classList.add(`enter-${navDirection}`);
+  navDirection = 'forward';
+  $$(ANIMATED, view).forEach((el, i) => el.style.setProperty('--i', Math.min(i, 12)));
+  $$('[data-count]', view).forEach(countUp);
+}
+
+// Zahlen von 0 hochzählen lassen
+function countUp(el) {
+  const target = Number(el.dataset.count);
+  const fmt = (n) => ('money' in el.dataset ? money(Math.round(n)) : String(Math.round(n)));
+  if (!target || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const start = performance.now();
+  const step = (t) => {
+    const p = Math.min(1, (t - start) / 700);
+    el.textContent = fmt(target * (1 - (1 - p) ** 3));
+    if (p < 1) requestAnimationFrame(step);
+  };
+  el.textContent = fmt(0);
+  requestAnimationFrame(step);
 }
 
 async function router() {
@@ -241,6 +276,10 @@ route('/', async () => {
   const unbilled = data.visits.filter((v) => !v.rechnungId).length;
   const offen = data.invoices.filter((i) => i.status === 'offen');
   const offenSumme = offen.reduce((s, i) => s + i.summe, 0);
+  const pm = prevMonth();
+  const monatFaellig = data.customers.filter((c) => c.aktiv !== false && isMonthly(c)
+    && data.visits.some((v) => v.kundeId === c.id && v.datum.startsWith(pm))
+    && !data.invoices.some((i) => i.kundeId === c.id && i.monat === pm && i.status !== 'storniert'));
 
   const section = (title, items) => (items.length
     ? `<h3 class="section">${title}</h3>${items.map((i) => planCard(i, data.kmap)).join('')}` : '');
@@ -254,9 +293,14 @@ route('/', async () => {
       <a class="btn ghost" href="#/kunde/neu">👤 Kunde</a>
     </div>
     <div class="stats">
-      <a class="stat" href="#/einsaetze?filter=offen"><b>${unbilled}</b><span>nicht abgerechnet</span></a>
-      <a class="stat" href="#/rechnungen?filter=offen"><b>${money(offenSumme)}</b><span>${offen.length} offene Rechnung${offen.length === 1 ? '' : 'en'}</span></a>
+      <a class="stat" href="#/einsaetze?filter=offen"><b data-count="${unbilled}">${unbilled}</b><span>nicht abgerechnet</span></a>
+      <a class="stat" href="#/rechnungen?filter=offen"><b data-count="${offenSumme}" data-money>${money(offenSumme)}</b><span>${offen.length} offene Rechnung${offen.length === 1 ? '' : 'en'}</span></a>
     </div>
+    ${monatFaellig.length ? `<h3 class="section">🧾 Monatsrechnung ${esc(monthLabel(pm))}</h3>
+      ${monatFaellig.map((c) => `<div class="card plan">
+        <div class="row between"><a class="strong" href="#/kunde/${c.id}">${esc(c.name)}</a><span class="badge">${money(c.monatspauschale || 0)}</span></div>
+        <div class="row gap mt"><a class="btn small" href="#/rechnung/neu?kunde=${c.id}&monat=${pm}">Rechnung erstellen</a></div>
+      </div>`).join('')}` : ''}
     ${section('⚠️ Überfällig', overdue)}
     ${section('Heute', heute)}
     ${section('Nächste 7 Tage', woche)}
@@ -299,7 +343,7 @@ route('/kunde/:id/bearbeiten', async ({ id }) => customerForm(await DB.get('cust
 
 function customerForm(c) {
   const isNew = !c;
-  c = c || { name: '', strasse: '', plzOrt: '', telefon: '', email: '', privat: true, aktiv: true, intervallTage: 14, stundensatz: S.stundensatz, aufgaben: ['Böden saugen & wischen', 'Bad reinigen', 'Küche reinigen', 'Staub wischen'], notizen: '' };
+  c = c || { name: '', strasse: '', plzOrt: '', telefon: '', email: '', privat: true, aktiv: true, intervallTage: 14, abrechnung: S.abrechnung, monatspauschale: S.monatspauschale, stundensatz: S.stundensatz, aufgaben: ['Böden saugen & wischen', 'Bad reinigen', 'Küche reinigen', 'Staub wischen'], notizen: '' };
   render(isNew ? 'Neuer Kunde' : 'Kunde bearbeiten', `
     <form id="f" class="form">
       <label>Name / Firma *<input name="name" required value="${esc(c.name)}" autocomplete="off"></label>
@@ -318,6 +362,15 @@ function customerForm(c) {
             ${[0, 7, 14, 21, 28, 30].includes(Number(c.intervallTage)) ? '' : `<option value="${c.intervallTage}" selected>alle ${c.intervallTage} Tage</option>`}
           </select>
         </label>
+        <label>Abrechnung
+          <select name="abrechnung">
+            <option value="monat" ${isMonthly(c) ? 'selected' : ''}>Monatspauschale</option>
+            <option value="stunde" ${isMonthly(c) ? '' : 'selected'}>Nach Stunden</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid2">
+        <label id="pauschaleField" ${isMonthly(c) ? '' : 'hidden'}>Monatspauschale (€)<input name="monatspauschale" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(c.monatspauschale)}"></label>
         <label>Stundensatz (€)<input name="stundensatz" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(c.stundensatz)}"></label>
       </div>
       <label>Standard-Aufgaben <span class="muted small">(eine pro Zeile)</span>
@@ -331,6 +384,7 @@ function customerForm(c) {
       ${isNew ? '' : '<button class="btn danger ghost block" type="button" id="del">Kunde löschen</button>'}
     </form>
   `);
+  $('#f [name=abrechnung]').addEventListener('change', (e) => { $('#pauschaleField').hidden = e.target.value !== 'monat'; });
   $('#f').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -343,12 +397,14 @@ function customerForm(c) {
       privat: fd.has('privat'),
       aktiv: fd.has('aktiv'),
       intervallTage: Number(fd.get('intervallTage')) || 0,
+      abrechnung: fd.get('abrechnung'),
+      monatspauschale: Math.round(num(fd.get('monatspauschale')) * 100),
       stundensatz: Math.round(num(fd.get('stundensatz')) * 100),
       aufgaben: fd.get('aufgaben').split('\n').map((s) => s.trim()).filter(Boolean),
       notizen: fd.get('notizen').trim(),
     });
     await DB.put('customers', c);
-    toast('Kunde gespeichert');
+    toast('✓ Kunde gespeichert');
     go(`#/kunde/${c.id}`, true);
   });
   $('#del')?.addEventListener('click', async () => {
@@ -378,7 +434,7 @@ route('/kunde/:id', async ({ id }) => {
       ${addr ? `<div>📍 <a href="https://maps.google.com/?q=${encodeURIComponent(addr)}" target="_blank" rel="noopener">${esc(addr)}</a></div>` : ''}
       ${c.telefon ? `<div>📞 <a href="tel:${esc(c.telefon.replace(/\s/g, ''))}">${esc(c.telefon)}</a></div>` : ''}
       ${c.email ? `<div>✉️ <a href="mailto:${esc(c.email)}">${esc(c.email)}</a></div>` : ''}
-      <div class="muted small mt">${c.privat ? 'Privatkunde' : 'Geschäftskunde'} · ${esc(intervall)} · ${money(c.stundensatz || 0)}/Std.</div>
+      <div class="muted small mt">${c.privat ? 'Privatkunde' : 'Geschäftskunde'} · ${esc(intervall)} · ${priceLabel(c)}</div>
       ${c.aufgaben?.length ? `<div class="small mt"><b>Aufgaben:</b> ${esc(c.aufgaben.join(' · '))}</div>` : ''}
       ${c.notizen ? `<div class="small mt">📝 ${nl2br(c.notizen)}</div>` : ''}
       <a class="btn small ghost mt" href="#/kunde/${id}/bearbeiten">Bearbeiten</a>
@@ -457,7 +513,7 @@ async function appointmentForm(a, q) {
       notiz: fd.get('notiz').trim(),
     });
     await DB.put('appointments', a);
-    toast('Termin gespeichert');
+    toast('✓ Termin gespeichert');
     go('#/termine', true);
   });
   $('#ics')?.addEventListener('click', () => downloadIcs(a, kmap[a.kundeId]));
@@ -507,8 +563,8 @@ function noCustomers() {
 
 // Aufgabenliste: mit Haken (erledigt) für Einsätze, ohne Haken für geplante Termine
 function taskEditor(el, tasks, withCheck = true) {
-  const draw = () => {
-    el.innerHTML = tasks.map((t, i) => `<li class="task">
+  const draw = (fresh = -1) => {
+    el.innerHTML = tasks.map((t, i) => `<li class="task ${i === fresh ? 'new' : ''}">
       <label>${withCheck ? `<input type="checkbox" data-i="${i}" ${t.erledigt ? 'checked' : ''}>` : '•'} <span>${esc(t.text)}</span></label>
       <button type="button" class="icon-btn" data-del="${i}" aria-label="Entfernen">✕</button></li>`).join('')
       + `<li class="task add"><input type="text" class="task-new" placeholder="Aufgabe hinzufügen…" enterkeyhint="done"><button type="button" class="btn small" data-add>+</button></li>`;
@@ -517,13 +573,16 @@ function taskEditor(el, tasks, withCheck = true) {
     const v = $('.task-new', el).value.trim();
     if (!v) return;
     tasks.push({ text: v, erledigt: true });
-    draw();
+    draw(tasks.length - 1);
     $('.task-new', el).focus();
   };
   el.addEventListener('change', (e) => { if (e.target.dataset.i !== undefined) tasks[e.target.dataset.i].erledigt = e.target.checked; });
   el.addEventListener('click', (e) => {
     const d = e.target.closest('[data-del]');
-    if (d) { tasks.splice(Number(d.dataset.del), 1); draw(); }
+    if (d) {
+      d.closest('.task').classList.add('leaving');
+      setTimeout(() => { tasks.splice(Number(d.dataset.del), 1); draw(); }, 200);
+    }
     if (e.target.closest('[data-add]')) add();
   });
   el.addEventListener('keydown', (e) => {
@@ -648,7 +707,7 @@ async function visitForm(v, q) {
         await DB.put('appointments', { kundeId: k.id, datum: nextDate, uhrzeit: v.von || '', aufgaben: [...(k.aufgaben || [])], notiz: '', erledigt: false });
       }
     }
-    toast('Einsatz gespeichert');
+    toast('✓ Einsatz gespeichert');
     go(`#/einsatz/${v.id}`, true);
   });
 }
@@ -808,11 +867,15 @@ route('/rechnung/neu', async (_, q) => {
       <a class="btn" href="#/einstellungen">Zu den Einstellungen</a></div>`);
   }
   let positions = [];
+  const selected = new Set();
   const draft = { kundeId: q.kunde || '', datum: today(), zahlungsziel: S.zahlungsziel };
+  // Bis zum 15. wird standardmäßig der Vormonat abgerechnet, danach der laufende Monat
+  const defaultMonth = q.monat || (new Date().getDate() <= 15 ? prevMonth() : today().slice(0, 7));
 
   render('Rechnung erstellen', `
     <form id="f" class="form">
       ${customerSelect(customers, draft.kundeId)}
+      <label id="monthField" hidden>Abrechnungsmonat<input type="month" name="monat" value="${defaultMonth}"></label>
       <div class="grid2">
         <label>Rechnungsdatum<input type="date" name="datum" required value="${draft.datum}"></label>
         <label>Zahlungsziel (Tage)<input type="number" name="zahlungsziel" min="0" value="${draft.zahlungsziel}"></label>
@@ -829,21 +892,56 @@ route('/rechnung/neu', async (_, q) => {
   `);
 
   const f = $('#f');
+  const kunde = () => data.kmap[f.kundeId.value];
+  const openVisits = () => {
+    const k = kunde();
+    if (!k) return [];
+    return data.visits
+      .filter((v) => v.kundeId === k.id && !v.rechnungId && (!isMonthly(k) || v.datum.startsWith(f.monat.value)))
+      .sort((a, b) => a.datum.localeCompare(b.datum));
+  };
+  // Positionen, die aus den angehakten Einsätzen entstehen (Pauschale oder je Einsatz nach Stunden)
+  const autoPositions = () => {
+    const k = kunde();
+    if (!k) return [];
+    const sel = openVisits().filter((v) => selected.has(v.id));
+    if (!isMonthly(k)) return sel.map((v) => ({ ...visitToPosition(v, k), auto: true }));
+    const m = f.monat.value;
+    if (!m) return [];
+    const old = positions.find((p) => p.pauschale);
+    return [{
+      auto: true,
+      pauschale: true,
+      visitIds: sel.map((v) => v.id),
+      beschreibung: `Reinigung – Monatspauschale ${monthLabel(m)}`
+        + (sel.length ? `\nEinsätze am ${sel.map((v) => fmtDate(v.datum).slice(0, 6)).join(', ')}` : ''),
+      datum: `${m}-01`,
+      datumBis: lastOfMonth(m),
+      menge: 1,
+      einheit: 'Monat',
+      preis: old ? old.preis : k.monatspauschale || S.monatspauschale || 0,
+      art: 'arbeit',
+    }];
+  };
+  const rebuild = () => {
+    positions = [...autoPositions(), ...positions.filter((p) => !p.auto)];
+    drawPositions();
+  };
   const drawTotal = () => { $('#total').innerHTML = `Gesamt: <b>${money(positions.reduce((s, p) => s + positionTotal(p), 0))}</b>`; };
   const drawPositions = () => {
     $('#positions').innerHTML = positions.map((p, i) => `<div class="pos card" data-i="${i}">
       <div class="row between"><b>Pos. ${i + 1}</b><button type="button" class="icon-btn" data-rm="${i}" aria-label="Position entfernen">✕</button></div>
-      <label>Leistung<textarea data-k="beschreibung" rows="2">${esc(p.beschreibung)}</textarea></label>
+      <label>Leistung<textarea data-k="beschreibung" rows="${p.pauschale ? 3 : 2}">${esc(p.beschreibung)}</textarea></label>
       <div class="grid2">
-        <label>Leistungsdatum<input type="date" data-k="datum" value="${esc(p.datum)}"></label>
-        <label>Art<select data-k="art">
+        <label>${p.datumBis ? 'Leistung von' : 'Leistungsdatum'}<input type="date" data-k="datum" value="${esc(p.datum)}"></label>
+        ${p.datumBis ? `<label>bis<input type="date" data-k="datumBis" value="${esc(p.datumBis)}"></label>` : `<label>Art<select data-k="art">
           ${[['arbeit', 'Arbeitsleistung'], ['fahrt', 'Fahrtkosten'], ['material', 'Material']].map(([v, l]) => `<option value="${v}" ${p.art === v ? 'selected' : ''}>${l}</option>`).join('')}
-        </select></label>
+        </select></label>`}
       </div>
       <div class="grid3">
         <label>Menge<input type="number" step="0.25" min="0" inputmode="decimal" data-k="menge" value="${esc(p.menge)}"></label>
         <label>Einheit<select data-k="einheit">
-          ${['Std.', 'pauschal', 'km', 'Stk.'].map((u) => `<option ${p.einheit === u ? 'selected' : ''}>${u}</option>`).join('')}
+          ${['Monat', 'Std.', 'pauschal', 'km', 'Stk.'].map((u) => `<option ${p.einheit === u ? 'selected' : ''}>${u}</option>`).join('')}
         </select></label>
         <label>Preis (€)<input type="number" step="0.01" min="0" inputmode="decimal" data-k="preis" value="${centsInput(p.preis)}"></label>
       </div>
@@ -852,28 +950,28 @@ route('/rechnung/neu', async (_, q) => {
     drawTotal();
   };
   const drawVisits = () => {
-    const k = data.kmap[f.kundeId.value];
-    const open = k ? data.visits.filter((v) => v.kundeId === k.id && !v.rechnungId).sort((a, b) => a.datum.localeCompare(b.datum)) : [];
-    positions = positions.filter((p) => !p.visitId);
-    positions.unshift(...open.map((v) => visitToPosition(v, k)));
+    const k = kunde();
+    const monthly = isMonthly(k);
+    $('#monthField').hidden = !monthly;
+    const open = openVisits();
+    selected.clear();
+    open.forEach((v) => selected.add(v.id));
+    positions = positions.filter((p) => !p.auto);
+    const title = monthly ? `Einsätze im ${monthLabel(f.monat.value)}` : 'Nicht abgerechnete Einsätze';
     $('#visits').innerHTML = open.length
-      ? `<div class="label">Nicht abgerechnete Einsätze</div>${open.map((v) => `<label class="check"><input type="checkbox" data-visit="${v.id}" checked> ${fmtDate(v.datum)} · ${v.stunden ? fmtNum(v.stunden) + ' Std.' : 'ohne Stundenangabe'}</label>`).join('')}`
-      : (k ? '<p class="muted small">Keine offenen Einsätze für diesen Kunden – du kannst Positionen manuell hinzufügen.</p>' : '');
-    drawPositions();
+      ? `<div class="label">${esc(title)}</div>${open.map((v) => `<label class="check"><input type="checkbox" data-visit="${v.id}" checked> ${fmtDateLong(v.datum)}${v.stunden ? ` · ${fmtNum(v.stunden)} Std.` : ''}</label>`).join('')}`
+      : (k ? `<p class="muted small">${monthly ? `Keine offenen Einsätze im ${esc(monthLabel(f.monat.value))}.` : 'Keine offenen Einsätze für diesen Kunden – du kannst Positionen manuell hinzufügen.'}</p>` : '');
+    rebuild();
   };
 
   f.kundeId.addEventListener('change', drawVisits);
+  f.monat.addEventListener('change', drawVisits);
   $('#visits').addEventListener('change', (e) => {
     const id = e.target.dataset.visit;
     if (!id) return;
-    if (e.target.checked) {
-      const v = data.visits.find((x) => x.id === id);
-      positions.push(visitToPosition(v, data.kmap[v.kundeId]));
-      positions.sort((a, b) => (a.visitId ? 0 : 1) - (b.visitId ? 0 : 1) || a.datum.localeCompare(b.datum));
-    } else {
-      positions = positions.filter((p) => p.visitId !== id);
-    }
-    drawPositions();
+    if (e.target.checked) selected.add(id);
+    else selected.delete(id);
+    rebuild();
   });
   $('#positions').addEventListener('input', (e) => {
     const key = e.target.dataset.k;
@@ -887,13 +985,22 @@ route('/rechnung/neu', async (_, q) => {
   $('#positions').addEventListener('click', (e) => {
     const rm = e.target.closest('[data-rm]');
     if (!rm) return;
-    const [p] = positions.splice(Number(rm.dataset.rm), 1);
-    if (p.visitId) { const cb = $(`[data-visit="${p.visitId}"]`); if (cb) cb.checked = false; }
-    drawPositions();
+    const box = rm.closest('.pos');
+    box.classList.add('leaving');
+    setTimeout(() => {
+      const [p] = positions.splice(Number(rm.dataset.rm), 1);
+      for (const id of p.visitIds || (p.visitId ? [p.visitId] : [])) {
+        selected.delete(id);
+        const cb = $(`[data-visit="${id}"]`);
+        if (cb) cb.checked = false;
+      }
+      drawPositions();
+    }, 200);
   });
   $('#addPos').addEventListener('click', () => {
     positions.push({ beschreibung: '', datum: today(), menge: 1, einheit: 'pauschal', preis: 0, art: 'arbeit' });
     drawPositions();
+    $('#positions .pos:last-child').scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
 
   f.addEventListener('submit', async (e) => {
@@ -906,14 +1013,18 @@ route('/rechnung/neu', async (_, q) => {
     if (!k.strasse || !k.plzOrt) {
       if (!confirm('Beim Kunden fehlt die Anschrift. Rechnungen über 250 € benötigen die vollständige Anschrift des Kunden. Trotzdem erstellen?')) return;
     }
+    const monat = isMonthly(k) && items.some((p) => p.pauschale) ? fd.get('monat') : null;
+    if (monat && data.invoices.some((i) => i.kundeId === k.id && i.monat === monat && i.status !== 'storniert')
+      && !confirm(`Für ${k.name} gibt es schon eine Rechnung für ${monthLabel(monat)}. Trotzdem noch eine erstellen?`)) return;
     $('#save').disabled = true;
     const datum = fd.get('datum');
     const ziel = Number(fd.get('zahlungsziel')) || 0;
-    const positionen = items.map((p) => ({ ...p, beschreibung: p.beschreibung.trim(), menge: num(p.menge), betrag: positionTotal(p) }));
+    const positionen = items.map(({ auto, ...p }) => ({ ...p, beschreibung: p.beschreibung.trim(), menge: num(p.menge), betrag: positionTotal(p) }));
     const inv = {
       nummer: await nextInvoiceNumber(datum),
       datum,
       faellig: addDays(datum, ziel),
+      monat,
       kundeId: k.id,
       kunde: { name: k.name, strasse: k.strasse, plzOrt: k.plzOrt, privat: !!k.privat },
       absender: Object.fromEntries(['firma', 'inhaber', 'strasse', 'plzOrt', 'telefon', 'email', 'steuernummer', 'bank', 'iban', 'bic'].map((key) => [key, S[key]])),
@@ -925,12 +1036,12 @@ route('/rechnung/neu', async (_, q) => {
       erstellt: new Date().toISOString(),
     };
     await DB.put('invoices', inv);
-    for (const p of positionen.filter((x) => x.visitId)) {
-      const v = data.visits.find((x) => x.id === p.visitId);
+    for (const id of positionen.flatMap((p) => p.visitIds || (p.visitId ? [p.visitId] : []))) {
+      const v = data.visits.find((x) => x.id === id);
       v.rechnungId = inv.id;
       await DB.put('visits', v);
     }
-    toast(`Rechnung ${inv.nummer} erstellt`);
+    toast(`✓ Rechnung ${inv.nummer} erstellt`);
     go(`#/rechnung/${inv.id}`, true);
   });
 
@@ -940,8 +1051,9 @@ route('/rechnung/neu', async (_, q) => {
 function invoiceDoc(inv) {
   const a = inv.absender;
   const k = inv.kunde;
-  const dates = inv.positionen.map((p) => p.datum).sort();
-  const zeitraum = dates[0] === dates[dates.length - 1] ? fmtDate(dates[0]) : `${fmtDate(dates[0])} – ${fmtDate(dates[dates.length - 1])}`;
+  const von = inv.positionen.map((p) => p.datum).sort()[0];
+  const bis = inv.positionen.map((p) => p.datumBis || p.datum).sort().pop();
+  const zeitraum = von === bis ? fmtDate(von) : `${fmtDate(von)} – ${fmtDate(bis)}`;
   return `<article class="invoice-doc ${inv.status === 'storniert' ? 'cancelled' : ''}">
     <header class="inv-head">
       <div class="inv-brand">${esc(a.firma)}</div>
@@ -965,7 +1077,7 @@ function invoiceDoc(inv) {
     <table class="inv-items">
       <thead><tr><th>Pos.</th><th>Datum</th><th>Leistung</th><th class="r">Menge</th><th class="r">Einzelpreis</th><th class="r">Betrag</th></tr></thead>
       <tbody>${inv.positionen.map((p, i) => `<tr>
-        <td>${i + 1}</td><td>${fmtDate(p.datum)}</td><td>${nl2br(p.beschreibung)}</td>
+        <td>${i + 1}</td><td>${fmtDate(p.datum)}${p.datumBis && p.datumBis !== p.datum ? ` –<br>${fmtDate(p.datumBis)}` : ''}</td><td>${nl2br(p.beschreibung)}</td>
         <td class="r">${fmtNum(p.menge)} ${esc(p.einheit)}</td><td class="r">${money(p.preis)}</td><td class="r">${money(p.betrag)}</td></tr>`).join('')}
       </tbody>
       <tfoot><tr><td colspan="5" class="r"><b>Gesamtbetrag</b></td><td class="r"><b>${money(inv.summe)}</b></td></tr></tfoot>
@@ -1011,7 +1123,7 @@ route('/rechnung/:id', async ({ id }) => {
   $('#paid')?.addEventListener('click', async () => {
     Object.assign(inv, { status: 'bezahlt', bezahltAm: today() });
     await DB.put('invoices', inv);
-    toast('Als bezahlt markiert');
+    toast('✓ Als bezahlt markiert');
     router();
   });
   $('#unpaid')?.addEventListener('click', async () => {
@@ -1051,6 +1163,15 @@ route('/einstellungen', async () => {
       <div class="grid2">${field('iban', 'IBAN')}${field('bic', 'BIC')}</div>
       <h3 class="section">Rechnungen</h3>
       <div class="grid2">
+        <label>Standard-Abrechnung neuer Kunden
+          <select name="abrechnung">
+            <option value="monat" ${S.abrechnung === 'monat' ? 'selected' : ''}>Monatspauschale</option>
+            <option value="stunde" ${S.abrechnung === 'monat' ? '' : 'selected'}>Nach Stunden</option>
+          </select>
+        </label>
+        <label>Standard-Monatspauschale (€)<input name="monatspauschale" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(S.monatspauschale)}"></label>
+      </div>
+      <div class="grid2">
         <label>Standard-Stundensatz (€)<input name="stundensatz" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(S.stundensatz)}"></label>
         <label>Zahlungsziel (Tage)<input name="zahlungsziel" type="number" min="0" value="${esc(S.zahlungsziel)}"></label>
       </div>
@@ -1077,7 +1198,7 @@ route('/einstellungen', async () => {
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
     </div>`}
-    <p class="muted small center">Toths Reinigungsservice · Version 1.0</p>
+    <p class="muted small center">Toths Reinigungsservice · Version 1.1</p>
   `);
 
   $('#f').addEventListener('submit', async (e) => {
@@ -1086,10 +1207,12 @@ route('/einstellungen', async () => {
     for (const key of ['firma', 'inhaber', 'strasse', 'plzOrt', 'telefon', 'email', 'steuernummer', 'bank', 'iban', 'bic', 'nrPrefix']) S[key] = fd.get(key).trim();
     S.iban = S.iban.toUpperCase();
     S.stundensatz = Math.round(num(fd.get('stundensatz')) * 100);
+    S.abrechnung = fd.get('abrechnung');
+    S.monatspauschale = Math.round(num(fd.get('monatspauschale')) * 100);
     S.zahlungsziel = Number(fd.get('zahlungsziel')) || 0;
     S.nrStart = Math.max(1, Number(fd.get('nrStart')) || 1);
     await DB.put('settings', S);
-    toast('Einstellungen gespeichert');
+    toast('✓ Einstellungen gespeichert');
   });
   $('#export').addEventListener('click', exportBackup);
   $('#import').addEventListener('change', (e) => e.target.files[0] && importBackup(e.target.files[0]));
@@ -1123,7 +1246,12 @@ async function importBackup(file) {
 }
 
 /* ---------- Start ---------- */
-$('#backBtn').addEventListener('click', () => (history.length > 1 ? history.back() : go('#/')));
+$('#backBtn').addEventListener('click', () => {
+  navDirection = 'back';
+  if (history.length > 1) history.back();
+  else go('#/');
+});
+$('#tabbar').addEventListener('click', (e) => { if (e.target.closest('a')) navDirection = 'tab'; });
 window.addEventListener('hashchange', router);
 
 (async () => {

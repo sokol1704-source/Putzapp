@@ -9,6 +9,7 @@ Web-App (PWA) für das Kleingewerbe *Toths Reinigungsservice*. Läuft auf Androi
 - **Termine** – geplante Reinigungen mit Aufgaben; nächste Fälligkeit wird automatisch aus dem Intervall berechnet; Export in den Handy-Kalender (.ics)
 - **Startseite** – überfällig / heute / nächste 7 Tage, nicht abgerechnete Einsätze, offene Rechnungen
 - **Rechnungen** für Kleinunternehmer (§ 19 UStG):
+  - Abrechnung je Kunde als **Monatspauschale** (Standard 250 €, mit Auflistung der Einsätze im Monat) oder **nach Stunden**; die Startseite erinnert an fällige Monatsrechnungen
   - Pflichtangaben nach § 14 UStG: Name & Anschrift beider Parteien, Steuernummer, Rechnungsdatum, fortlaufende Rechnungsnummer (`RE-2026-001`), Leistungsdatum, Menge & Art der Leistung, Entgelt
   - Hinweis „Gemäß § 19 UStG wird keine Umsatzsteuer berechnet“
   - Für Privatkunden: Ausweis der Arbeits- und Fahrtkosten nach § 35a EStG (haushaltsnahe Dienstleistung) und Aufbewahrungshinweis
