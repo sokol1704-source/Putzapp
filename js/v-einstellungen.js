@@ -67,6 +67,13 @@ route('/einstellungen', async () => {
       </div>
     </div>
 
+    <h3 class="section">⚠️ Werkseinstellungen</h3>
+    <div class="card small">
+      <p>Setzt die App auf null zurück: Kunden, Objekte, Einsätze, Fotos, Rechnungen, Angebote, Finanzen, Material und Einstellungen werden auf diesem Handy gelöscht.</p>
+      <p class="danger-text">Das lässt sich nicht rückgängig machen. Erstelle vorher eine Sicherung.</p>
+      <button class="btn danger block" type="button" id="factoryReset">Alles löschen und neu beginnen</button>
+    </div>
+
     ${NATIVE ? '' : `<h3 class="section">📱 App auf den Startbildschirm</h3>
     <div class="card small">
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
@@ -109,7 +116,17 @@ route('/einstellungen', async () => {
     }
   });
   $('#import').addEventListener('change', (e) => e.target.files[0] && importBackup(e.target.files[0]));
+  $('#factoryReset').addEventListener('click', factoryReset);
 });
+
+async function factoryReset() {
+  if (!confirm('Alle Daten auf diesem Gerät löschen und die App auf Werkseinstellungen zurücksetzen?')) return;
+  if (prompt('Zur Bestätigung bitte LÖSCHEN eingeben:') !== 'LÖSCHEN') return toast('Nichts gelöscht');
+  for (const s of DB.stores) await DB.clear(s);
+  toast('✓ Alles gelöscht – die App startet neu');
+  location.hash = '#/';
+  setTimeout(() => location.reload(), 600);
+}
 
 route('/leistungen', () => {
   const list = S.leistungen.map((l) => ({ ...l }));
