@@ -24,6 +24,7 @@ route('/', async () => {
 
   // Mit automatischer Sicherung (Android-App) reicht es, ab und zu eine Kopie in die Cloud zu legen
   const backupDue = data.visits.length > 0 && (!S.letzteSicherung || daysBetween(S.letzteSicherung, t) > (S.letzteAutoSicherung ? 30 : 7));
+  const gp = gruendungProgress();
   const hour = new Date().getHours();
   const greet = hour < 11 ? 'Guten Morgen' : hour < 17 ? 'Hallo' : 'Guten Abend';
   const firstName = (S.inhaber || '').split(' ')[0];
@@ -42,6 +43,10 @@ route('/', async () => {
       </div>
     </div>
     ${backupDue ? `<a class="card hint" href="#/einstellungen">💾 <b>Zeit für eine Datensicherung!</b> ${S.letzteSicherung ? `Die letzte ist vom ${fmtDate(S.letzteSicherung)}.` : 'Du hast noch keine erstellt.'} Alle Daten liegen nur auf diesem Handy.</a>` : ''}
+    ${gp.done < gp.total && !S.gruendungAusgeblendet ? `<a class="card link g-start" href="#/gruendung">
+      <div class="row between"><b>🚀 Gründung: ${gp.done} von ${gp.total} erledigt</b><span class="muted">›</span></div>
+      <div class="bar"><div style="width:${(gp.done / gp.total) * 100}%"></div></div>
+      <div class="muted small">Nächster Schritt: ${esc(visibleSteps().find((s) => !isDone(s))?.title || '')}</div></a>` : ''}
     ${settingsComplete() ? '' : `<a class="card hint" href="#/einstellungen">⚠️ <b>Firmendaten fehlen.</b> Für korrekte Rechnungen bitte Name, Anschrift und Steuernummer eintragen.</a>`}
     ${fastLeer.length ? `<a class="card link shop-hint" href="#/material?tab=einkauf"><div class="row between"><b>🛒 ${fastLeer.length} ${fastLeer.length === 1 ? 'Sache' : 'Sachen'} fast leer</b><span class="muted">›</span></div>
       <div class="muted small">${esc(fastLeer.map((m) => m.name).join(', '))}</div></a>` : ''}
@@ -89,6 +94,7 @@ route('/mehr', async () => {
     <span class="tile-icon">${icon}</span><b>${title}</b><span class="muted small">${sub}</span>${badge ? `<span class="tile-badge">${badge}</span>` : ''}</a>`;
   render('Mehr', `
     <div class="tiles">
+      ${(() => { const p = gruendungProgress(); return tile('#/gruendung', '🚀', 'Gründung', p.done === p.total ? 'Alles erledigt ✓' : `${p.done} von ${p.total} Schritten erledigt`, p.total - p.done || ''); })()}
       ${tile('#/kunden', '👥', 'Auftraggeber', `${data.customers.length} Hausverwaltungen & Eigentümer`)}
       ${tile('#/einsaetze', '🧽', 'Einsätze', `${data.visits.length} erfasst`, unbilled || '')}
       ${tile('#/maengel', '⚠️', 'Mängel', 'Schäden melden & verfolgen', maengelOffen || '')}

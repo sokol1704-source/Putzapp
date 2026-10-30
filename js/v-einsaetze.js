@@ -264,7 +264,7 @@ route('/einsatz/:id', async ({ id }) => {
     </div>
     ${v.rechnungId ? '' : '<button class="btn danger ghost block" id="del">Einsatz löschen</button>'}
   `);
-  $('#view').addEventListener('click', (e) => { const img = e.target.closest('[data-view]'); if (img) lightbox(img.src); });
+  onView('click', (e) => { const img = e.target.closest('[data-view]'); if (img) lightbox(img.src); });
   $('#share')?.addEventListener('click', async () => {
     if (!(await shareFiles(photoFiles(photos, v.datum), `Reinigung ${objLabel(o)} ${fmtDate(v.datum)}`))) toast('Teilen wird auf diesem Gerät nicht unterstützt');
   });

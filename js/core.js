@@ -444,7 +444,17 @@ function render(title, html, { tab = '', back = true } = {}) {
   $$('[data-count]', view).forEach(countUp);
 }
 
+// Ereignisse auf dem Seitenbereich: werden beim nächsten Seitenwechsel automatisch entfernt,
+// damit sich Handler beim erneuten Öffnen einer Seite nicht verdoppeln
+let viewListeners = [];
+function onView(type, fn) {
+  $('#view').addEventListener(type, fn);
+  viewListeners.push([type, fn]);
+}
+
 async function router() {
+  viewListeners.forEach(([type, fn]) => $('#view').removeEventListener(type, fn));
+  viewListeners = [];
   objectUrls.forEach((u) => URL.revokeObjectURL(u));
   objectUrls = [];
   $$('.lightbox').forEach((l) => l.remove());

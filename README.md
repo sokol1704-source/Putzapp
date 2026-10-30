@@ -25,6 +25,7 @@ Gemacht für die **Treppenhaus- und Objektreinigung in Mehrfamilienhäusern**.
 - **Auswertung** – Kennzahlen mit Vorjahresvergleich, Hochrechnung zur Kleinunternehmergrenze, Umsatz & Kosten pro Monat, Umsatzanteile je Auftraggeber, Stundenlohn je Haus mit Ziellinie und Preisempfehlung, automatische Erkenntnisse (Diagrammfarben auf Farbsehschwäche geprüft)
 - **Urlaub & Krankheit** – Termine im Zeitraum nachholen oder absagen, fertige Nachricht an jede Hausverwaltung
 - **Preisanpassung** – Preise prozentual erhöhen, ab Stichtag automatisch abrechnen, Anschreiben als PDF
+- **Gründungs-Checkliste** – Handwerkskammer, Gewerbeanmeldung, ELSTER, Finanzamt (Kleinunternehmer), BG BAU, Krankenkasse, Betriebshaftpflicht, Konto, Website, Google-Profil – mit Fristen ab Gewerbebeginn; Steuernummer, Versicherung und IBAN landen direkt in der App
 - **Datensicherung** – Export/Import aller Daten inkl. Fotos; in der Android-App zusätzlich wöchentlich automatisch in *Dokumente/TothsReinigung*
 
 > Alle Daten liegen **nur auf dem Handy** (kein Server, keine Cloud). Bitte regelmäßig unter *Einstellungen → Sicherung erstellen* sichern. Rechnungen müssen 10 Jahre aufbewahrt werden. Das ist keine Steuer- oder Rechtsberatung: Vorlagen bitte einmal vom Steuerbüro prüfen lassen.

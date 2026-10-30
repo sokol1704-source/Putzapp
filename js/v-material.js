@@ -123,7 +123,7 @@ route('/material', async (_, q) => {
     router();
   });
 
-  $('#view').addEventListener('click', async (e) => {
+  onView('click', async (e) => {
     const step = e.target.closest('[data-step]');
     if (!step) return;
     e.preventDefault();

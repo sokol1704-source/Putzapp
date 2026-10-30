@@ -40,6 +40,7 @@ route('/objekt/:id/vertrag', async ({ id }) => {
   if (!o) return go('#/objekte', true);
   const k = (await DB.get('customers', o.kundeId)) || { name: '' };
   const v = { ...DEFAULT_VERTRAG, beginn: addDays(lastOfMonth(today().slice(0, 7)), 1), ...o.vertrag };
+  if (!v.versicherung) v.versicherung = S.versicherung || '';
   const keyAG = `vertrag_${id}_ag`;
   const keyAN = `vertrag_${id}_an`;
   const [sigAG, sigAN] = await Promise.all([DB.get('unterschriften', keyAG), DB.get('unterschriften', keyAN)]);
@@ -204,7 +205,7 @@ route('/preise', async () => {
     toast('✓ Preisanpassung angekündigt');
     router();
   });
-  $('#view').addEventListener('click', async (e) => {
+  onView('click', async (e) => {
     const c = e.target.closest('[data-cancel]');
     if (!c) return;
     const o = data.omap[c.dataset.cancel];

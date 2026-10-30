@@ -206,7 +206,7 @@ route('/mangel/:id', async ({ id }) => {
     </div>
     <button class="btn danger ghost block" id="del">Löschen</button>
   `);
-  $('#view').addEventListener('click', (e) => { const img = e.target.closest('[data-view]'); if (img) lightbox(img.src); });
+  onView('click', (e) => { const img = e.target.closest('[data-view]'); if (img) lightbox(img.src); });
   $('#send').addEventListener('click', async () => {
     const text = [`${m.dringend ? '🚨 DRINGEND – ' : ''}Mängelmeldung: ${objLabel(o)}${objAddress(o) && objAddress(o) !== objLabel(o) ? `, ${objAddress(o)}` : ''}`, '',
       `Ort: ${m.ort}`, `Festgestellt am: ${fmtDateLong(m.datum)}`, '', m.text, '',
@@ -337,7 +337,7 @@ route('/winter/:id', async ({ id }) => {
     </div>
     ${w.rechnungId ? '' : '<button class="btn danger ghost block" id="del">Löschen</button>'}
   `);
-  $('#view').addEventListener('click', (e) => { const img = e.target.closest('[data-view]'); if (img) lightbox(img.src); });
+  onView('click', (e) => { const img = e.target.closest('[data-view]'); if (img) lightbox(img.src); });
   $('#del')?.addEventListener('click', async () => {
     if (!confirm('Eintrag löschen?')) return;
     await deletePhotos(id);
