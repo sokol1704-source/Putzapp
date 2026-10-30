@@ -200,3 +200,37 @@ route('/finanzen', async (_, q) => {
 });
 const eur2 = (cents) => (cents / 100).toFixed(2).replace('.', ',') + 'EUR';
 
+
+/* ---------- Buchhaltung (Übersicht) ---------- */
+route('/buchhaltung', async () => {
+  const jahr = String(new Date().getFullYear());
+  const d = await financeData(jahr);
+  const invoices = await DB.all('invoices');
+  const offen = invoices.filter((i) => i.status === 'offen');
+  const overdue = offen.filter((i) => i.faellig < today());
+  const objects = await DB.all('objects');
+  const belegeFehlen = d.aus.filter((a) => !a.fotoAnzahl).length;
+  render('Buchhaltung', `
+    <div class="card profit">
+      <div class="muted small">Gewinn ${jahr} (vorläufig)</div>
+      <div class="profit-value ${d.gewinn < 0 ? 'neg' : ''}" ${d.gewinn > 0 ? `data-count="${d.gewinn}" data-money` : ''}>${money(d.gewinn)}</div>
+      <div class="row between small"><span>Einnahmen (bezahlt)</span><b>${money(d.sumE)}</b></div>
+      <div class="row between small"><span>Ausgaben inkl. Fahrten</span><b>− ${money(d.sumA)}</b></div>
+      ${offen.length ? `<div class="row between small"><span>Offene Rechnungen</span><b>${money(offen.reduce((s, i) => s + i.summe, 0))}</b></div>` : ''}
+    </div>
+    ${overdue.length ? `<a class="card hint" href="#/rechnungen?filter=offen">⏰ <b>${overdue.length} Rechnung${overdue.length === 1 ? '' : 'en'} überfällig</b> – jetzt Zahlungserinnerung schicken.</a>` : ''}
+    ${belegeFehlen ? `<a class="card hint" href="#/ausgaben">🧾 Bei <b>${belegeFehlen} Ausgabe${belegeFehlen === 1 ? '' : 'n'}</b> fehlt noch das Belegfoto.</a>` : ''}
+    <div class="quick">
+      <a class="btn" href="#/ausgabe/neu">🧾 Ausgabe erfassen</a>
+      <a class="btn ghost" href="#/fahrt/neu">🚗 Fahrt eintragen</a>
+    </div>
+    <div class="tiles">
+      ${tile('#/finanzen', '📒', 'Finanzen & Steuer', 'Gewinn, EÜR-Export, Belege')}
+      ${tile('#/auswertung', '📊', 'Auswertung', 'Was bringt welches Haus?')}
+      ${tile('#/ausgaben', '🧾', 'Ausgaben', `${d.aus.length} in ${jahr} · ${money(d.aus.reduce((s, a) => s + a.betrag, 0))}`, belegeFehlen || '')}
+      ${tile('#/fahrten', '🚗', 'Fahrtenbuch', `${fmtNum(d.km)} km in ${jahr}`)}
+      ${tile('#/rechnungen?filter=offen', '💶', 'Offene Rechnungen', `${offen.length} offen`, overdue.length || '')}
+      ${tile('#/preise', '📈', 'Preisanpassung', 'Preise erhöhen & ankündigen', objects.some((o) => o.neuerPreis) ? '!' : '')}
+    </div>
+  `);
+});

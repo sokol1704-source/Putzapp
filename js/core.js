@@ -506,6 +506,9 @@ function objectSelect(objects, kmap, selected, label = 'Haus') {
   </select></label>`;
 }
 
+const tile = (href, icon, title, sub, badge = '') => `<a class="tile" href="${href}">
+    <span class="tile-icon">${icon}</span><b>${title}</b><span class="muted small">${sub}</span>${badge ? `<span class="tile-badge">${badge}</span>` : ''}</a>`;
+
 function noObjects() {
   render('Hinweis', `<div class="empty"><p>Lege zuerst ein Haus an.</p><a class="btn" href="#/objekt/neu">+ Haus anlegen</a></div>`);
 }

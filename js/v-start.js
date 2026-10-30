@@ -90,11 +90,11 @@ route('/mehr', async () => {
   const angeboteOffen = data.angebote.filter((a) => a.status === 'offen').length;
   const unbilled = data.visits.filter((v) => !v.rechnungId).length;
   const material = await DB.all('material');
-  const tile = (href, icon, title, sub, badge = '') => `<a class="tile" href="${href}">
-    <span class="tile-icon">${icon}</span><b>${title}</b><span class="muted small">${sub}</span>${badge ? `<span class="tile-badge">${badge}</span>` : ''}</a>`;
+  const overdue = data.invoices.filter((i) => i.status === 'offen' && i.faellig < today()).length;
   render('Mehr', `
     <div class="tiles">
       ${(() => { const p = gruendungProgress(); return tile('#/gruendung', '🚀', 'Gründung', p.done === p.total ? 'Alles erledigt ✓' : `${p.done} von ${p.total} Schritten erledigt`, p.total - p.done || ''); })()}
+      ${tile('#/buchhaltung', '💰', 'Buchhaltung', 'Finanzen, Ausgaben, Fahrten, Auswertung', overdue || '')}
       ${tile('#/kunden', '👥', 'Auftraggeber', `${data.customers.length} Hausverwaltungen & Eigentümer`)}
       ${tile('#/einsaetze', '🧽', 'Einsätze', `${data.visits.length} erfasst`, unbilled || '')}
       ${tile('#/maengel', '⚠️', 'Mängel', 'Schäden melden & verfolgen', maengelOffen || '')}
@@ -104,12 +104,7 @@ route('/mehr', async () => {
       ${tile('#/tour', '🚐', 'Tagestour', 'Alle Häuser von heute')}
       ${tile('#/leistungen', '💶', 'Leistungen & Preise', `${S.leistungen.length} Zusatzleistungen`)}
       ${tile('#/material', '🧴', 'Material', 'Lager & Einkaufsliste', material.filter(isLow).length || '')}
-      ${tile('#/finanzen', '💰', 'Finanzen & Steuer', 'Gewinn, EÜR-Export')}
-      ${tile('#/auswertung', '📊', 'Auswertung', 'Was bringt welches Haus?')}
-      ${tile('#/ausgaben', '🧾', 'Ausgaben', 'Belege fotografieren')}
-      ${tile('#/fahrten', '🚗', 'Fahrtenbuch', '0,30 € je km absetzen')}
       ${tile('#/abwesenheit', '🏖️', 'Urlaub & Krankheit', 'Termine verschieben')}
-      ${tile('#/preise', '📈', 'Preisanpassung', 'Preise erhöhen & ankündigen', data.objects.some((o) => o.neuerPreis) ? '!' : '')}
       ${tile('#/einstellungen', '⚙️', 'Einstellungen', 'Firma, Erinnerungen, Sicherung')}
     </div>
   `, { tab: 'mehr', back: false });
