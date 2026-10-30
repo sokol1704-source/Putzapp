@@ -205,7 +205,7 @@ const DEFAULT_SETTINGS = {
   nrStart: 1,
   leistungen: DEFAULT_LEISTUNGEN,
   // Richtwerte für den Angebotsrechner (je Reinigung)
-  kalk: { proEtage: 800, aufzug: 600, keller: 1000, dachboden: 800, aussen: 800, muellplatz: 500 },
+  kalk: { proEtage: 1200, aufzug: 800, keller: 1500, dachboden: 1000, aussen: 1000, muellplatz: 700 },
   timer: null,
   schema: 0,
 };

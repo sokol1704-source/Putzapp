@@ -464,9 +464,12 @@ route('/angebot/neu', async (_, q) => {
         <label>Eingänge<input name="eingaenge" type="number" min="1" inputmode="numeric" value="1"></label>
         <label>Rhythmus<select name="intervall"><option value="7">wöchentlich</option><option value="14">alle 2 Wochen</option><option value="28">alle 4 Wochen</option></select></label>
       </div>
+      <label>Entfernung zum Haus (km, einfach) <span class="muted small">– Anfahrt wird je Reinigung berechnet</span><input name="km" type="number" step="1" min="0" inputmode="numeric" value="0"></label>
       <div class="label">Zusätzlich je Reinigung</div>
       <div class="chip-row">${OPTIONS.map(([key, label]) => `<label class="chip toggle"><input type="checkbox" name="opt_${key}" hidden>${label}</label>`).join('')}</div>
       <label class="check"><input type="checkbox" name="winter"> ❄️ Winterdienst optional anbieten</label>
+      <div class="label">Optionale Zusatzleistungen <span class="muted small">(auf Abruf, nicht im Monatspreis)</span></div>
+      <div class="chip-row">${S.leistungen.map((l, i) => `<label class="chip toggle"><input type="checkbox" name="zus_${i}" hidden>${esc(l.name)} · ${unitPrice(l)}</label>`).join('') || '<span class="muted small">Keine Leistungen im Katalog.</span>'}</div>
       <details><summary>⚙️ Preise je Reinigung anpassen (Richtwerte)</summary>
         <div class="grid3 mt">
           <label>pro Etage (€)<input name="k_proEtage" type="number" step="0.5" min="0" value="${K.proEtage / 100}"></label>
@@ -486,7 +489,9 @@ route('/angebot/neu', async (_, q) => {
     const etagen = Number(f.etagen.value) || 0;
     const eing = Number(f.eingaenge.value) || 1;
     const iv = Number(f.intervall.value);
-    let perClean = etagen * eing * num(f.k_proEtage.value);
+    const km = num(f.km.value);
+    const anfahrt = 2 * km * (KM_SATZ / 100);
+    let perClean = etagen * eing * num(f.k_proEtage.value) + anfahrt;
     for (const [key] of OPTIONS) if (f[`opt_${key}`].checked) perClean += num(f[`k_${key}`].value);
     const rpm = perMonth(iv);
     const monthly = Math.ceil((perClean * rpm) / 5) * 5;
@@ -494,6 +499,7 @@ route('/angebot/neu', async (_, q) => {
     const market = iv === 7 ? '25–80 €' : iv === 14 ? 'ca. 15–45 €' : 'ca. 10–30 €';
     $('#calc').innerHTML = `<div class="calc-row"><span>Reinigungen pro Monat</span><b>${fmtNum(Math.round(rpm * 100) / 100)}</b></div>
       <div class="calc-row"><span>Preis je Reinigung</span><b>${money(Math.round(perClean * 100))}</b></div>
+      ${km ? `<div class="calc-row small"><span>davon Anfahrt (2 × ${fmtNum(km)} km × 0,30 €)</span><b>${money(Math.round(anfahrt * 100))}</b></div>` : ''}
       <div class="calc-total"><span>Monatspreis</span><b>${money(monthly * 100)}</b></div>
       <div class="muted small">= ${money(Math.round(perFloor * 100))} pro Etage und Monat · marktüblich ${market} (Firmen zzgl. 19 % USt – du bist ohne USt günstiger)</div>`;
     return { perClean, monthly: monthly * 100, rpm };
@@ -523,6 +529,8 @@ route('/angebot/neu', async (_, q) => {
     const { monthly } = calc();
     const iv = Number(fd.get('intervall'));
     const optionen = OPTIONS.filter(([key]) => fd.has(`opt_${key}`)).map(([key]) => key);
+    const km = num(fd.get('km'));
+    const zusatz = S.leistungen.filter((l, i) => fd.has(`zus_${i}`)).map((l) => ({ name: l.name, preis: l.preis, einheit: l.einheit }));
     const rhythm = { 7: 'wöchentlich', 14: 'alle 2 Wochen', 28: 'alle 4 Wochen' }[iv];
     const leistungen = [...TASK_SUGGESTIONS.slice(0, 7).map(([t]) => t), ...OPTIONS.filter(([key]) => optionen.includes(key)).map(([, , t]) => t)];
     const datum = today();
@@ -537,7 +545,9 @@ route('/angebot/neu', async (_, q) => {
       optionen,
       leistungen,
       monatspreis: monthly,
-      positionen: [{ beschreibung: `Treppenhausreinigung ${rhythm}${Number(fd.get('etagen')) ? ` – ${fd.get('etagen')} Etagen${Number(fd.get('eingaenge')) > 1 ? `, ${fd.get('eingaenge')} Eingänge` : ''}` : ''}\nLeistungsumfang siehe unten`, menge: 1, einheit: 'Monat', preis: monthly, art: 'arbeit' }],
+      positionen: [{ beschreibung: `Treppenhausreinigung ${rhythm}${Number(fd.get('etagen')) ? ` – ${fd.get('etagen')} Etagen${Number(fd.get('eingaenge')) > 1 ? `, ${fd.get('eingaenge')} Eingänge` : ''}` : ''}${km ? `\ninkl. Anfahrt (${fmtNum(km)} km einfach)` : ''}\nLeistungsumfang siehe unten`, menge: 1, einheit: 'Monat', preis: monthly, art: 'arbeit' }],
+      km,
+      zusatz,
       winterPreis: fd.has('winter') ? toCents(fd.get('k_winter')) : 0,
       notiz: fd.get('notiz').trim(),
       absender: absender(),
@@ -565,6 +575,9 @@ function angebotDoc(a) {
     <p class="inv-object">🏢 <b>Objekt:</b> ${esc([a.objekt.strasse, a.objekt.plzOrt].filter(Boolean).join(', '))}</p>
     <p>vielen Dank für Ihr Interesse. Gerne biete ich Ihnen die regelmäßige Reinigung des oben genannten Objekts zu folgenden Konditionen an:</p>
     ${itemsTable(a.positionen, a.monatspreis).replace('Gesamtbetrag', 'Monatlich')}
+    ${a.zusatz?.length ? `<h3 class="doc-h3">Optionale Zusatzleistungen <span class="doc-muted">(auf Abruf, nicht im Monatspreis enthalten)</span></h3>
+      <table class="inv-items small-table"><thead><tr><th>Leistung</th><th class="r">Preis</th></tr></thead>
+      <tbody>${a.zusatz.map((z) => `<tr><td>${esc(z.name)}</td><td class="r">${money(z.preis)}${z.einheit === 'pauschal' ? ' pauschal' : ` / ${esc(z.einheit)}`}</td></tr>`).join('')}</tbody></table>` : ''}
     <h3 class="doc-h3">Leistungsumfang</h3>
     <ul class="doc-list">${a.leistungen.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>
     ${a.winterPreis ? `<p class="inv-note">❄️ <b>Optional Winterdienst:</b> Räumen und Streuen der Zugänge und des Gehwegs bei Schnee und Glätte, inkl. Räum- und Streuprotokoll – ${money(a.winterPreis)} je Einsatz.</p>` : ''}

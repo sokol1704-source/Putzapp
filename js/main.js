@@ -211,6 +211,12 @@ window.addEventListener('hashchange', router);
   await loadSettings();
   await migrate();
   await applyDuePrices();
+  // Alte, zu niedrige Richtwerte für Angebote durch die neuen ersetzen – eigene Änderungen bleiben
+  if (!S.kalkV3) {
+    if (!S.kalk || S.kalk.proEtage <= 800) S.kalk = { ...DEFAULT_SETTINGS.kalk };
+    S.kalkV3 = true;
+    await saveSettings();
+  }
   router();
   updateTimerPill();
   setupBackButton();
