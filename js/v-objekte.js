@@ -64,6 +64,7 @@ async function objectForm(o, q) {
         <label class="check-col">Aufzug<input type="checkbox" name="aufzug" ${o.aufzug ? 'checked' : ''}></label>
       </div>
       <label>🔑 Zugang <span class="muted small">(Schlüssel, Türcode, Schlüsselbox)</span><input name="zugang" value="${esc(o.zugang)}"></label>
+      <label>📷 Fotopflicht <span class="muted small">(Nachher-Fotos je Einsatz, z. B. 4 für eins pro Etage · 0 = aus)</span><input name="fotoPflicht" type="number" min="0" max="30" inputmode="numeric" value="${esc(o.fotoPflicht || 0)}"></label>
       <div class="grid2">
         <label>👤 Ansprechpartner vor Ort<input name="vorOrtName" value="${esc(o.vorOrtName)}" placeholder="z. B. Hausmeister"></label>
         <label>Telefon<input name="vorOrtTelefon" type="tel" value="${esc(o.vorOrtTelefon)}"></label>
@@ -141,6 +142,7 @@ async function objectForm(o, q) {
       eingaenge: Number(fd.get('eingaenge')) || 1,
       aufzug: fd.has('aufzug'),
       zugang: fd.get('zugang').trim(),
+      fotoPflicht: Number(fd.get('fotoPflicht')) || 0,
       vorOrtName: fd.get('vorOrtName').trim(),
       vorOrtTelefon: fd.get('vorOrtTelefon').trim(),
       abrechnung: fd.get('abrechnung'),

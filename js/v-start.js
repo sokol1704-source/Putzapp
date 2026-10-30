@@ -111,6 +111,8 @@ route('/mehr', async () => {
 });
 
 /* ---------- Tagestour ---------- */
+const tourLegCache = {};
+
 route('/tour', async (_, q) => {
   const data = await loadAll();
   const datum = q.datum || today();
@@ -126,21 +128,38 @@ route('/tour', async (_, q) => {
   };
   const addMin = (hhmm, mins) => { const [h, m] = hhmm.split(':').map(Number); const t = h * 60 + m + mins; return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`; };
   // Pro Termin: Fahrzeit bis dorthin, Startzeit (frühestens feste Uhrzeit), Dauer (Art oder Erfahrung)
+  // Echte Fahrzeiten zwischen den Häusern (wenn Internet da ist, sonst Schätzung)
+  const objStops = stops.filter((s) => s.o);
+  // Sofort mit den Schätzwerten zeichnen; echte Fahrzeiten werden nachgeladen und zwischengespeichert
+  const legKey = objStops.map((s) => s.o.id).join('|');
+  const legs = tourLegCache[legKey] || {};
+  if (!tourLegCache[legKey]) {
+    travelLegs(objStops.map((s) => s.o)).then((found) => {
+      if (!Object.keys(found).length) return;
+      tourLegCache[legKey] = found;
+      if (location.hash.startsWith('#/tour')) router();
+    });
+  }
   let clock = stops.find((s) => s.it.uhrzeit)?.it.uhrzeit || '08:00';
   const plan = {};
   let fahrtGesamt = 0;
+  let kmGesamt = 0;
   let arbeitGesamt = 0;
   stops.forEach(({ it, o }, idx) => {
     const key = o ? o.id : it.id;
     if (o && done(o.id)) return;
-    const fahrt = idx === 0 ? 0 : (it.fahrzeit ?? 20);
+    const k = o ? objStops.findIndex((s) => s.o.id === o.id) : -1;
+    const real = k > 0 ? legs[k] : null;
+    const fahrt = idx === 0 ? 0 : (real && !it.fahrzeitManuell ? real.min : (it.fahrzeit ?? 20));
+    const km = idx === 0 ? 0 : (real?.km || 0);
     fahrtGesamt += fahrt;
+    kmGesamt += km;
     const arrival = addMin(clock, fahrt);
     const start = it.uhrzeit && it.uhrzeit > arrival ? it.uhrzeit : arrival;
     const dauer = it.dauer || terminTyp(it).dauer || (o ? Math.round(avgHours(o.id) * 60) : 60);
     arbeitGesamt += dauer;
     const end = addMin(start, dauer);
-    plan[key] = { start, end, fahrt, dauer };
+    plan[key] = { start, end, fahrt, dauer, km };
     clock = end;
   });
   const addrs = stops.map((s) => objAddress(s.o)).filter(Boolean);
@@ -153,12 +172,12 @@ route('/tour', async (_, q) => {
     <div class="card tour-head">
       <div class="row between">
         <a class="icon-btn" href="#/tour?datum=${addDays(datum, -1)}" aria-label="Vorheriger Tag">‹</a>
-        <div class="center"><b>${datum === today() ? 'Heute' : fmtDateLong(datum)}</b><div class="muted small">${stops.length} ${stops.length === 1 ? 'Termin' : 'Termine'} · ${doneCount} erledigt · Fahrweg ca. ${fmtNum(fahrtGesamt / 60)} Std. · Arbeit ca. ${fmtNum(arbeitGesamt / 60)} Std.</div></div>
+        <div class="center"><b>${datum === today() ? 'Heute' : fmtDateLong(datum)}</b><div class="muted small">${stops.length} ${stops.length === 1 ? 'Termin' : 'Termine'} · ${doneCount} erledigt · Fahrweg ca. ${fmtNum(fahrtGesamt / 60)} Std.${kmGesamt ? ` (${fmtNum(kmGesamt)} km)` : ''} · Arbeit ca. ${fmtNum(arbeitGesamt / 60)} Std.</div></div>
         <a class="icon-btn" href="#/tour?datum=${addDays(datum, 1)}" aria-label="Nächster Tag">›</a>
       </div>
       ${stops.length ? `<div class="bar"><div style="width:${(doneCount / stops.length) * 100}%"></div></div>` : ''}
       ${routeUrl ? `<a class="btn block" href="${routeUrl}" target="_blank" rel="noopener">🧭 Ganze Route in Google Maps</a>` : ''}
-      ${stops.some((s) => s.o) ? `<a class="btn ghost block" href="#/fahrt/neu?datum=${datum}&objekte=${stops.filter((s) => s.o).map((s) => s.o.id).join(',')}">🚗 Fahrt ins Fahrtenbuch</a>` : ''}
+      ${stops.some((s) => s.o) ? `<a class="btn ghost block" href="#/fahrt/neu?datum=${datum}&km=${kmGesamt ? fmtNum(kmGesamt).replace(',', '.') : ''}&objekte=${stops.filter((s) => s.o).map((s) => s.o.id).join(',')}">🚗 Fahrt ins Fahrtenbuch</a>` : ''}
     </div>
     <div class="timeline">
       ${stops.map(({ it, o }, i) => {
@@ -170,7 +189,7 @@ route('/tour', async (_, q) => {
         const ziel = adresse || it.ort;
         return `<div class="card plan-entry tour-stop ${isDone ? 'done' : ''} ${isReinigung(it) ? '' : 'termin-typ'}">
         <div class="row between"><b>${i + 1}. ${isReinigung(it) ? '' : `${t.icon} `}${esc(titel)}</b>${isDone ? '<span class="badge ok">✓ erledigt</span>' : p ? `<span class="badge">${esc(p.start)}–${esc(p.end)} Uhr</span>` : ''}</div>
-        ${!isDone && p ? `<div class="small muted">${p.fahrt ? `🚗 ${p.fahrt} Min. Fahrt · ` : ''}${isReinigung(it) ? '🧽' : t.icon} ${esc(t.label)} · ca. ${p.dauer} Min.</div>` : ''}
+        ${!isDone && p ? `<div class="small muted">${p.fahrt ? `🚗 ${p.fahrt} Min.${p.km ? ` · ${fmtNum(p.km)} km` : ''} Fahrt · ` : ''}${isReinigung(it) ? '🧽' : t.icon} ${esc(t.label)} · ca. ${p.dauer} Min.</div>` : ''}
         ${o && adresse ? `<div class="muted small">${esc(adresse)}${it.datum < datum ? ` · <span class="danger-text">${esc(whenLabel(it.datum))}</span>` : ''}</div>` : ''}
         ${o?.zugang ? `<div class="small">🔑 ${esc(o.zugang)}</div>` : ''}
         ${o && (o.vorOrtName || o.vorOrtTelefon) ? `<div class="small">👤 ${esc(o.vorOrtName || 'Ansprechpartner')}${o.vorOrtTelefon ? ` · <a href="tel:${esc(o.vorOrtTelefon.replace(/\s/g, ''))}">${esc(o.vorOrtTelefon)}</a>` : ''}</div>` : ''}

@@ -819,3 +819,11 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 
 /* Großer Bildschirm (Tablet): inhaltlich breiter, ruhiger */
 @media (min-width: 720px) { .view { max-width: 760px; } .tabbar { max-width: 760px; left: 50%; right: auto; transform: translateX(-50%); border-left: 1px solid var(--border); border-right: 1px solid var(--border); } }
+
+/* Monatsabschluss & Fotopflicht */
+.month-head .bar { margin: 10px 0 6px; }
+.abschluss.done { border-left: 4px solid #16a34a; }
+.abschluss.ready { border-left: 4px solid #f59e0b; }
+.abschluss.none { opacity: .7; }
+.ok-text { color: var(--ok); font-weight: 700; }
+.wbar + .small, .hint-line { font-size: 13px; }

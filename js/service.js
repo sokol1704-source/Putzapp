@@ -185,3 +185,44 @@ async function applyDuePrices() {
     await DB.put('objects', o);
   }
 }
+
+/* ---------- Echte Fahrzeiten & Kilometer (OpenStreetMap, nur bei Internet) ---------- */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const geoFetch = (url) => fetch(url, { signal: AbortSignal.timeout(5000), headers: { 'Accept-Language': 'de' } }).then((r) => r.json());
+
+// Adresse → Koordinaten. Ergebnis wird am Haus gespeichert, damit nur einmal gesucht wird.
+async function ensureGeo(o) {
+  const adresse = objAddress(o);
+  if (!adresse) return null;
+  if (o.geo?.adresse === adresse) return o.geo;
+  const hit = (await geoFetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=de&q=${encodeURIComponent(adresse)}`))[0];
+  await sleep(1100); // Nutzungsrichtlinie: höchstens eine Anfrage pro Sekunde
+  if (!hit) return null;
+  o.geo = { lat: Number(hit.lat), lon: Number(hit.lon), adresse };
+  await DB.put('objects', o);
+  return o.geo;
+}
+
+// Fahrt zwischen zwei Koordinaten: Minuten und Kilometer
+async function drivingLeg(a, b) {
+  const j = await geoFetch(`https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`);
+  const r = j.routes?.[0];
+  return r ? { min: Math.max(1, Math.round(r.duration / 60)), km: Math.round(r.distance / 100) / 10 } : null;
+}
+
+// Fahrten zwischen aufeinanderfolgenden Häusern. Gibt { [index]: {min, km} } zurück, leer ohne Internet.
+async function travelLegs(objs) {
+  const legs = {};
+  try {
+    const geos = [];
+    for (const o of objs) geos.push(await ensureGeo(o));
+    for (let i = 1; i < objs.length; i++) {
+      if (!geos[i - 1] || !geos[i]) continue;
+      const leg = await drivingLeg(geos[i - 1], geos[i]);
+      if (leg) legs[i] = leg;
+    }
+  } catch {
+    // offline oder Dienst nicht erreichbar: die Schätzwerte aus der Tagestour bleiben
+  }
+  return legs;
+}

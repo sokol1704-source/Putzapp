@@ -115,7 +115,7 @@ async function fahrtForm(f, q) {
   const objects = (await DB.all('objects')).filter((o) => o.aktiv !== false || f?.objektIds?.includes(o.id)).sort((a, b) => objLabel(a).localeCompare(objLabel(b), 'de'));
   const isNew = !f;
   const pre = (q.objekte || '').split(',').filter(Boolean);
-  f = f || { datum: q.datum || today(), km: '', kmStart: '', kmEnde: '', zweck: pre.length ? 'Reinigungstour' : '', objektIds: pre };
+  f = f || { datum: q.datum || today(), km: q.km || '', kmStart: '', kmEnde: '', zweck: pre.length ? 'Reinigungstour' : '', objektIds: pre };
   render(isNew ? 'Fahrt eintragen' : 'Fahrt', `
     <form id="f" class="form">
       <label>Datum<input type="date" name="datum" value="${esc(f.datum)}"></label>
@@ -249,6 +249,7 @@ route('/buchhaltung', async () => {
       ${tile('#/ausgaben', '🧾', 'Ausgaben', `${d.aus.length} in ${jahr} · ${money(d.aus.reduce((s, a) => s + betrieblich(a), 0))}`, belegeFehlen || '')}
       ${tile('#/fahrten', '🚗', 'Fahrtenbuch', `${fmtNum(d.km)} km in ${jahr}`)}
       ${tile('#/rechnungen?filter=offen', '💶', 'Offene Rechnungen', `${offen.length} offen`, overdue.length || '')}
+      ${tile('#/monatsabschluss', '🗓️', 'Monatsabschluss', 'Was ist abzurechnen?')}
       ${tile('#/preise', '📈', 'Preisanpassung', 'Preise erhöhen & ankündigen', objects.some((o) => o.neuerPreis) ? '!' : '')}
     </div>
   `);

@@ -116,6 +116,8 @@ async function appointmentForm(a, q) {
       fahrzeit: Number(fd.get('fahrzeit')) || 0,
       aufgaben: typ === 'reinigung' ? tasks.map((t) => t.text) : [],
       notiz: fd.get('notiz').trim(),
+      // Nur wenn du die Fahrzeit selbst geändert hast, gilt sie statt der echten Route
+      fahrzeitManuell: Number(fd.get('fahrzeit')) !== 20 && fd.get('fahrzeit') !== '',
     });
     await DB.put('appointments', a);
     toast('✓ Termin gespeichert');
@@ -216,6 +218,7 @@ async function visitForm(v, q) {
       <div class="label">Zusatzleistungen <span class="muted small">(werden extra berechnet)</span></div>
       <ul class="tasks extras" id="extras"></ul>
       <div class="label">Fotos</div>
+      <p class="small" id="fotoHint"></p>
       <div id="photos"></div>
       <label>Notiz<textarea name="notiz" rows="3" placeholder="z. B. Besonderheiten, Verschmutzungen, Material verbraucht…">${esc(v.notiz)}</textarea></label>
       ${v.rechnungId ? '<p class="muted small">Dieser Einsatz ist bereits abgerechnet.</p>' : ''}
@@ -238,6 +241,21 @@ async function visitForm(v, q) {
     $('#sameAsLast').remove();
   });
   photoEditor($('#photos'), existing, pending);
+  // Fotopflicht: zeigt, wie viele Nachher-Fotos noch fehlen
+  const fotoPflicht = () => omap[$('#f').objektId.value]?.fotoPflicht || 0;
+  const nachherCount = () => [...existing, ...pending].filter((p) => p.typ === 'nachher').length;
+  const updateFotoHint = () => {
+    const n = fotoPflicht();
+    const hint = $('#fotoHint');
+    if (!n) { hint.textContent = ''; return; }
+    const have = nachherCount();
+    hint.innerHTML = have >= n
+      ? `<span class="ok-text">✓ Fotopflicht erfüllt (${have} von ${n} Nachher-Fotos)</span>`
+      : `<span class="danger-text">📷 Pflicht: noch ${n - have} von ${n} Nachher-Fotos fehlen</span>`;
+  };
+  new MutationObserver(updateFotoHint).observe($('#photos'), { childList: true, subtree: true });
+  $('#f').objektId.addEventListener('change', updateFotoHint);
+  updateFotoHint();
 
   const f = $('#f');
   f.objektId.addEventListener('change', () => {
@@ -252,6 +270,10 @@ async function visitForm(v, q) {
     $('#save').disabled = true;
     const fd = new FormData(f);
     const o = omap[fd.get('objektId')];
+    if (o?.fotoPflicht && nachherCount() < o.fotoPflicht) {
+      $('#save').disabled = false;
+      return alert(`Für ${objLabel(o)} sind ${o.fotoPflicht} Nachher-Fotos Pflicht – du hast ${nachherCount()}. Bitte ergänzen.`);
+    }
     Object.assign(v, {
       objektId: o.id,
       kundeId: o.kundeId,
