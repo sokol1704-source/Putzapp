@@ -63,6 +63,20 @@ Deinstallieren neu installieren, und dabei gehen die Daten auf dem Handy verlore
 Vor jedem neuen Build `versionCode` in `android/app/build.gradle` erhöhen.
 Icons und Splash-Screens neu erzeugen: `node scripts/android-icons.js`.
 
+## Website
+
+Die Firmen-Website liegt in `website/` (reines HTML/CSS, keine Cookies, keine Tracker, keine externen Schriften):
+Startseite mit Leistungen, Vorteilen, Preis-Schnellcheck, Ablauf, FAQ und Anfrageformular (öffnet E-Mail bzw. WhatsApp,
+speichert nichts), dazu `impressum.html` und `datenschutz.html`.
+
+Vor der Veröffentlichung ausfüllen:
+- gelb markierte Platzhalter `[…]` in `index.html`, `impressum.html`, `datenschutz.html` (Name, Anschrift, Telefon, E-Mail, Region)
+- `KONTAKT` (Telefon, WhatsApp, E-Mail) und ggf. die Richtpreise `PREISE` oben in `website/main.js`
+
+Mit GitHub Pages ist sie unter `https://<benutzer>.github.io/Putzapp/website/` erreichbar. Für eine eigene Domain
+(z. B. toths-reinigung.de) den Ordnerinhalt bei einem Webhoster hochladen und den Abschnitt „Hosting“ der
+Datenschutzerklärung anpassen.
+
 ## Lokal starten
 
 ```bash
