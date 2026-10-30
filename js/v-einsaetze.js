@@ -232,6 +232,7 @@ async function visitForm(v, q) {
         await DB.put('appointments', { kundeId: o.kundeId, objektId: o.id, datum: nextDate, uhrzeit: o.uhrzeit || v.von || '', aufgaben: dueTasks(o, await DB.all('visits'), nextDate), notiz: '', erledigt: false });
       }
     }
+    if (isNew) await consumeMaterial('reinigung');
     vibrate(15);
     toast('✓ Einsatz gespeichert');
     go(`#/einsatz/${v.id}`, true);

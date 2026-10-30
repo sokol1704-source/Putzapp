@@ -83,6 +83,11 @@ async function weatherForecast(force = false) {
   }
 }
 
+const streuHint = (material) => {
+  const low = material.filter((m) => m.kategorie === 'Streumittel' && isLow(m));
+  return low.length ? `<a class="small danger-text mt block-link" href="#/material?tab=einkauf">⚠️ Streumittel knapp: ${esc(low.map((m) => `${m.name} (${matNum(m.bestand)} ${m.einheit})`).join(', '))} – jetzt einkaufen</a>` : '';
+};
+
 const winterObjects = (objects) => objects.filter((o) => o.aktiv !== false && o.winterAbrechnung && o.winterAbrechnung !== 'keiner');
 
 // Wetterkarte auf der Startseite (wird nachgeladen, wenn Internet da ist)
@@ -97,6 +102,7 @@ async function fillWeatherCard(el, objects) {
   el.innerHTML = `<div class="card weather ${risk ? 'risk' : ''}">
     <div class="row between"><b>${risk ? `❄️ ${esc(risk.risiko)} ${label(risk).toLowerCase()}` : '🌤️ Wetter'}</b><span class="muted small">${esc(S.wetterOrt?.name || '')}</span></div>
     <div class="weather-days">${next.map((d) => `<div class="${d.risiko ? 'risk' : ''}"><span>${label(d)}</span><b>${Math.round(d.tmin)}° / ${Math.round(d.tmax)}°</b><small>${d.schnee >= 0.5 ? `🌨️ ${fmtNum(Math.round(d.schnee * 10) / 10)} cm` : d.regen >= 0.3 ? `🌧️ ${fmtNum(Math.round(d.regen))} mm` : '–'}</small></div>`).join('')}</div>
+    ${risk && wobjs.length ? streuHint(await DB.all('material')) : ''}
     ${risk && wobjs.length ? `<div class="small mt">Winterdienst bei <b>${wobjs.length} ${wobjs.length === 1 ? 'Haus' : 'Häusern'}</b>: ${esc(wobjs.map(objLabel).join(', '))}</div>
       <a class="btn small winter-btn mt" href="#/winter/neu">❄️ Einsatz eintragen</a>` : ''}
   </div>`;
@@ -129,6 +135,7 @@ async function scheduleNotifications(force = false) {
     const [hh, mm] = (S.erinnerungUhrzeit || '19:00').split(':').map(Number);
     const eveningBefore = (datum) => { const d = parseISO(addDays(datum, -1)); d.setHours(hh, mm, 0, 0); return d; };
     const notes = [];
+    const lowMat = (await DB.all('material')).filter(isLow).map((m) => m.name);
     for (let i = 1; i <= 14; i++) {
       const datum = addDays(today(), i);
       const items = plan.filter((p) => p.datum === datum).sort((a, b) => (a.uhrzeit || '99').localeCompare(b.uhrzeit || '99'));
@@ -138,7 +145,7 @@ async function scheduleNotifications(force = false) {
       notes.push({
         id: 1000 + i,
         title: `Morgen: ${items.length} ${items.length === 1 ? 'Haus' : 'Häuser'} 🧽`,
-        body: `${items[0].uhrzeit ? `Los geht's um ${items[0].uhrzeit} Uhr: ` : ''}${names.join(', ')}`,
+        body: `${items[0].uhrzeit ? `Los geht's um ${items[0].uhrzeit} Uhr: ` : ''}${names.join(', ')}${i === 1 && lowMat.length ? ` · 🛒 Fast leer: ${lowMat.join(', ')}` : ''}`,
         schedule: { at: at.toISOString(), allowWhileIdle: true },
       });
     }

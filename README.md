@@ -20,6 +20,7 @@ Gemacht für die **Treppenhaus- und Objektreinigung in Mehrfamilienhäusern**.
 - **Unterschrift auf dem Display** – Leistungsnachweis und Vertrag direkt auf dem Handy unterschreiben lassen
 - **Reinigungsvertrag** – Muster mit Leistungsumfang, Preis, Winterdienst, Kündigungsfrist und Preisanpassungsklausel
 - **Erinnerungen** (Android-App) – am Vorabend an die Häuser von morgen; **Glätte-Warnung** über die Wettervorhersage (Open-Meteo) für Häuser mit Winterdienst
+- **Material & Einkaufsliste** – Lager mit Mindest- und Sollbestand, automatischer Verbrauch je Reinigung bzw. Winter-Einsatz, Reichweite, Einkaufsliste zum Teilen, Einkauf direkt als Ausgabe buchen; Hinweise auf der Startseite, in der Abend-Erinnerung und bei Glättegefahr (Streumittel)
 - **Finanzen** – Ausgaben mit Belegfoto, Fahrtenbuch (0,30 €/km), Gewinn-Übersicht und EÜR-Export als CSV (Excel) für das Steuerbüro
 - **Auswertung** – Umsatz pro Monat und tatsächlicher Stundenlohn je Haus
 - **Urlaub & Krankheit** – Termine im Zeitraum nachholen oder absagen, fertige Nachricht an jede Hausverwaltung

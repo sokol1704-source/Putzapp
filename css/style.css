@@ -640,3 +640,19 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 .pdf-render .inv-brand b { background: none; color: #0f766e; -webkit-text-fill-color: #0f766e; }
 .pdf-render .inv-logo { border-radius: 14px; }
 .sign-row { align-items: end; }
+
+/* Material */
+.mat.low { border-left: 4px solid var(--bad); }
+.stepper { display: flex; align-items: center; gap: 2px; background: var(--bg); border-radius: 999px; padding: 2px; }
+.stepper b { min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+.stepper .icon-btn { width: 34px; height: 34px; border-radius: 50%; font-size: 20px; color: var(--brand); padding: 0; }
+.stepper .icon-btn:active { background: var(--brand-soft); }
+.shop-item { display: flex !important; align-items: center; gap: 12px; cursor: pointer; transition: opacity .2s; }
+.shop-item .grow { flex: 1; min-width: 0; }
+.shop-item.done { opacity: .55; }
+.shop-item.done b { text-decoration: line-through; }
+.qty-box { display: flex; flex-direction: column; align-items: center; }
+.qty-box input { width: 64px; margin: 0; text-align: center; font-weight: 700; padding: 8px 4px; }
+.qty-box small { font-size: 11px; color: var(--muted); }
+.shop-hint { border-left: 4px solid #f59e0b; }
+.block-link { display: block; }

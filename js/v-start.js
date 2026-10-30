@@ -14,6 +14,7 @@ route('/', async () => {
   const offen = data.invoices.filter((i) => i.status === 'offen');
   const offenSumme = offen.reduce((s, i) => s + i.summe, 0);
   const maengelOffen = data.maengel.filter((m) => m.status !== 'erledigt').length;
+  const fastLeer = (await DB.all('material')).filter(isLow);
   const umsatzMonat = data.invoices.filter((i) => i.status !== 'storniert' && i.datum.startsWith(t.slice(0, 7))).reduce((s, i) => s + i.summe, 0);
 
   // Auftraggeber mit nicht abgerechneten Einsätzen im Vormonat → Monatsrechnung fällig
@@ -42,6 +43,8 @@ route('/', async () => {
     </div>
     ${backupDue ? `<a class="card hint" href="#/einstellungen">💾 <b>Zeit für eine Datensicherung!</b> ${S.letzteSicherung ? `Die letzte ist vom ${fmtDate(S.letzteSicherung)}.` : 'Du hast noch keine erstellt.'} Alle Daten liegen nur auf diesem Handy.</a>` : ''}
     ${settingsComplete() ? '' : `<a class="card hint" href="#/einstellungen">⚠️ <b>Firmendaten fehlen.</b> Für korrekte Rechnungen bitte Name, Anschrift und Steuernummer eintragen.</a>`}
+    ${fastLeer.length ? `<a class="card link shop-hint" href="#/material?tab=einkauf"><div class="row between"><b>🛒 ${fastLeer.length} ${fastLeer.length === 1 ? 'Sache' : 'Sachen'} fast leer</b><span class="muted">›</span></div>
+      <div class="muted small">${esc(fastLeer.map((m) => m.name).join(', '))}</div></a>` : ''}
     <div id="weather"></div>
     <div class="qa">
       <a href="#/mangel/neu"><span>⚠️</span>Mangel melden</a>
@@ -81,6 +84,7 @@ route('/mehr', async () => {
   const winterCount = data.winter.filter((w) => seasonOf(w.datum) === season).length;
   const angeboteOffen = data.angebote.filter((a) => a.status === 'offen').length;
   const unbilled = data.visits.filter((v) => !v.rechnungId).length;
+  const material = await DB.all('material');
   const tile = (href, icon, title, sub, badge = '') => `<a class="tile" href="${href}">
     <span class="tile-icon">${icon}</span><b>${title}</b><span class="muted small">${sub}</span>${badge ? `<span class="tile-badge">${badge}</span>` : ''}</a>`;
   render('Mehr', `
@@ -93,6 +97,7 @@ route('/mehr', async () => {
       ${tile('#/angebote', '📝', 'Angebote', 'Preise berechnen & anbieten', angeboteOffen || '')}
       ${tile('#/tour', '🚐', 'Tagestour', 'Alle Häuser von heute')}
       ${tile('#/leistungen', '💶', 'Leistungen & Preise', `${S.leistungen.length} Zusatzleistungen`)}
+      ${tile('#/material', '🧴', 'Material', 'Lager & Einkaufsliste', material.filter(isLow).length || '')}
       ${tile('#/finanzen', '💰', 'Finanzen & Steuer', 'Gewinn, EÜR-Export')}
       ${tile('#/auswertung', '📊', 'Auswertung', 'Was bringt welches Haus?')}
       ${tile('#/ausgaben', '🧾', 'Ausgaben', 'Belege fotografieren')}

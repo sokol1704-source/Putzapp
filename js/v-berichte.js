@@ -310,6 +310,7 @@ async function winterForm(w, q) {
     w.fotoAnzahl = existing.length + pending.length;
     await DB.put('winter', w);
     vibrate(15);
+    if (isNew) await consumeMaterial('winter');
     toast('❄️ Winterdienst gespeichert');
     go(`#/winter/${w.id}`, true);
   });
