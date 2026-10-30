@@ -57,10 +57,11 @@ route('/material', async (_, q) => {
     const soll = num(m.soll) || num(m.mindest) * 2 || 1;
     const pct = Math.min(100, (num(m.bestand) / soll) * 100);
     return `<div class="card mat ${isLow(m) ? 'low' : ''}" data-id="${m.id}">
-      <div class="row between"><a class="strong" href="#/material/${m.id}">${esc(m.name)}</a>
+      <div class="row between">
+        <a class="mat-edit strong" href="#/material/${m.id}" aria-label="${esc(m.name)} ändern">${esc(m.name)}<span class="mat-pen">✏️</span></a>
         <div class="stepper"><button class="icon-btn" data-step="-1" aria-label="Weniger">−</button><b>${matNum(m.bestand)}</b><button class="icon-btn" data-step="1" aria-label="Mehr">+</button></div></div>
       <div class="hbar"><span class="${isLow(m) ? 'bad' : pct < 60 ? 'warn' : 'ok'}" style="width:${pct}%"></span></div>
-      <div class="muted small">${esc(m.einheit)} · Mindestbestand ${matNum(m.mindest)}${rangeLabel(m, perWeek) ? ` · ${rangeLabel(m, perWeek)}` : ''}</div>
+      <a class="mat-edit muted small" href="#/material/${m.id}">${esc(m.einheit)} · Mindestbestand ${matNum(m.mindest)}${rangeLabel(m, perWeek) ? ` · ${rangeLabel(m, perWeek)}` : ''}</a>
     </div>`;
   };
 
@@ -79,6 +80,7 @@ route('/material', async (_, q) => {
         <div class="quick"><button class="btn" id="bought">✓ Eingekauft – Bestand auffüllen</button><button class="btn ghost" id="shareList">💬 Liste teilen</button></div>`
       : `<div class="empty">Alles da 👍<br><span class="small">Sobald etwas unter den Mindestbestand fällt, steht es hier.</span></div>`}
     ` : `
+      <p class="muted small mt">Tippe auf ein Material, um es zu ändern oder zu löschen. Mit − und + passt du den Bestand an.</p>
       <div class="row gap mt"><a class="btn" href="#/material/neu">+ Material</a>${items.length ? '' : '<button class="btn ghost" id="vorlagen">📋 Vorlagen laden</button>'}</div>
       ${MAT_KATEGORIEN.map((k) => { const list = items.filter((m) => m.kategorie === k); return list.length ? `<h3 class="section">${esc(k)}</h3>${list.map(stockCard).join('')}` : ''; }).join('')}
       ${items.length ? '<p class="muted small">Mit − und + korrigierst du den Bestand. Der Verbrauch pro Reinigung bzw. Winter-Einsatz wird beim Speichern automatisch abgezogen.</p>'
