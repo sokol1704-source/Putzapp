@@ -620,6 +620,7 @@ route('/angebot/:id', async ({ id }) => {
         <button class="btn ghost" id="print">🖨️ Drucken</button>
         ${a.status === 'offen' ? '<button class="btn ghost" id="yes">🎉 Angenommen</button><button class="btn ghost" id="no">Abgelehnt</button>' : ''}
         ${a.objektId ? `<a class="btn ghost" href="#/objekt/${a.objektId}">🏢 Zum Haus</a>` : ''}
+        ${a.status === 'angenommen' && a.objektId ? `<a class="btn ghost" href="#/rechnung/neu?kunde=${a.kundeId}&objekt=${a.objektId}">🧾 Erste Rechnung vorbereiten</a>` : ''}
       </div>
     </div>
     ${angebotNachfassen(a) ? `<div class="card hint no-print"><b>⏰ Seit ${daysBetween(a.datum, today())} Tagen keine Antwort</b>

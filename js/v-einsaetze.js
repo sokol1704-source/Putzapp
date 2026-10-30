@@ -38,6 +38,31 @@ route('/termine', async () => {
   `, { tab: 'termine', back: false });
 });
 
+route('/bestaetigen', async () => {
+  const data = await loadAll();
+  const morgen = addDays(today(), 1);
+  const items = planning(data).filter((p) => p.datum === morgen && p.objektId).sort((a, b) => (a.uhrzeit || '99').localeCompare(b.uhrzeit || '99'));
+  render('Bestätigungen', `
+    <p class="muted small">Schick deinen Auftraggebern eine kurze Nachricht für morgen. Eine Antwort kommt nicht automatisch in die App – sie kommt per WhatsApp oder Mail zurück.</p>
+    <h3 class="section">Morgen, ${fmtDateLong(morgen)}</h3>
+    ${items.map((p, i) => {
+      const o = data.omap[p.objektId];
+      return `<div class="card">
+        <div class="row between"><b>🏢 ${esc(objLabel(o))}</b><span class="muted">${p.uhrzeit ? `${esc(p.uhrzeit)} Uhr` : ''}</span></div>
+        <div class="muted small">${esc(kundeName(data.kmap, o?.kundeId))}</div>
+        <button class="btn small mt" type="button" data-bestaetigen="${i}">📨 Bestätigung senden</button>
+      </div>`;
+    }).join('') || '<div class="empty">Morgen ist nichts geplant.</div>'}
+  `, { tab: '', back: true });
+  document.querySelectorAll('[data-bestaetigen]').forEach((btn) => btn.addEventListener('click', () => {
+    const p = items[Number(btn.dataset.bestaetigen)];
+    const o = data.omap[p.objektId];
+    const k = data.kmap[o?.kundeId];
+    const text = `Guten Tag${k?.ansprechpartner ? ` ${k.ansprechpartner}` : ''},\n\nich bestätige Ihnen den Termin morgen, ${WEEKDAYS[parseISO(morgen).getDay()]}, den ${fmtDate(morgen)}${p.uhrzeit ? ` um ${p.uhrzeit} Uhr` : ''} für die Reinigung von ${objLabel(o)}.\n\nBitte geben Sie kurz Bescheid, falls etwas dazwischenkommt.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`;
+    shareText(text, 'Terminbestätigung');
+  }));
+});
+
 route('/termin/neu', (_, q) => appointmentForm(null, q));
 route('/termin/:id', async ({ id }) => appointmentForm(await DB.get('appointments', id), {}));
 

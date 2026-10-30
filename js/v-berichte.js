@@ -259,7 +259,7 @@ route('/objekt/:id/jahr', async ({ id }, q) => {
       <b>${jahr}</b>
       <a class="icon-btn" href="#/objekt/${id}/jahr?jahr=${Number(jahr) + 1}" aria-label="Nächstes Jahr">›</a>
     </div>
-    ${docButtons()}
+    ${docButtons('<button class="btn ghost" id="gespraech">🗣️ Gesprächsvorlage</button>')}
     <div class="doc-wrap"><article class="invoice-doc">
       ${docHeader()}
       <div class="inv-row">
@@ -288,6 +288,11 @@ route('/objekt/:id/jahr', async ({ id }, q) => {
       ${docFooter()}
     </article></div>
   `);
+  $('#gespraech').addEventListener('click', () => {
+    const mz = data.maengel.filter((x) => x.objektId === id && x.datum.startsWith(jahr));
+    const behoben = mz.filter((x) => x.status === 'erledigt').length;
+    shareText(`Guten Tag${k.ansprechpartner ? ` ${k.ansprechpartner}` : ''},\n\nich möchte Ihnen einen kurzen Rückblick auf ${jahr} für ${objLabel(o)} geben: ${sum('visits')} Reinigungen mit insgesamt ${fmtNum(sum('stunden'))} Stunden. Gemeldet wurden ${mz.length} Mängel, davon ${behoben} behoben.\n\nGern vereinbare ich mit Ihnen einen Termin für ein kurzes Gespräch, um Leistung und Preis für das kommende Jahr abzustimmen.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`, `Rückblick ${jahr}`);
+  });
   wireDocButtons(`Jahresübersicht ${objLabel(o)} ${jahr}`, `Guten Tag,\n\nanbei die Jahresübersicht ${jahr} für ${objLabel(o)}.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`);
 });
 
