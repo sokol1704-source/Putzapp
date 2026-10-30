@@ -223,6 +223,7 @@ route('/objekt/:id', async ({ id }) => {
       <a href="#/objekt/${id}/aushang"><span>📌</span>Aushang</a>
       <a href="#/objekt/${id}/vertrag"><span>📜</span>Vertrag</a>
       <a href="#/rechnung/neu?kunde=${o.kundeId}&objekt=${id}"><span>🧾</span>Rechnung</a>
+      ${(o.vorOrtTelefon || k?.telefon) ? `<a href="tel:${esc((o.vorOrtTelefon || k.telefon).replace(/\s/g, ''))}"><span>📞</span>Anrufen</a>` : `<a href="#/objekt/${id}/bearbeiten"><span>📞</span>Nummer</a>`}
     </div>
     ${o.aktiv === false ? `<button class="btn ghost block" id="danke">💌 Dankeschön an ${esc(k?.ansprechpartner || k?.name || 'den Auftraggeber')}</button>` : ''}
     <h3 class="section">Anstehend</h3>
