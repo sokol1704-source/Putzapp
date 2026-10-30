@@ -24,6 +24,10 @@ route('/termine', async () => {
       <a class="btn" href="#/termin/neu">+ Termin</a>
       <a class="btn ghost" href="#/tour">🚐 Tour heute</a>
     </div>
+    <div class="quick">
+      <a class="btn ghost" href="#/termin/neu?typ=besichtigung">📝 Angebot vor Ort</a>
+      <a class="btn ghost" href="#/termin/neu?typ=gespraech">🤝 Kundengespräch</a>
+    </div>
     ${weeks.map((w) => `<h3 class="section">${weekTitle(w.monday)}</h3>${w.items.map((p) => planCard(p, data)).join('')}`).join('')
       || '<div class="empty mt">Keine anstehenden Termine.<br><span class="small">Tipp: Beim Haus unter „Plan“ alle Termine auf einmal eintragen.</span></div>'}
     ${done.length ? `<details class="mt"><summary>Erledigte Termine</summary>
@@ -40,26 +44,35 @@ route('/termin/:id', async ({ id }) => appointmentForm(await DB.get('appointment
 async function appointmentForm(a, q) {
   const [allObjects, customers, visits] = await Promise.all([DB.all('objects'), DB.all('customers'), DB.all('visits')]);
   const objects = allObjects.filter((o) => o.aktiv !== false || o.id === a?.objektId).sort((x, y) => objLabel(x).localeCompare(objLabel(y), 'de'));
-  if (!objects.length) return noObjects();
+  if (!objects.length && !q.typ) return noObjects();
   const isNew = !a;
   const omap = Object.fromEntries(objects.map((o) => [o.id, o]));
   const kmap = Object.fromEntries(customers.map((c) => [c.id, c]));
   if (!a) {
     const o = omap[q.objekt];
+    const typ = q.typ || 'reinigung';
     const datum = q.datum || (o ? snapWeekday(nextPlanStart(o, visits), o.wochentag) : addDays(today(), 1));
-    a = { objektId: q.objekt || '', datum, uhrzeit: o?.uhrzeit || '', aufgaben: dueTasks(o, visits, datum), notiz: '', erledigt: false };
+    a = { objektId: q.objekt || '', typ, ort: '', dauer: 0, fahrzeit: 20, datum, uhrzeit: o?.uhrzeit || '', aufgaben: typ === 'reinigung' ? dueTasks(o, visits, datum) : [], notiz: '', erledigt: false };
   }
+  a.typ ||= 'reinigung';
   const tasks = a.aufgaben.map((text) => ({ text }));
+  const typOptions = Object.entries(TERMIN_TYPEN).map(([k, t]) => `<option value="${k}" ${a.typ === k ? 'selected' : ''}>${t.icon} ${t.label}</option>`).join('');
 
   render(isNew ? 'Termin planen' : 'Termin', `
     <form id="f" class="form">
-      ${objectSelect(objects, kmap, a.objektId)}
-      <div class="grid2">
+      <label>Art des Termins<select name="typ">${typOptions}</select></label>
+      <div id="objBox">${objectSelect(objects, kmap, a.objektId, 'Haus <span class="muted small">(optional bei Gespräch im Büro)</span>').replace(' required', '')}</div>
+      <label id="ortField">Ort <span class="muted small">(z. B. Kundenbüro, Adresse)</span><input name="ort" value="${esc(a.ort)}" placeholder="z. B. Büro Schmidt, Hauptstraße 1"></label>
+      <div class="grid3">
         <label>Datum *<input type="date" name="datum" required value="${esc(a.datum)}"></label>
         <label>Uhrzeit<input type="time" name="uhrzeit" value="${esc(a.uhrzeit)}"></label>
+        <label>Dauer (Min.)<input type="number" name="dauer" min="0" step="5" inputmode="numeric" value="${esc(a.dauer || '')}" placeholder="auto"></label>
       </div>
+      <label>Fahrzeit dorthin (Min.)<input type="number" name="fahrzeit" min="0" step="5" inputmode="numeric" value="${esc(a.fahrzeit ?? 20)}"></label>
+      <p class="muted small" id="dauerHint"></p>
+      <div id="reinigungBox">
       <div class="label">Was ist zu tun?</div>
-      <ul class="tasks" id="tasks"></ul>
+      <ul class="tasks" id="tasks"></ul></div>
       <label>Notiz<textarea name="notiz" rows="2">${esc(a.notiz)}</textarea></label>
       <button class="btn block" type="submit">Speichern</button>
       ${isNew ? '' : `
@@ -70,20 +83,38 @@ async function appointmentForm(a, q) {
   `);
   const f = $('#f');
   const editor = taskEditor($('#tasks'), tasks, false);
+  const syncType = () => {
+    const reinig = f.typ.value === 'reinigung';
+    $('#reinigungBox').hidden = !reinig;
+    const def = TERMIN_TYPEN[f.typ.value];
+    $('#dauerHint').textContent = reinig
+      ? 'Dauer wird automatisch aus deinen letzten Einsätzen im Haus geschätzt.'
+      : `Standard: ${def.dauer} Min. – leer lassen für diesen Wert.`;
+  };
+  f.typ.addEventListener('change', syncType);
+  syncType();
   f.objektId.addEventListener('change', () => {
     const o = omap[f.objektId.value];
     if (o?.uhrzeit && !f.uhrzeit.value) f.uhrzeit.value = o.uhrzeit;
-    editor.set(dueTasks(o, visits, f.datum.value || today()).map((text) => ({ text })));
+    if (f.typ.value === 'reinigung') editor.set(dueTasks(o, visits, f.datum.value || today()).map((text) => ({ text })));
   });
   f.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(f);
+    const typ = fd.get('typ');
+    const objektId = fd.get('objektId');
+    if (typ === 'reinigung' && !objektId) return alert('Für eine Reinigung bitte ein Haus wählen.');
+    if (!objektId && !fd.get('ort').trim()) return alert('Bitte einen Ort eintragen, z. B. das Kundenbüro.');
     Object.assign(a, {
-      objektId: fd.get('objektId'),
-      kundeId: omap[fd.get('objektId')]?.kundeId,
+      typ,
+      objektId,
+      kundeId: omap[objektId]?.kundeId || '',
+      ort: fd.get('ort').trim(),
       datum: fd.get('datum'),
       uhrzeit: fd.get('uhrzeit'),
-      aufgaben: tasks.map((t) => t.text),
+      dauer: Number(fd.get('dauer')) || 0,
+      fahrzeit: Number(fd.get('fahrzeit')) || 0,
+      aufgaben: typ === 'reinigung' ? tasks.map((t) => t.text) : [],
       notiz: fd.get('notiz').trim(),
     });
     await DB.put('appointments', a);
@@ -116,8 +147,8 @@ function downloadIcs(a, o) {
     `UID:${a.id}@toths-reinigung`,
     `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
     dt,
-    `SUMMARY:${icsEsc('Reinigung ' + objLabel(o))}`,
-    `LOCATION:${icsEsc(objAddress(o))}`,
+    `SUMMARY:${icsEsc(isReinigung(a) ? 'Reinigung ' + objLabel(o) : `${terminTyp(a).label}${a.ort ? ` – ${a.ort}` : o ? ` – ${objLabel(o)}` : ''}`)}`,
+    `LOCATION:${icsEsc(o ? objAddress(o) : a.ort || '')}`,
     `DESCRIPTION:${icsEsc([...(a.aufgaben || []), a.notiz].filter(Boolean).join('\n'))}`,
     'END:VEVENT', 'END:VCALENDAR',
   ].join('\r\n');

@@ -153,9 +153,22 @@ function confetti() {
 }
 
 /* ---------- Stoppuhr-Knöpfe & Zeitanzeige ---------- */
-document.addEventListener('click', (e) => {
+document.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-start]');
-  if (btn) { e.preventDefault(); startTimer(btn.dataset.start, btn.dataset.termin || ''); }
+  if (btn) { e.preventDefault(); startTimer(btn.dataset.start, btn.dataset.termin || ''); return; }
+  // Termin ohne Haus (Angebot vor Ort, Gespräch) direkt als erledigt markieren
+  const done = e.target.closest('[data-done]');
+  if (done) {
+    e.preventDefault();
+    const t = await DB.get('appointments', done.dataset.done);
+    if (!t) return;
+    t.erledigt = true;
+    await DB.put('appointments', t);
+    vibrate(15);
+    toast(`✓ ${terminTyp(t).label} erledigt`);
+    scheduleNotifications(true);
+    router();
+  }
 });
 $('#timerPill').addEventListener('click', () => {
   if (confirm('Zeitmessung beenden und Einsatz erfassen?')) stopTimer();

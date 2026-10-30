@@ -330,10 +330,21 @@ function assignStarts(o, visits, oldTasks) {
 }
 
 // Offene Termine + automatisch berechnete Fälligkeiten aus dem Rhythmus
+// Termin-Arten: Dauer in Minuten (0 = automatisch aus den letzten Einsätzen) und Standard-Fahrzeit
+const TERMIN_TYPEN = {
+  reinigung: { label: 'Reinigung', icon: '🧽', dauer: 0 },
+  besichtigung: { label: 'Angebot vor Ort', icon: '📝', dauer: 60 },
+  gespraech: { label: 'Kundengespräch', icon: '🤝', dauer: 45 },
+  sonstiges: { label: 'Sonstiges', icon: '📌', dauer: 30 },
+};
+const terminTyp = (a) => TERMIN_TYPEN[a.typ || 'reinigung'] || TERMIN_TYPEN.reinigung;
+const isReinigung = (a) => (a.typ || 'reinigung') === 'reinigung';
+
 function planning({ objects, visits, appointments }) {
   const items = appointments
     .filter((a) => !a.erledigt)
-    .map((a) => ({ type: 'termin', id: a.id, datum: a.datum, uhrzeit: a.uhrzeit, objektId: a.objektId, aufgaben: a.aufgaben || [], notiz: a.notiz }));
+    .map((a) => ({ type: 'termin', id: a.id, datum: a.datum, uhrzeit: a.uhrzeit, objektId: a.objektId || '', aufgaben: a.aufgaben || [], notiz: a.notiz,
+      typ: a.typ || 'reinigung', ort: a.ort || '', dauer: Number(a.dauer) || 0, fahrzeit: a.fahrzeit ?? 20 }));
   for (const o of objects) {
     if (o.aktiv === false || !(o.intervallTage > 0)) continue;
     if (items.some((i) => i.objektId === o.id)) continue;
@@ -525,6 +536,15 @@ function taskSummary(o, texts) {
 
 function planCard(it, data) {
   const o = data.omap[it.objektId];
+  if (!o && it.type === 'termin' && it.typ !== 'reinigung') {
+    // Termin ohne Haus (z. B. Kundengespräch im Büro)
+    const t = TERMIN_TYPEN[it.typ] || TERMIN_TYPEN.sonstiges;
+    return `<div class="card plan">
+      <div class="row between"><b>${t.icon} ${esc(t.label)}${it.ort ? ` · ${esc(it.ort)}` : ''}</b><span class="badge">${it.uhrzeit ? `${esc(it.uhrzeit)} Uhr` : 'Termin'}</span></div>
+      <div class="small muted">${esc(whenLabel(it.datum))}${it.notiz ? ` · 📝 ${esc(it.notiz)}` : ''}</div>
+      <div class="row gap mt"><button class="btn small" data-done="${it.id}">✓ Erledigt</button><a class="btn small ghost" href="#/termin/${it.id}">Bearbeiten</a></div>
+    </div>`;
+  }
   if (!o) return '';
   const overdue = it.datum < today();
   const tasks = taskSummary(o, it.aufgaben);
