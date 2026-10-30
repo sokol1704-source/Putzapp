@@ -767,3 +767,8 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 .mat-edit.strong { color: var(--brand); font-weight: 700; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .mat-pen { font-size: 13px; opacity: .55; }
 .mat .mat-edit:active { opacity: .7; }
+
+/* Suche */
+.search-bar input[type=search] { width: 100%; margin: 0 0 12px; font-size: 17px; padding: 14px 16px; border-radius: 16px; box-shadow: var(--shadow); }
+.search-hit b mark, .search-hit mark { background: #fde68a; color: #0f172a; border-radius: 3px; padding: 0 1px; }
+.topbar .gear { margin-left: 4px; }
