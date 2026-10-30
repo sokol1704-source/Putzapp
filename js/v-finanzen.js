@@ -1,6 +1,14 @@
 'use strict';
 
-const KATEGORIEN = ['Reinigungsmittel', 'Streumittel', 'Arbeitsmaterial & Geräte', 'Arbeitskleidung', 'Fahrzeug (Tanken, Werkstatt)', 'Telefon & Internet', 'Versicherungen', 'Werbung', 'Büro & Porto', 'Sonstiges'];
+const KATEGORIEN = ['Reinigungsmittel', 'Streumittel', 'Arbeitsmaterial & Geräte', 'Arbeitskleidung', 'Fahrzeug (Tanken, Werkstatt)', 'Computer, Handy & Software', 'Büromaterial & Porto', 'Telefon & Internet', 'Versicherungen', 'Werbung', 'Sonstiges'];
+// Nur der berufliche Anteil zählt (z. B. Laptop zu 50 % privat genutzt)
+const betrieblich = (a) => Math.round((a.betrag * (100 - (Number(a.privat) || 0))) / 100);
+function steuerHinweis(kategorie, betrag) {
+  if (kategorie === 'Computer, Handy & Software') return '💻 Computer, Zubehör und Software sind im Kaufjahr komplett absetzbar (Nutzungsdauer 1 Jahr).';
+  if (betrag > 80000 && /Geräte|Fahrzeug|Sonstiges/.test(kategorie)) return '📆 Über 800 €: wird in der Regel über mehrere Jahre abgeschrieben – kurz mit dem Steuerbüro klären.';
+  if (betrag > 0 && betrag <= 80000 && /Geräte/.test(kategorie)) return '✓ Bis 800 € (brutto, da Kleinunternehmer) sofort voll absetzbar.';
+  return '';
+}
 const yearOf = (d) => (d || '').slice(0, 4);
 const yearSeg = (base, jahr, years) => `<div class="seg">${years.map((y) => `<a href="${base}?jahr=${y}" class="${String(y) === String(jahr) ? 'active' : ''}">${y}</a>`).join('')}</div>`;
 const lastYears = () => { const y = new Date().getFullYear(); return [y - 2, y - 1, y]; };
@@ -18,8 +26,8 @@ route('/ausgaben', async (_, q) => {
     ${months.map((m) => {
       const items = list.filter((a) => a.datum.startsWith(m));
       return `<h3 class="section">${esc(monthLabel(m))} · ${money(items.reduce((s, a) => s + a.betrag, 0))}</h3>${items.map((a) => `<a class="card link" href="#/ausgabe/${a.id}">
-        <div class="row between"><b>${esc(a.beschreibung || a.kategorie)}</b><b>${money(a.betrag)}</b></div>
-        <div class="muted small">${fmtDate(a.datum)} · ${esc(a.kategorie)}${a.fotoAnzahl ? ' · 🧾 Beleg' : ' · <span class="danger-text">kein Beleg</span>'}</div></a>`).join('')}`;
+        <div class="row between"><b>${esc(a.beschreibung || a.kategorie)}</b><b>${money(betrieblich(a))}</b></div>
+        <div class="muted small">${fmtDate(a.datum)} · ${esc(a.kategorie)}${a.privat ? ` · ${a.privat} % privat (von ${money(a.betrag)})` : ''}${a.fotoAnzahl ? ' · 🧾 Beleg' : ' · <span class="danger-text">kein Beleg</span>'}</div></a>`).join('')}`;
     }).join('') || '<div class="empty">Noch keine Ausgaben.<br><span class="small">Putzmittel, Streusalz, Werkzeug … mit Foto vom Kassenzettel erfassen.</span></div>'}
   `);
 });
@@ -42,6 +50,8 @@ async function ausgabeForm(a) {
       </div>
       <label>Kategorie<select name="kategorie">${KATEGORIEN.map((k) => `<option ${k === a.kategorie ? 'selected' : ''}>${k}</option>`).join('')}</select></label>
       <label>Was / wo gekauft?<input name="beschreibung" value="${esc(a.beschreibung)}" placeholder="z. B. Bodenreiniger, Mikrofasertücher – Großhandel"></label>
+      <label>Privater Anteil <span class="muted small">(z. B. Laptop oder Handy auch privat genutzt)</span><select name="privat">${[0, 10, 20, 25, 30, 40, 50, 60, 70, 75].map((pct) => `<option value="${pct}" ${Number(a.privat || 0) === pct ? 'selected' : ''}>${pct ? `${pct} % privat – ${100 - pct} % absetzbar` : 'rein beruflich – 100 % absetzbar'}</option>`).join('')}</select></label>
+      <div class="card ok-note small" id="steuerHint" hidden></div>
       <label>Bezahlt mit<select name="zahlung">${['Karte', 'Bar', 'Überweisung', 'PayPal'].map((z) => `<option ${z === a.zahlung ? 'selected' : ''}>${z}</option>`).join('')}</select></label>
       <p class="muted small">Tipp: Fährst du mit dem eigenen Auto, trage die Kilometer im Fahrtenbuch ein (0,30 €/km) – dann Tankquittungen nicht zusätzlich als Ausgabe erfassen.</p>
       <button class="btn block" type="submit" id="save">Speichern</button>
@@ -49,10 +59,19 @@ async function ausgabeForm(a) {
     </form>
   `);
   photoEditor($('#photos'), existing, pending, [['beleg', 'Beleg']]);
+  const hint = () => {
+    const f = $('#f');
+    const t = steuerHinweis(f.kategorie.value, toCents(f.betrag.value));
+    $('#steuerHint').hidden = !t;
+    $('#steuerHint').textContent = t;
+  };
+  $('#f').addEventListener('input', hint);
+  $('#f').addEventListener('change', hint);
+  hint();
   $('#f').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    Object.assign(a, { betrag: toCents(fd.get('betrag')), datum: fd.get('datum'), kategorie: fd.get('kategorie'), beschreibung: fd.get('beschreibung').trim(), zahlung: fd.get('zahlung') });
+    Object.assign(a, { betrag: toCents(fd.get('betrag')), datum: fd.get('datum'), kategorie: fd.get('kategorie'), beschreibung: fd.get('beschreibung').trim(), zahlung: fd.get('zahlung'), privat: Number(fd.get('privat')) || 0 });
     if (!a.betrag) return alert('Bitte einen Betrag eintragen.');
     $('#save').disabled = true;
     await savePhotos(a.id, pending);
@@ -139,8 +158,8 @@ async function financeData(jahr) {
   const fahrtkosten = Math.round(km * KM_SATZ);
   const sumE = einnahmen.reduce((s, i) => s + i.summe, 0);
   const byKat = {};
-  aus.forEach((a) => { byKat[a.kategorie] = (byKat[a.kategorie] || 0) + a.betrag; });
-  const sumA = aus.reduce((s, a) => s + a.betrag, 0) + fahrtkosten;
+  aus.forEach((a) => { byKat[a.kategorie] = (byKat[a.kategorie] || 0) + betrieblich(a); });
+  const sumA = aus.reduce((s, a) => s + betrieblich(a), 0) + fahrtkosten;
   const offen = invoices.filter((i) => i.status === 'offen').reduce((s, i) => s + i.summe, 0);
   const umsatz = invoices.filter((i) => i.status !== 'storniert' && yearOf(i.datum) === jahr).reduce((s, i) => s + i.summe, 0);
   return { einnahmen, aus, fa, km, fahrtkosten, sumE, sumA, byKat, gewinn: sumE - sumA, offen, umsatz };
@@ -182,7 +201,7 @@ route('/finanzen', async (_, q) => {
     const eur = (cents) => (cents / 100).toFixed(2).replace('.', ',');
     const rows = [[`Einnahmen-Überschuss-Rechnung ${jahr} – ${S.firma}`], [], ['Datum', 'Art', 'Kategorie', 'Beschreibung', 'Betrag (EUR)', 'Beleg']];
     d.einnahmen.forEach((i) => rows.push([fmtDate(i.bezahltAm || i.datum), 'Einnahme', 'Betriebseinnahme (§ 19 UStG)', `${i.nummer} ${i.kunde.name}`, eur(i.summe), i.nummer]));
-    d.aus.forEach((a) => rows.push([fmtDate(a.datum), 'Ausgabe', a.kategorie, `${a.beschreibung} (${a.zahlung})`, eur(-a.betrag), a.fotoAnzahl ? 'Foto in App' : 'fehlt']));
+    d.aus.forEach((a) => rows.push([fmtDate(a.datum), 'Ausgabe', a.kategorie, `${a.beschreibung} (${a.zahlung})${a.privat ? ` – ${100 - a.privat} % beruflich von ${eur(a.betrag)} €` : ''}`, eur(-betrieblich(a)), a.fotoAnzahl ? 'Foto in App' : 'fehlt']));
     d.fa.forEach((f) => rows.push([fmtDate(f.datum), 'Ausgabe', 'Fahrtkosten (0,30 €/km)', `${fmtNum(f.km)} km – ${f.zweck}`, eur(-Math.round(num(f.km) * KM_SATZ)), 'Fahrtenbuch']));
     rows.push([], ['', 'Summe Einnahmen', '', '', eur(d.sumE)], ['', 'Summe Ausgaben', '', '', eur(-d.sumA)], ['', 'Gewinn', '', '', eur(d.gewinn)]);
     const csv = '﻿' + rows.map((r) => r.map(c).join(';')).join('\r\n');
@@ -227,7 +246,7 @@ route('/buchhaltung', async () => {
     <div class="tiles">
       ${tile('#/finanzen', '📒', 'Finanzen & Steuer', 'Gewinn, EÜR-Export, Belege')}
       ${tile('#/auswertung', '📊', 'Auswertung', 'Was bringt welches Haus?')}
-      ${tile('#/ausgaben', '🧾', 'Ausgaben', `${d.aus.length} in ${jahr} · ${money(d.aus.reduce((s, a) => s + a.betrag, 0))}`, belegeFehlen || '')}
+      ${tile('#/ausgaben', '🧾', 'Ausgaben', `${d.aus.length} in ${jahr} · ${money(d.aus.reduce((s, a) => s + betrieblich(a), 0))}`, belegeFehlen || '')}
       ${tile('#/fahrten', '🚗', 'Fahrtenbuch', `${fmtNum(d.km)} km in ${jahr}`)}
       ${tile('#/rechnungen?filter=offen', '💶', 'Offene Rechnungen', `${offen.length} offen`, overdue.length || '')}
       ${tile('#/preise', '📈', 'Preisanpassung', 'Preise erhöhen & ankündigen', objects.some((o) => o.neuerPreis) ? '!' : '')}

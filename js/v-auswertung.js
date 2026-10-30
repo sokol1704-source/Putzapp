@@ -32,7 +32,7 @@ async function analyticsData(jahr) {
   const umsatzM = Array(12).fill(0);
   const kostenM = Array(12).fill(0);
   invY.forEach((i) => { umsatzM[Number(i.datum.slice(5, 7)) - 1] += i.summe; });
-  ausgaben.filter((a) => yearOf(a.datum) === jahr).forEach((a) => { kostenM[Number(a.datum.slice(5, 7)) - 1] += a.betrag; });
+  ausgaben.filter((a) => yearOf(a.datum) === jahr).forEach((a) => { kostenM[Number(a.datum.slice(5, 7)) - 1] += betrieblich(a); });
   fahrten.filter((f) => yearOf(f.datum) === jahr).forEach((f) => { kostenM[Number(f.datum.slice(5, 7)) - 1] += Math.round(num(f.km) * KM_SATZ); });
   const umsatz = umsatzM.reduce((s, v) => s + v, 0);
   const kosten = kostenM.reduce((s, v) => s + v, 0);
