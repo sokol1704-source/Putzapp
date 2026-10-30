@@ -725,3 +725,153 @@ const recipientBlock = (k, a = absender()) => `<div class="inv-recipient">
     <div class="inv-sender">${esc([a.firma, a.inhaber, a.strasse, a.plzOrt].filter(Boolean).join(' · '))}</div>
     ${esc(k.name)}${k.ansprechpartner ? `<br>z. Hd. ${esc(k.ansprechpartner)}` : ''}<br>${esc(k.strasse)}<br>${esc(k.plzOrt)}
   </div>`;
+
+/* ---------- PDF direkt erzeugen & teilen ---------- */
+const loadedScripts = {};
+function loadScript(src) {
+  loadedScripts[src] ||= new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = res;
+    s.onerror = () => rej(new Error(`${src} konnte nicht geladen werden`));
+    document.head.appendChild(s);
+  });
+  return loadedScripts[src];
+}
+
+// Rendert ein Dokument (.invoice-doc) als A4-PDF. Lange Dokumente werden auf mehrere Seiten verteilt.
+async function docToPdf(docEl) {
+  await Promise.all([loadScript('js/vendor/html2canvas.min.js'), loadScript('js/vendor/jspdf.umd.min.js')]);
+  const holder = document.createElement('div');
+  holder.className = 'pdf-render';
+  const clone = docEl.cloneNode(true);
+  clone.querySelectorAll('.no-print').forEach((el) => el.remove());
+  // html2canvas kann SVG-Verläufe nicht zuverlässig zeichnen → PNG-Logo verwenden
+  clone.querySelectorAll('img[src="icons/icon.svg"]').forEach((img) => { img.src = 'icons/icon-512.png'; });
+  holder.appendChild(clone);
+  document.body.appendChild(holder);
+  try {
+    await Promise.all([...clone.querySelectorAll('img')].map((img) => (img.complete ? null : new Promise((r) => { img.onload = img.onerror = r; }))));
+    const top = clone.getBoundingClientRect().top;
+    const blockRects = [...clone.querySelectorAll('p, li, h2, h3, tr, figure, .sign-row, .parties, .inv-row, .inv-head, .inv-foot, .aushang-dates, .aushang-contact')]
+      .map((el) => { const r = el.getBoundingClientRect(); return [r.top - top, r.bottom - top]; });
+    const headRects = [...clone.querySelectorAll('h2, h3')].map((el) => { const r = el.getBoundingClientRect(); return [r.top - top, r.bottom - top]; });
+    const canvas = await window.html2canvas(clone, { scale: 2, backgroundColor: '#ffffff', logging: false });
+    const k = canvas.width / clone.offsetWidth;
+    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    const pageH = Math.floor((canvas.width * 297) / 210);
+    const topPad = Math.round(44 * k);
+    let y = 0;
+    for (let page = 0; y < canvas.height - 2; page++) {
+      const avail = page ? pageH - topPad : pageH;
+      let end = Math.min(y + avail, canvas.height);
+      // Nicht mitten durch eine Zeile, einen Absatz oder eine Tabellenzeile schneiden
+      if (end < canvas.height) {
+        const cut = blockRects.filter(([t, b]) => t * k < end && b * k > end && t * k > y + avail * 0.3).map(([t]) => t * k);
+        if (cut.length) end = Math.floor(Math.min(...cut)) - 4;
+        // Eine Überschrift nicht allein am Seitenende stehen lassen
+        const orphan = headRects.filter(([t, b]) => b * k <= end && b * k > end - 60 * k && t * k > y + avail * 0.3).map(([t]) => t * k);
+        if (orphan.length) end = Math.floor(Math.min(...orphan)) - 4;
+      }
+      const slice = document.createElement('canvas');
+      slice.width = canvas.width;
+      slice.height = end - y;
+      slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+      if (page) pdf.addPage();
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.9), 'JPEG', 0, page ? (topPad * 210) / canvas.width : 0, 210, (slice.height * 210) / canvas.width);
+      y = end;
+    }
+    return pdf.output('blob');
+  } finally {
+    holder.remove();
+  }
+}
+
+async function sharePdf(docEl, fileBase, text = '') {
+  toast('📄 PDF wird erstellt…');
+  try {
+    const blob = await docToPdf(docEl);
+    const name = `${fileBase.replace(/[^\wäöüÄÖÜß.-]+/g, '_')}.pdf`;
+    if (!(await shareFiles([{ blob, name }], fileBase, text))) download(blob, name);
+  } catch (e) {
+    toast('PDF fehlgeschlagen: ' + e.message);
+  }
+}
+
+// Knöpfe „Drucken“ und „Als PDF senden“ unter einem Dokument verdrahten
+function wireDocButtons(fileBase, text = '') {
+  $('#print')?.addEventListener('click', () => printPage(fileBase));
+  $('#sendPdf')?.addEventListener('click', () => sharePdf($('.invoice-doc'), fileBase, text));
+}
+const docActionButtons = (extra = '') => `<div class="quick">
+    <button class="btn" id="sendPdf">📤 Als PDF senden</button>
+    <button class="btn ghost" id="print">🖨️ Drucken</button>${extra}</div>`;
+
+/* ---------- Unterschrift auf dem Display ---------- */
+function signaturePad(title, defaultName = '') {
+  return new Promise((resolve) => {
+    const sheet = document.createElement('div');
+    sheet.className = 'sheet-backdrop';
+    sheet.innerHTML = `<div class="sheet">
+      <h3>${esc(title)}</h3>
+      <input class="sig-name" placeholder="Name in Druckbuchstaben" value="${esc(defaultName)}">
+      <div class="sig-box"><canvas></canvas><span class="sig-hint">Hier mit dem Finger unterschreiben</span></div>
+      <div class="row gap"><button class="btn ghost" data-act="clear">Löschen</button><button class="btn ghost" data-act="cancel">Abbrechen</button><button class="btn" data-act="ok">✓ Übernehmen</button></div>
+    </div>`;
+    document.body.appendChild(sheet);
+    const canvas = $('canvas', sheet);
+    const box = $('.sig-box', sheet);
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = box.clientWidth * dpr;
+    canvas.height = box.clientHeight * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#0b2545';
+    let drawing = false;
+    let empty = true;
+    let last = null;
+    const pos = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    canvas.addEventListener('pointerdown', (e) => { drawing = true; last = pos(e); canvas.setPointerCapture(e.pointerId); $('.sig-hint', sheet).hidden = true; });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!drawing) return;
+      const p = pos(e);
+      ctx.beginPath();
+      ctx.moveTo(last.x, last.y);
+      ctx.quadraticCurveTo(last.x, last.y, (last.x + p.x) / 2, (last.y + p.y) / 2);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      last = p;
+      empty = false;
+    });
+    const stop = () => { drawing = false; };
+    canvas.addEventListener('pointerup', stop);
+    canvas.addEventListener('pointercancel', stop);
+    const close = (result) => { sheet.classList.add('closing'); setTimeout(() => sheet.remove(), 200); resolve(result); };
+    sheet.addEventListener('click', (e) => {
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (act === 'clear') { ctx.clearRect(0, 0, canvas.width, canvas.height); empty = true; $('.sig-hint', sheet).hidden = false; }
+      if (act === 'cancel') close(null);
+      if (act === 'ok') {
+        if (empty) return toast('Bitte zuerst unterschreiben');
+        close({ name: $('.sig-name', sheet).value.trim(), png: canvas.toDataURL('image/png'), datum: today() });
+      }
+    });
+  });
+}
+
+// Unterschriftsfeld im Dokument: zeigt eine gespeicherte Unterschrift oder eine leere Linie
+const signSlot = (sig, label) => `<div class="sign-slot">
+    ${sig ? `<img src="${sig.png}" alt="Unterschrift"><div>${esc(sig.name || '')}${sig.name ? ', ' : ''}${fmtDate(sig.datum)}</div>` : '<div class="sign-empty"></div>'}
+    <div class="sign-label">${label}</div></div>`;
+
+/* ---------- Preise ---------- */
+// Monatspauschale für einen Monat – berücksichtigt eine angekündigte Preisanpassung
+function priceFor(o, month) {
+  if (o.neuerPreis && month >= o.neuerPreis.ab.slice(0, 7)) return o.neuerPreis.betrag;
+  // Für Monate vor einer bereits übernommenen Anpassung gilt der damalige Preis
+  const later = (o.preisHistorie || []).filter((h) => month < h.ab.slice(0, 7)).sort((a, b) => a.ab.localeCompare(b.ab));
+  return later.length ? later[0].alt : o.monatspauschale || 0;
+}
+const KM_SATZ = 30; // 0,30 € je gefahrenem Kilometer (Fahrten mit dem Privat-Pkw)

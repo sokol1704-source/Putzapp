@@ -186,16 +186,16 @@ route('/rechnung/neu', async (_, q) => {
           auto: true, pauschale: true, objektId: o.id, visitIds: sel.map((v) => v.id),
           beschreibung: `${prefix}Treppenhausreinigung – Monatspauschale ${monthLabel(m)}${sel.length ? `\nReinigungen am ${sel.map((v) => fmtDay(v.datum)).join(', ')}` : ''}`,
           datum: `${m}-01`, datumBis: lastOfMonth(m), menge: 1, einheit: 'Monat',
-          preis: old ? old.preis : o.monatspauschale || 0, art: 'arbeit',
+          preis: old ? old.preis : priceFor(o, m), art: 'arbeit',
         });
       } else {
-        out.push(...sel.map((v) => ({ ...visitToPosition(v, o, prefix), auto: true })));
+        out.push(...sel.map((v) => ({ ...visitToPosition(v, o, prefix), objektId: o.id, auto: true })));
       }
-      out.push(...extraPositions(sel, prefix));
+      out.push(...extraPositions(sel, prefix).map((p) => ({ ...p, objektId: o.id })));
       const ws = openWinter().filter((w) => w.objektId === o.id && selW.has(w.id));
       if (ws.length) {
         out.push({
-          auto: true, winterIds: ws.map((w) => w.id),
+          auto: true, objektId: o.id, winterIds: ws.map((w) => w.id),
           beschreibung: `${prefix}Winterdienst – Räumen/Streuen (am ${ws.map((w) => fmtDay(w.datum)).join(', ')})`,
           datum: ws[0].datum, ...(ws.length > 1 ? { datumBis: ws[ws.length - 1].datum } : {}),
           menge: ws.length, einheit: 'Einsatz', preis: o.winterPreis || 0, art: 'arbeit',
@@ -373,17 +373,18 @@ route('/rechnung/:id', async ({ id }) => {
     <div class="card no-print">
       <div class="row between"><span>Status</span><span class="badge ${overdue ? 'bad' : cls}">${overdue ? `überfällig seit ${fmtDate(inv.faellig)}` : label}${inv.bezahltAm ? ` am ${fmtDate(inv.bezahltAm)}` : ''}</span></div>
       <div class="quick">
-        <button class="btn" id="print">🖨️ Drucken / PDF</button>
+        <button class="btn" id="sendPdf">📤 Als PDF senden</button>
+        <button class="btn ghost" id="print">🖨️ Drucken</button>
         ${inv.status === 'offen' ? '<button class="btn ghost" id="paid">✓ Bezahlt</button>' : ''}
         ${inv.status === 'bezahlt' ? '<button class="btn ghost" id="unpaid">Wieder offen</button>' : ''}
         ${overdue ? '<button class="btn ghost" id="remind">⏰ Zahlungserinnerung</button>' : ''}
       </div>
-      <p class="muted small">Tipp: Im Druckdialog als Drucker „Als PDF speichern“ wählen und die PDF dann per WhatsApp oder E-Mail senden.</p>
+      <p class="muted small">„Als PDF senden“ öffnet WhatsApp, E-Mail & Co. direkt mit der fertigen PDF.</p>
     </div>
     <div class="doc-wrap">${invoiceDoc(inv)}</div>
     ${inv.status !== 'storniert' ? '<button class="btn danger ghost block no-print" id="storno">Rechnung stornieren</button>' : ''}
   `);
-  $('#print').addEventListener('click', () => printPage(`Rechnung ${inv.nummer}`));
+  wireDocButtons(`Rechnung ${inv.nummer}`, `Guten Tag${inv.kunde.ansprechpartner ? ` ${inv.kunde.ansprechpartner}` : ''},\n\nanbei erhalten Sie die Rechnung ${inv.nummer} über ${money(inv.summe)}.\n\nViele Grüße\n${inv.absender.inhaber}\n${inv.absender.firma}`);
   $('#paid')?.addEventListener('click', async () => {
     Object.assign(inv, { status: 'bezahlt', bezahltAm: today() });
     await DB.put('invoices', inv);
@@ -584,7 +585,8 @@ route('/angebot/:id', async ({ id }) => {
     <div class="card no-print">
       <div class="row between"><span>Status</span><span class="badge ${cls}">${label}</span></div>
       <div class="quick">
-        <button class="btn" id="print">🖨️ Drucken / PDF</button>
+        <button class="btn" id="sendPdf">📤 Als PDF senden</button>
+        <button class="btn ghost" id="print">🖨️ Drucken</button>
         ${a.status === 'offen' ? '<button class="btn ghost" id="yes">🎉 Angenommen</button><button class="btn ghost" id="no">Abgelehnt</button>' : ''}
         ${a.objektId ? `<a class="btn ghost" href="#/objekt/${a.objektId}">🏢 Zum Haus</a>` : ''}
       </div>
@@ -592,7 +594,7 @@ route('/angebot/:id', async ({ id }) => {
     <div class="doc-wrap">${angebotDoc(a)}</div>
     <button class="btn danger ghost block no-print" id="del">Angebot löschen</button>
   `);
-  $('#print').addEventListener('click', () => printPage(`Angebot ${a.nummer}`));
+  wireDocButtons(`Angebot ${a.nummer}`, `Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nanbei erhalten Sie mein Angebot für die Treppenhausreinigung ${a.objekt.strasse}. Ich freue mich auf Ihre Rückmeldung!\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`);
   $('#no')?.addEventListener('click', async () => { a.status = 'abgelehnt'; await DB.put('angebote', a); router(); });
   $('#yes')?.addEventListener('click', async () => {
     if (!confirm('Angebot angenommen? Ich lege dann Auftraggeber und Haus mit Plan und Monatspreis an.')) return;

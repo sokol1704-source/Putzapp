@@ -1,8 +1,7 @@
 'use strict';
 
 const signLines = (left = 'Ort, Datum', right = 'Unterschrift Auftraggeber') => `<div class="sign-lines"><div>${left}</div><div>${right}</div></div>`;
-const docButtons = (extra = '') => `<div class="card no-print"><div class="quick"><button class="btn" id="print">🖨️ Drucken / PDF</button>${extra}</div>
-  <p class="muted small">Im Druckdialog „Als PDF speichern“ wählen und an die Hausverwaltung schicken.</p></div>`;
+const docButtons = (extra = '') => `<div class="card no-print">${docActionButtons(extra)}</div>`;
 
 /* ---------- Leistungsnachweise ---------- */
 route('/nachweise', async () => {
@@ -38,6 +37,8 @@ route('/objekt/:id/nachweis', async ({ id }, q) => {
     pick.forEach((p) => photos.push({ ...p, datum: v.datum }));
   }
   const hours = visits.reduce((s, v) => s + num(v.stunden), 0);
+  const sigKey = `nachweis_${id}_${m}`;
+  const sig = await DB.get('unterschriften', sigKey);
 
   render('Leistungsnachweis', `
     <div class="card no-print row between">
@@ -45,7 +46,7 @@ route('/objekt/:id/nachweis', async ({ id }, q) => {
       <b>${esc(monthLabel(m))}</b>
       <a class="icon-btn" href="#/objekt/${id}/nachweis?monat=${next}" aria-label="Nächster Monat">›</a>
     </div>
-    ${docButtons()}
+    ${docButtons(sig ? '<button class="btn ghost" id="unsign">Unterschrift entfernen</button>' : '<button class="btn ghost" id="sign">✍️ Unterschreiben lassen</button>')}
     <div class="doc-wrap"><article class="invoice-doc">
       ${docHeader()}
       <div class="inv-row">
@@ -76,11 +77,20 @@ route('/objekt/:id/nachweis', async ({ id }, q) => {
       ${maengel.length ? `<h3 class="doc-h3">⚠️ Gemeldete Mängel</h3><ul class="doc-list">${maengel.map((x) => `<li>${fmtDate(x.datum)} · ${esc(x.ort)}: ${esc(x.text)} ${x.status === 'erledigt' ? '(behoben)' : ''}</li>`).join('')}</ul>` : ''}
       ${photos.length ? `<h3 class="doc-h3">📷 Fotodokumentation</h3><div class="doc-photos">${photos.map((p) => `<figure><img src="${objUrl(p.blob)}" alt=""><figcaption>${fmtDate(p.datum)}</figcaption></figure>`).join('')}</div>` : ''}
       <p class="inv-note">Die Arbeiten wurden ordnungsgemäß gemäß Leistungsverzeichnis ausgeführt.</p>
-      ${signLines()}
+      <div class="sign-row">${signSlot(null, 'Ort, Datum')}${signSlot(sig, 'Bestätigung Auftraggeber / Hausmeister')}</div>
       ${docFooter()}
     </article></div>
   `);
-  $('#print').addEventListener('click', () => printPage(`Leistungsnachweis ${objLabel(o)} ${monthLabel(m)}`));
+  wireDocButtons(`Leistungsnachweis ${objLabel(o)} ${monthLabel(m)}`, `Guten Tag,\n\nanbei der Leistungsnachweis für ${objLabel(o)} (${monthLabel(m)}).\n\nViele Grüße\n${S.inhaber}\n${S.firma}`);
+  $('#sign')?.addEventListener('click', async () => {
+    const sig = await signaturePad(`Leistungsnachweis ${monthLabel(m)} bestätigen`, o.vorOrtName || '');
+    if (!sig) return;
+    await DB.put('unterschriften', { id: sigKey, ...sig });
+    vibrate(15);
+    toast('✍️ Unterschrift gespeichert');
+    router();
+  });
+  $('#unsign')?.addEventListener('click', async () => { if (confirm('Unterschrift entfernen?')) { await DB.del('unterschriften', sigKey); router(); } });
 });
 
 /* ---------- Aushang fürs Treppenhaus ---------- */
@@ -108,7 +118,7 @@ route('/objekt/:id/aushang', async ({ id }) => {
       <div class="aushang-contact">Fragen, Lob oder Hinweise?<br><b>${esc(S.firma)}</b> · ${esc(S.inhaber)}${S.telefon ? `<br>📞 ${esc(S.telefon)}` : ''}${S.email ? ` · ✉️ ${esc(S.email)}` : ''}</div>
     </article></div>
   `);
-  $('#print').addEventListener('click', () => printPage(`Aushang ${objLabel(o)}`));
+  wireDocButtons(`Aushang ${objLabel(o)}`, `Aushang Treppenhausreinigung ${objLabel(o)}`);
 });
 
 /* ---------- Mängel ---------- */
@@ -367,5 +377,5 @@ route('/winter/protokoll/:id', async ({ id }, q) => {
       ${docFooter()}
     </article></div>
   `);
-  $('#print').addEventListener('click', () => printPage(`Streuprotokoll ${objLabel(o)} ${season}`));
+  wireDocButtons(`Streuprotokoll ${objLabel(o)} ${season}`, `Guten Tag,\n\nanbei das Räum- und Streuprotokoll für ${objLabel(o)} (Winter ${season}).\n\nViele Grüße\n${S.inhaber}\n${S.firma}`);
 });

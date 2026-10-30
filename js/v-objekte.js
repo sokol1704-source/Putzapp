@@ -219,6 +219,7 @@ route('/objekt/:id', async ({ id }) => {
       <a href="#/objekt/${id}/plan"><span>🗓️</span>Plan</a>
       <a href="#/objekt/${id}/nachweis"><span>📄</span>Nachweis</a>
       <a href="#/objekt/${id}/aushang"><span>📌</span>Aushang</a>
+      <a href="#/objekt/${id}/vertrag"><span>📜</span>Vertrag</a>
       <a href="#/rechnung/neu?kunde=${o.kundeId}&objekt=${id}"><span>🧾</span>Rechnung</a>
     </div>
     <h3 class="section">Anstehend</h3>
@@ -289,6 +290,7 @@ route('/objekt/:id/plan', async ({ id }, q) => {
     }
     vibrate(15);
     toast(`✓ ${n} Termine eingetragen`);
+    scheduleNotifications(true);
     navDirection = 'tab';
     go('#/termine');
   });

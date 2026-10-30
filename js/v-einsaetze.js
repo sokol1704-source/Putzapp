@@ -88,6 +88,7 @@ async function appointmentForm(a, q) {
     });
     await DB.put('appointments', a);
     toast('✓ Termin gespeichert');
+    scheduleNotifications(true);
     go('#/termine', true);
   });
   $('#ics')?.addEventListener('click', () => downloadIcs(a, omap[a.objektId]));

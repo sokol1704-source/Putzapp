@@ -21,7 +21,8 @@ route('/', async () => {
   const dueCustomers = data.customers.filter((c) => data.visits.some((v) => v.kundeId === c.id && !v.rechnungId && v.datum.startsWith(pm))
     || data.winter.some((w) => data.omap[w.objektId]?.kundeId === c.id && !w.rechnungId && w.datum.startsWith(pm) && data.omap[w.objektId]?.winterAbrechnung === 'einsatz'));
 
-  const backupDue = data.visits.length > 0 && (!S.letzteSicherung || daysBetween(S.letzteSicherung, t) > 7);
+  // Mit automatischer Sicherung (Android-App) reicht es, ab und zu eine Kopie in die Cloud zu legen
+  const backupDue = data.visits.length > 0 && (!S.letzteSicherung || daysBetween(S.letzteSicherung, t) > (S.letzteAutoSicherung ? 30 : 7));
   const hour = new Date().getHours();
   const greet = hour < 11 ? 'Guten Morgen' : hour < 17 ? 'Hallo' : 'Guten Abend';
   const firstName = (S.inhaber || '').split(' ')[0];
@@ -41,6 +42,7 @@ route('/', async () => {
     </div>
     ${backupDue ? `<a class="card hint" href="#/einstellungen">💾 <b>Zeit für eine Datensicherung!</b> ${S.letzteSicherung ? `Die letzte ist vom ${fmtDate(S.letzteSicherung)}.` : 'Du hast noch keine erstellt.'} Alle Daten liegen nur auf diesem Handy.</a>` : ''}
     ${settingsComplete() ? '' : `<a class="card hint" href="#/einstellungen">⚠️ <b>Firmendaten fehlen.</b> Für korrekte Rechnungen bitte Name, Anschrift und Steuernummer eintragen.</a>`}
+    <div id="weather"></div>
     <div class="qa">
       <a href="#/mangel/neu"><span>⚠️</span>Mangel melden</a>
       <a href="#/winter/neu"><span>❄️</span>Winterdienst</a>
@@ -68,6 +70,7 @@ route('/', async () => {
       <a class="btn" href="#/objekt/neu">+ Erstes Haus anlegen</a>
     </div>`}
   `, { tab: 'start', back: false });
+  fillWeatherCard($('#weather'), data.objects);
 });
 
 /* ---------- Mehr ---------- */
@@ -90,7 +93,13 @@ route('/mehr', async () => {
       ${tile('#/angebote', '📝', 'Angebote', 'Preise berechnen & anbieten', angeboteOffen || '')}
       ${tile('#/tour', '🚐', 'Tagestour', 'Alle Häuser von heute')}
       ${tile('#/leistungen', '💶', 'Leistungen & Preise', `${S.leistungen.length} Zusatzleistungen`)}
-      ${tile('#/einstellungen', '⚙️', 'Einstellungen', 'Firma, Rechnungen, Sicherung')}
+      ${tile('#/finanzen', '💰', 'Finanzen & Steuer', 'Gewinn, EÜR-Export')}
+      ${tile('#/auswertung', '📊', 'Auswertung', 'Was bringt welches Haus?')}
+      ${tile('#/ausgaben', '🧾', 'Ausgaben', 'Belege fotografieren')}
+      ${tile('#/fahrten', '🚗', 'Fahrtenbuch', '0,30 € je km absetzen')}
+      ${tile('#/abwesenheit', '🏖️', 'Urlaub & Krankheit', 'Termine verschieben')}
+      ${tile('#/preise', '📈', 'Preisanpassung', 'Preise erhöhen & ankündigen', data.objects.some((o) => o.neuerPreis) ? '!' : '')}
+      ${tile('#/einstellungen', '⚙️', 'Einstellungen', 'Firma, Erinnerungen, Sicherung')}
     </div>
   `, { tab: 'mehr', back: false });
 });
@@ -119,6 +128,7 @@ route('/tour', async (_, q) => {
       </div>
       ${stops.length ? `<div class="bar"><div style="width:${(doneCount / stops.length) * 100}%"></div></div>` : ''}
       ${routeUrl ? `<a class="btn block" href="${routeUrl}" target="_blank" rel="noopener">🧭 Ganze Route in Google Maps</a>` : ''}
+      ${stops.length ? `<a class="btn ghost block" href="#/fahrt/neu?datum=${datum}&objekte=${stops.map((s) => s.o.id).join(',')}">🚗 Fahrt ins Fahrtenbuch</a>` : ''}
     </div>
     <div class="timeline">
       ${stops.map(({ it, o }, i) => `<div class="card plan-entry tour-stop ${done(o.id) ? 'done' : ''}">

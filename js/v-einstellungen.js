@@ -43,10 +43,24 @@ route('/einstellungen', async () => {
     <a class="card link mt" href="#/leistungen"><div class="row between"><b>💶 Leistungen & Preise</b><span class="muted">›</span></div>
       <div class="muted small">${S.leistungen.length} Zusatzleistungen, z. B. Grundreinigung, Sperrmüll, Winterdienst</div></a>
 
+    <h3 class="section">🔔 Erinnerungen & Wetter</h3>
+    <div class="card form">
+      ${NATIVE ? `<label class="check"><input type="checkbox" id="notif" ${S.benachrichtigungen !== false ? 'checked' : ''}> Am Vorabend an die Häuser von morgen erinnern</label>
+      <label>Uhrzeit der Erinnerung<input type="time" id="notifTime" value="${esc(S.erinnerungUhrzeit || '19:00')}"></label>
+      <p class="muted small">Bei Häusern mit Winterdienst warnt die App zusätzlich am Vorabend vor Schnee und Glätte.${S.geplanteErinnerungen != null ? ` Aktuell geplant: ${S.geplanteErinnerungen} Erinnerungen.` : ''}</p>
+      <button class="btn ghost small" type="button" id="testNotif">Test-Benachrichtigung</button>` : '<p class="muted small">Erinnerungen und Glätte-Warnungen gibt es in der Android-App.</p>'}
+      <label class="mt">Ort für die Wettervorhersage
+        <div class="row gap"><input id="wOrt" value="${esc(S.wetterOrt?.name || '')}" placeholder="z. B. Mannheim"><button class="btn small" type="button" id="wSearch">Suchen</button></div>
+      </label>
+    </div>
+
     <h3 class="section" id="sicherung">💾 Datensicherung</h3>
     <div class="card">
       <p class="small">Alle Daten und Fotos liegen <b>nur auf diesem Handy</b>. Erstelle regelmäßig eine Sicherung und speichere sie z. B. in Google Drive – Rechnungen musst du 10 Jahre aufbewahren.</p>
-      <p class="muted small">Letzte Sicherung: ${S.letzteSicherung ? fmtDateLong(S.letzteSicherung) : 'noch nie'}${est ? ` · Speicher: ${(est.usage / 1048576).toFixed(1)} MB` : ''}${persisted ? ' · dauerhaft gespeichert ✓' : ''}</p>
+      ${NATIVE ? `<label class="check"><input type="checkbox" id="autoBk" ${S.autoSicherung !== false ? 'checked' : ''}> Jede Woche automatisch sichern</label>
+      <p class="muted small">${S.letzteAutoSicherung ? `Letzte automatische Sicherung: ${fmtDateLong(S.letzteAutoSicherung)} · ${esc(S.autoSicherungOrt || '')}` : 'Noch keine automatische Sicherung.'}${S.autoSicherungFehler ? ` <span class="danger-text">Fehler: ${esc(S.autoSicherungFehler)}</span>` : ''}</p>
+      <button class="btn ghost small" type="button" id="autoNow">Jetzt automatisch sichern</button>` : ''}
+      <p class="muted small">Letzte Sicherung zum Teilen: ${S.letzteSicherung ? fmtDateLong(S.letzteSicherung) : 'noch nie'}${est ? ` · Speicher: ${(est.usage / 1048576).toFixed(1)} MB` : ''}${persisted ? ' · dauerhaft gespeichert ✓' : ''}</p>
       <div class="quick">
         <button class="btn" id="export">⬇️ Sicherung erstellen</button>
         <label class="btn ghost">⬆️ Wiederherstellen<input type="file" id="import" accept="application/json,.json" hidden></label>
@@ -58,7 +72,7 @@ route('/einstellungen', async () => {
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
     </div>`}
-    <p class="muted small center">Toths Reinigungsservice · Version 2.0</p>
+    <p class="muted small center">Toths Reinigungsservice · Version 2.1</p>
   `);
 
   $('#f').addEventListener('submit', async (e) => {
@@ -75,6 +89,25 @@ route('/einstellungen', async () => {
     toast('✓ Einstellungen gespeichert');
   });
   $('#export').addEventListener('click', exportBackup);
+  $('#notif')?.addEventListener('change', async (e) => { S.benachrichtigungen = e.target.checked; await saveSettings(); scheduleNotifications(true); });
+  $('#notifTime')?.addEventListener('change', async (e) => { S.erinnerungUhrzeit = e.target.value || '19:00'; await saveSettings(); scheduleNotifications(true); toast('✓ Gespeichert'); });
+  $('#testNotif')?.addEventListener('click', testNotification);
+  $('#autoBk')?.addEventListener('change', async (e) => { S.autoSicherung = e.target.checked; await saveSettings(); });
+  $('#autoNow')?.addEventListener('click', async () => { toast('Sicherung läuft…'); toast((await autoBackup(true)) ? '✓ Gesichert in ' + S.autoSicherungOrt : 'Sicherung fehlgeschlagen'); });
+  $('#wSearch').addEventListener('click', async () => {
+    const name = $('#wOrt').value.trim();
+    if (!name) return;
+    try {
+      const hit = await geocode(name);
+      if (!hit) return toast('Ort nicht gefunden');
+      S.wetterOrt = hit;
+      await saveSettings();
+      $('#wOrt').value = hit.name;
+      toast(`✓ Wetter für ${hit.name}`);
+    } catch {
+      toast('Keine Internetverbindung');
+    }
+  });
   $('#import').addEventListener('change', (e) => e.target.files[0] && importBackup(e.target.files[0]));
 });
 
@@ -139,11 +172,8 @@ route('/leistungen', () => {
 /* ---------- Datensicherung ---------- */
 async function exportBackup() {
   toast('Sicherung wird erstellt…');
-  const data = { app: 'toths-reinigung', version: 2, exportiert: new Date().toISOString() };
-  for (const s of DB.stores) data[s] = await DB.all(s);
-  data.photos = await Promise.all(data.photos.map(async (p) => ({ ...p, blob: await blobToDataUrl(p.blob) })));
   const name = `toths-sicherung-${today()}.json`;
-  await saveFile(new Blob([JSON.stringify(data)], { type: 'application/json' }), name);
+  await saveFile(new Blob([await buildBackupJson()], { type: 'application/json' }), name);
   S.letzteSicherung = today();
   await saveSettings();
 }

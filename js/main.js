@@ -190,8 +190,12 @@ window.addEventListener('hashchange', router);
 (async () => {
   await loadSettings();
   await migrate();
+  await applyDuePrices();
   router();
   updateTimerPill();
+  autoBackup();
+  scheduleNotifications();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleNotifications(); });
   navigator.storage?.persist?.();
   if (!NATIVE && 'serviceWorker' in navigator && location.protocol !== 'file:') {
     navigator.serviceWorker.register('sw.js').catch(() => {});

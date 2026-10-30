@@ -35,6 +35,14 @@ const dens = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
     const fg = Math.round(108 * f);
     await shot(path.join(dir, 'ic_launcher_foreground.png'), fg, fg, `<div class="c">${adaptive.replace('<svg', `<svg width="${fg}" height="${fg}"`)}</div>`);
   }
+  // Kleines, einfarbiges Symbol für Benachrichtigungen (Android färbt es selbst ein)
+  const stat = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 4h16v4h-6v12h-4V8H4z" fill="#fff"/><path d="M19.5 10.5q.5 2 2.5 2.5q-2 .5-2.5 2.5q-.5-2-2.5-2.5q2-.5 2.5-2.5z" fill="#fff"/></svg>`;
+  for (const [d, f] of Object.entries(dens)) {
+    const dir = path.join(res, `drawable-${d}`);
+    fs.mkdirSync(dir, { recursive: true });
+    const s = Math.round(24 * f);
+    await shot(path.join(dir, 'ic_stat_toths.png'), s, s, stat.replace('<svg', `<svg width="${s}" height="${s}"`));
+  }
   // Splash-Screens: Markenfarbe mit Logo und Namen
   for (const dir of fs.readdirSync(res).filter((n) => n.startsWith('drawable'))) {
     const file = path.join(res, dir, 'splash.png');

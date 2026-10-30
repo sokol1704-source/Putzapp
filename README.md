@@ -16,7 +16,15 @@ Gemacht für die **Treppenhaus- und Objektreinigung in Mehrfamilienhäusern**.
 - **Leistungsnachweis** pro Haus und Monat (mit Fotos, Winterdienst und Mängeln) und **Aushang** fürs Treppenhaus mit den nächsten Terminen
 - **Angebote** – Preisrechner (Etagen × Rhythmus + Extras, mit Marktvergleich), Angebot als PDF; bei Annahme werden Auftraggeber und Haus automatisch angelegt
 - **Rechnungen** für Kleinunternehmer (§ 19 UStG) – Monatspauschale oder Stunden, Zusatzleistungen und Winterdienst automatisch, Sammelrechnung für mehrere Häuser, Pflichtangaben nach § 14 UStG, Arbeitskostenanteil nach § 35a EStG (für die Betriebskostenabrechnung), Zahlungserinnerung
-- **Datensicherung** – Export/Import aller Daten inkl. Fotos, Erinnerung auf der Startseite
+- **PDF mit einem Tipp senden** – Rechnung, Angebot, Nachweis, Protokoll, Vertrag direkt als PDF an WhatsApp/E-Mail
+- **Unterschrift auf dem Display** – Leistungsnachweis und Vertrag direkt auf dem Handy unterschreiben lassen
+- **Reinigungsvertrag** – Muster mit Leistungsumfang, Preis, Winterdienst, Kündigungsfrist und Preisanpassungsklausel
+- **Erinnerungen** (Android-App) – am Vorabend an die Häuser von morgen; **Glätte-Warnung** über die Wettervorhersage (Open-Meteo) für Häuser mit Winterdienst
+- **Finanzen** – Ausgaben mit Belegfoto, Fahrtenbuch (0,30 €/km), Gewinn-Übersicht und EÜR-Export als CSV (Excel) für das Steuerbüro
+- **Auswertung** – Umsatz pro Monat und tatsächlicher Stundenlohn je Haus
+- **Urlaub & Krankheit** – Termine im Zeitraum nachholen oder absagen, fertige Nachricht an jede Hausverwaltung
+- **Preisanpassung** – Preise prozentual erhöhen, ab Stichtag automatisch abrechnen, Anschreiben als PDF
+- **Datensicherung** – Export/Import aller Daten inkl. Fotos; in der Android-App zusätzlich wöchentlich automatisch in *Dokumente/TothsReinigung*
 
 > Alle Daten liegen **nur auf dem Handy** (kein Server, keine Cloud). Bitte regelmäßig unter *Einstellungen → Sicherung erstellen* sichern. Rechnungen müssen 10 Jahre aufbewahrt werden. Das ist keine Steuer- oder Rechtsberatung: Vorlagen bitte einmal vom Steuerbüro prüfen lassen.
 
@@ -63,4 +71,4 @@ python3 -m http.server 8000
 
 ## Technik
 
-Reines HTML/CSS/JavaScript ohne Build-Schritt. Daten in IndexedDB (`js/db.js`), gemeinsame Bausteine und Plan-Logik in `js/core.js`, die Seiten in `js/v-*.js`, Start, Gesten und Datenübernahme in `js/main.js`, Offline-Cache in `sw.js`. Nach Änderungen an Dateien die Cache-Version in `sw.js` erhöhen.
+Reines HTML/CSS/JavaScript ohne Build-Schritt. Daten in IndexedDB (`js/db.js`), gemeinsame Bausteine und Plan-Logik in `js/core.js`, die Seiten in `js/v-*.js`, Start, Gesten und Datenübernahme in `js/main.js`, Hintergrunddienste (Sicherung, Wetter, Erinnerungen) in `js/service.js`, PDF-Erzeugung mit jsPDF + html2canvas (`js/vendor/`, MIT-Lizenz), Offline-Cache in `sw.js`. Nach Änderungen an Dateien die Cache-Version in `sw.js` erhöhen.

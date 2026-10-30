@@ -565,3 +565,78 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
   .sign-lines { margin-top: 30px; }
   .doc-photos { grid-template-columns: repeat(5, 1fr); }
 }
+
+/* =====================================================================
+   Version 2.1 – PDF, Unterschrift, Wetter, Finanzen, Auswertung
+   ===================================================================== */
+/* Unsichtbarer Bereich, in dem PDFs gerendert werden */
+.pdf-render { position: fixed; left: -10000px; top: 0; width: 794px; background: #fff; }
+.pdf-render .invoice-doc { width: 794px; min-width: 0; padding: 44px 52px; box-shadow: none; border-radius: 0; animation: none !important; }
+.pdf-render * { animation: none !important; transition: none !important; }
+
+/* Unterschrift */
+.sheet-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(15, 23, 42, .55); display: flex; align-items: flex-end; justify-content: center; animation: fade .2s ease; }
+.sheet-backdrop.closing { animation: fade .2s ease reverse forwards; }
+.sheet { width: 100%; max-width: 560px; background: var(--card); border-radius: 22px 22px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); animation: rise .3s cubic-bezier(.2, .8, .2, 1); }
+.sheet h3 { margin: 0 0 10px; }
+.sheet .row .btn { flex: 1; }
+.sig-box { position: relative; height: 200px; margin: 10px 0 12px; border: 2px dashed var(--border); border-radius: 14px; background: #fff; touch-action: none; }
+.sig-box canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.sig-hint { position: absolute; inset: 0; display: grid; place-items: center; color: #94a3b8; pointer-events: none; font-size: 14px; }
+.sig-hint[hidden] { display: none; }
+.sign-row { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 36px; break-inside: avoid; }
+.sign-slot img { height: 54px; display: block; margin-bottom: -6px; }
+.sign-slot > div:not(.sign-label):not(.sign-empty) { font-size: 10px; color: #444; }
+.sign-empty { height: 48px; }
+.sign-label { border-top: 1px solid #555; padding-top: 4px; font-size: 10.5px; color: #555; }
+
+/* Vertrag */
+.vertrag .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 6px 0 10px; font-size: 12px; line-height: 1.5; }
+.vertrag .doc-h3 { margin-top: 12px; }
+.vertrag p { margin: 4px 0; }
+
+/* Wetter */
+.weather.risk { border-color: #93c5fd; background: linear-gradient(160deg, rgba(96, 165, 250, .16), transparent 70%), var(--card); }
+.weather-days { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.weather-days > div { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; background: var(--bg); font-size: 13px; }
+.weather-days > div.risk { background: #dbeafe; color: #1e3a8a; }
+@media (prefers-color-scheme: dark) { .weather-days > div.risk { background: #1e3a8a; color: #dbeafe; } }
+.weather-days b { font-size: 15px; }
+.weather-days small { font-size: 11px; opacity: .8; }
+
+/* Finanzen */
+.profit .profit-value { font-size: 34px; font-weight: 800; letter-spacing: -.02em; color: var(--ok); margin: 2px 0 8px; }
+.profit .profit-value.neg { color: var(--bad); }
+.profit .row { padding: 2px 0; }
+
+/* Diagramm: Umsatz pro Monat (eine Reihe, eine Farbe) */
+.chart-readout { font-size: 13px; color: var(--muted); }
+.chart-readout b { color: var(--text); }
+.chart-bars { display: flex; align-items: stretch; gap: 4px; height: 170px; margin-top: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--border); position: relative; }
+.bar-col { flex: 1; position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
+.bar-col .bar { width: 100%; max-width: 22px; border-radius: 4px 4px 0 0; background: var(--brand); transform-origin: bottom; animation: grow-y .7s cubic-bezier(.2, .8, .2, 1) both; transition: filter .2s; }
+.bar-col:nth-child(n) .bar { animation-delay: calc(var(--n, 0) * 30ms); }
+.bar-col.active .bar { filter: brightness(1.25); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--brand); }
+.bar-label { position: absolute; bottom: -20px; font-size: 11px; color: var(--muted); }
+@keyframes grow-y { from { transform: scaleY(0); } }
+
+/* Stundenlohn je Haus */
+.hbar { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; margin: 6px 0; }
+.hbar span { display: block; height: 100%; border-radius: 4px; background: var(--brand); transform-origin: left; animation: grow 1s cubic-bezier(.2, .8, .2, 1) both; }
+.hbar span.ok { background: #16a34a; }
+.hbar span.warn { background: #d97706; }
+.hbar span.bad { background: #dc2626; }
+
+/* Preisanpassung, Nachrichten */
+.price-row { display: flex !important; align-items: center; gap: 10px; color: var(--text) !important; font-weight: 400 !important; }
+.price-row > span { flex: 1; }
+.price-row .neu { width: 96px; margin: 0; text-align: right; font-weight: 700; }
+.msg { white-space: pre-wrap; font: inherit; font-size: 13px; background: var(--bg); border-radius: 10px; padding: 10px; margin: 8px 0; }
+
+.qa.qa-6 { grid-template-columns: repeat(5, 1fr); }
+.qa.qa-6 > * { font-size: 11px; padding: 8px 2px; }
+.qa.qa-6 span { font-size: 21px; }
+/* Im PDF: Farbverlauf-Schrift wird nicht unterstützt → einfarbig */
+.pdf-render .inv-brand b { background: none; color: #0f766e; -webkit-text-fill-color: #0f766e; }
+.pdf-render .inv-logo { border-radius: 14px; }
+.sign-row { align-items: end; }

@@ -1,0 +1,180 @@
+'use strict';
+
+/* ---------- Sicherung ---------- */
+async function buildBackupJson() {
+  const data = { app: 'toths-reinigung', version: 3, exportiert: new Date().toISOString() };
+  for (const s of DB.stores) data[s] = await DB.all(s);
+  data.photos = await Promise.all(data.photos.map(async (p) => ({ ...p, blob: await blobToDataUrl(p.blob) })));
+  return JSON.stringify(data);
+}
+
+// Speichert in der Android-App einmal pro Woche selbstständig eine Sicherung im Ordner
+// „Dokumente/TothsReinigung“ (die letzten 4 bleiben erhalten). Dort überlebt sie auch ein Deinstallieren der App.
+async function autoBackup(force = false) {
+  if (!NATIVE || S.autoSicherung === false) return false;
+  if (!force && S.letzteAutoSicherung && daysBetween(S.letzteAutoSicherung, today()) < 7) return false;
+  if (!(await DB.all('objects')).length) return false;
+  const dir = 'TothsReinigung';
+  const path = `${dir}/toths-sicherung-${today()}.json`;
+  let where = 'DOCUMENTS';
+  try {
+    const data = await buildBackupJson();
+    try {
+      await native('Filesystem', 'writeFile', { path, data, directory: where, encoding: 'utf8', recursive: true });
+    } catch {
+      where = 'EXTERNAL';
+      await native('Filesystem', 'writeFile', { path, data, directory: where, encoding: 'utf8', recursive: true });
+    }
+    try {
+      const { files } = await native('Filesystem', 'readdir', { path: dir, directory: where });
+      const names = files.map((f) => f.name || f).filter((n) => n.startsWith('toths-sicherung-')).sort();
+      for (const n of names.slice(0, -4)) await native('Filesystem', 'deleteFile', { path: `${dir}/${n}`, directory: where });
+    } catch { /* Aufräumen ist nicht wichtig */ }
+    S.letzteAutoSicherung = today();
+    S.autoSicherungOrt = where === 'DOCUMENTS' ? 'Dokumente › TothsReinigung' : 'App-Speicher (wird beim Deinstallieren gelöscht!)';
+    S.autoSicherungFehler = '';
+    await saveSettings();
+    return true;
+  } catch (e) {
+    S.autoSicherungFehler = e.message;
+    await saveSettings();
+    return false;
+  }
+}
+
+/* ---------- Wetter & Glätte (Open-Meteo, kostenlos, ohne Konto) ---------- */
+let weatherCache = null;
+
+async function geocode(name) {
+  const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=de&countryCode=DE`);
+  const hit = (await r.json()).results?.[0];
+  return hit ? { name: hit.name, lat: hit.latitude, lon: hit.longitude } : null;
+}
+
+function glaetteRisiko(d) {
+  if (d.schnee >= 0.5) return 'Schnee';
+  if (d.tmin <= 0.5 && d.regen >= 0.3) return 'Glatteis';
+  if (d.tmin <= -1) return 'Frost / Reifglätte';
+  return null;
+}
+
+async function weatherForecast(force = false) {
+  try {
+    if (!S.wetterOrt) {
+      const city = (S.plzOrt || '').replace(/^\d{4,5}\s*/, '').trim();
+      if (!city) return null;
+      S.wetterOrt = await geocode(city);
+      if (!S.wetterOrt) return null;
+      await saveSettings();
+    }
+    if (!force && weatherCache && Date.now() - weatherCache.t < 3 * 3600e3) return weatherCache.days;
+    const { lat, lon } = S.wetterOrt;
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_min,temperature_2m_max,snowfall_sum,precipitation_sum&timezone=Europe%2FBerlin&forecast_days=4`);
+    const j = await r.json();
+    const days = j.daily.time.map((datum, i) => {
+      const d = { datum, tmin: j.daily.temperature_2m_min[i], tmax: j.daily.temperature_2m_max[i], schnee: j.daily.snowfall_sum[i] || 0, regen: j.daily.precipitation_sum[i] || 0 };
+      d.risiko = glaetteRisiko(d);
+      return d;
+    });
+    weatherCache = { t: Date.now(), days };
+    return days;
+  } catch {
+    return null;
+  }
+}
+
+const winterObjects = (objects) => objects.filter((o) => o.aktiv !== false && o.winterAbrechnung && o.winterAbrechnung !== 'keiner');
+
+// Wetterkarte auf der Startseite (wird nachgeladen, wenn Internet da ist)
+async function fillWeatherCard(el, objects) {
+  const days = await weatherForecast();
+  if (!days || !document.body.contains(el)) return;
+  const wobjs = winterObjects(objects);
+  const next = days.slice(0, 3);
+  const risk = next.find((d) => d.risiko && d.datum >= today());
+  if (!risk && !isWinter()) return;
+  const label = (d) => (d.datum === today() ? 'Heute' : d.datum === addDays(today(), 1) ? 'Morgen' : fmtDateLong(d.datum).slice(0, 3));
+  el.innerHTML = `<div class="card weather ${risk ? 'risk' : ''}">
+    <div class="row between"><b>${risk ? `❄️ ${esc(risk.risiko)} ${label(risk).toLowerCase()}` : '🌤️ Wetter'}</b><span class="muted small">${esc(S.wetterOrt?.name || '')}</span></div>
+    <div class="weather-days">${next.map((d) => `<div class="${d.risiko ? 'risk' : ''}"><span>${label(d)}</span><b>${Math.round(d.tmin)}° / ${Math.round(d.tmax)}°</b><small>${d.schnee >= 0.5 ? `🌨️ ${fmtNum(Math.round(d.schnee * 10) / 10)} cm` : d.regen >= 0.3 ? `🌧️ ${fmtNum(Math.round(d.regen))} mm` : '–'}</small></div>`).join('')}</div>
+    ${risk && wobjs.length ? `<div class="small mt">Winterdienst bei <b>${wobjs.length} ${wobjs.length === 1 ? 'Haus' : 'Häusern'}</b>: ${esc(wobjs.map(objLabel).join(', '))}</div>
+      <a class="btn small winter-btn mt" href="#/winter/neu">❄️ Einsatz eintragen</a>` : ''}
+  </div>`;
+}
+
+/* ---------- Benachrichtigungen (nur Android-App) ---------- */
+async function notificationsAllowed(ask = true) {
+  if (!NATIVE) return false;
+  try {
+    let p = await native('LocalNotifications', 'checkPermissions');
+    if (p.display !== 'granted' && ask) p = await native('LocalNotifications', 'requestPermissions');
+    return p.display === 'granted';
+  } catch {
+    return false;
+  }
+}
+
+// Plant die Erinnerungen der nächsten Tage neu: am Vorabend die Häuser für morgen, bei Glättegefahr eine Warnung.
+let lastSchedule = 0;
+async function scheduleNotifications(force = false) {
+  if (!NATIVE || S.benachrichtigungen === false) return;
+  if (!force && Date.now() - lastSchedule < 10 * 60e3) return;
+  lastSchedule = Date.now();
+  if (!(await notificationsAllowed())) return;
+  try {
+    const pending = await native('LocalNotifications', 'getPending');
+    if (pending.notifications?.length) await native('LocalNotifications', 'cancel', { notifications: pending.notifications.map((n) => ({ id: n.id })) });
+    const data = await loadAll();
+    const plan = planning(data);
+    const [hh, mm] = (S.erinnerungUhrzeit || '19:00').split(':').map(Number);
+    const eveningBefore = (datum) => { const d = parseISO(addDays(datum, -1)); d.setHours(hh, mm, 0, 0); return d; };
+    const notes = [];
+    for (let i = 1; i <= 14; i++) {
+      const datum = addDays(today(), i);
+      const items = plan.filter((p) => p.datum === datum).sort((a, b) => (a.uhrzeit || '99').localeCompare(b.uhrzeit || '99'));
+      const at = eveningBefore(datum);
+      if (!items.length || at < new Date()) continue;
+      const names = items.map((p) => objLabel(data.omap[p.objektId]));
+      notes.push({
+        id: 1000 + i,
+        title: `Morgen: ${items.length} ${items.length === 1 ? 'Haus' : 'Häuser'} 🧽`,
+        body: `${items[0].uhrzeit ? `Los geht's um ${items[0].uhrzeit} Uhr: ` : ''}${names.join(', ')}`,
+        schedule: { at: at.toISOString(), allowWhileIdle: true },
+      });
+    }
+    const wobjs = winterObjects(data.objects);
+    const days = wobjs.length ? await weatherForecast(true) : null;
+    for (const d of (days || []).filter((x) => x.risiko && x.datum > today())) {
+      let at = eveningBefore(d.datum);
+      if (at < new Date()) at = new Date(Date.now() + 60e3);
+      notes.push({
+        id: 2000 + daysBetween(today(), d.datum),
+        title: `❄️ ${d.risiko} – morgen früh ${Math.round(d.tmin)} °C`,
+        body: `Winterdienst bei ${wobjs.length} ${wobjs.length === 1 ? 'Haus' : 'Häusern'}: ${wobjs.map(objLabel).join(', ')}. Wecker stellen!`,
+        schedule: { at: at.toISOString(), allowWhileIdle: true },
+      });
+    }
+    if (notes.length) await native('LocalNotifications', 'schedule', { notifications: notes });
+    S.geplanteErinnerungen = notes.length;
+    await saveSettings();
+  } catch (e) {
+    console.warn('Benachrichtigungen', e);
+  }
+}
+
+async function testNotification() {
+  if (!(await notificationsAllowed())) return toast('Benachrichtigungen sind nicht erlaubt (Android-Einstellungen → Apps → Toths Reinigung)');
+  await native('LocalNotifications', 'schedule', { notifications: [{ id: 99, title: '✨ Toths Reinigungsservice', body: 'So sehen deine Erinnerungen aus.', schedule: { at: new Date(Date.now() + 3000).toISOString() } }] });
+  toast('Test kommt in 3 Sekunden');
+}
+
+/* ---------- Angekündigte Preisanpassungen ab Stichtag übernehmen ---------- */
+async function applyDuePrices() {
+  for (const o of await DB.all('objects')) {
+    if (!o.neuerPreis || o.neuerPreis.ab > today()) continue;
+    (o.preisHistorie ||= []).push({ ab: o.neuerPreis.ab, alt: o.monatspauschale, neu: o.neuerPreis.betrag });
+    o.monatspauschale = o.neuerPreis.betrag;
+    delete o.neuerPreis;
+    await DB.put('objects', o);
+  }
+}
