@@ -664,6 +664,7 @@ function extrasEditor(el, extras) {
     extras.find((x) => x.name === catalog[i].name).menge = e.target.value;
   });
   draw();
+  return { set(list) { extras.splice(0, extras.length, ...list.map((x) => ({ ...x }))); draw(); } };
 }
 
 // Fotos aufnehmen/auswählen. Neue Fotos bleiben bis zum Speichern in "pending".

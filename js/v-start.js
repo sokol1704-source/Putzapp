@@ -119,6 +119,21 @@ route('/tour', async (_, q) => {
     .sort((a, b) => (a.uhrzeit || '99').localeCompare(b.uhrzeit || '99'));
   const done = (oid) => data.visits.some((v) => v.objektId === oid && v.datum === datum);
   const stops = items.map((it) => ({ it, o: data.omap[it.objektId] })).filter((s) => s.o);
+  // Zeitplan: Dauer je Haus aus den letzten Einsätzen, dazwischen 20 Min. Fahrt
+  const avgHours = (oid) => {
+    const hs = data.visits.filter((v) => v.objektId === oid && num(v.stunden) > 0).sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 3).map((v) => num(v.stunden));
+    return hs.length ? hs.reduce((s, h) => s + h, 0) / hs.length : 2;
+  };
+  const addMin = (hhmm, mins) => { const [h, m] = hhmm.split(':').map(Number); const t = h * 60 + m + mins; return `${pad(Math.floor(t / 60) % 24)}:${pad(t % 60)}`; };
+  let clock = stops.find((s) => s.it.uhrzeit)?.it.uhrzeit || '08:00';
+  const plan = {};
+  for (const { it, o } of stops) {
+    if (done(o.id)) continue;
+    const start = it.uhrzeit && it.uhrzeit > clock ? it.uhrzeit : clock;
+    const end = addMin(start, Math.round(avgHours(o.id) * 60));
+    plan[o.id] = `${start}–${end}`;
+    clock = addMin(end, 20);
+  }
   const addrs = stops.map((s) => objAddress(s.o)).filter(Boolean);
   const routeUrl = addrs.length
     ? `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(addrs[addrs.length - 1])}${addrs.length > 1 ? `&waypoints=${encodeURIComponent(addrs.slice(0, -1).join('|'))}` : ''}`
@@ -138,7 +153,8 @@ route('/tour', async (_, q) => {
     </div>
     <div class="timeline">
       ${stops.map(({ it, o }, i) => `<div class="card plan-entry tour-stop ${done(o.id) ? 'done' : ''}">
-        <div class="row between"><b>${i + 1}. ${esc(objLabel(o))}</b>${done(o.id) ? '<span class="badge ok">✓ erledigt</span>' : it.uhrzeit ? `<span class="badge">${esc(it.uhrzeit)} Uhr</span>` : ''}</div>
+        <div class="row between"><b>${i + 1}. ${esc(objLabel(o))}</b>${done(o.id) ? '<span class="badge ok">✓ erledigt</span>' : plan[o.id] ? `<span class="badge">${esc(plan[o.id])} Uhr</span>` : ''}</div>
+        ${!done(o.id) && plan[o.id] ? `<div class="small muted">⏱️ geschätzt inkl. 20 Min. Fahrt zum nächsten Haus</div>` : ''}
         <div class="muted small">${esc(objAddress(o))}${it.datum < datum ? ` · <span class="danger-text">${esc(whenLabel(it.datum))}</span>` : ''}</div>
         ${o.zugang ? `<div class="small">🔑 ${esc(o.zugang)}</div>` : ''}
         ${o.vorOrtName || o.vorOrtTelefon ? `<div class="small">👤 ${esc(o.vorOrtName || 'Ansprechpartner')}${o.vorOrtTelefon ? ` · <a href="tel:${esc(o.vorOrtTelefon.replace(/\s/g, ''))}">${esc(o.vorOrtTelefon)}</a>` : ''}</div>` : ''}

@@ -164,6 +164,8 @@ async function visitForm(v, q) {
   }
   const tasks = v.aufgaben.map((t) => ({ ...t }));
   const extras = (v.extras || []).map((x) => ({ ...x }));
+  // Letzter Einsatz im selben Haus (für „Wie beim letzten Mal“)
+  const lastOfObjekt = isNew && v.objektId ? allVisits.filter((x) => x.objektId === v.objektId).sort((a, b) => b.datum.localeCompare(a.datum))[0] : null;
   const existing = isNew ? [] : await DB.by('photos', 'visitId', v.id);
   const pending = [];
 
@@ -177,6 +179,7 @@ async function visitForm(v, q) {
         <label>Stunden<input type="number" name="stunden" step="0.25" min="0" inputmode="decimal" value="${esc(v.stunden)}"></label>
       </div>
       ${q.von && q.bis ? `<div class="card ok-note small">⏱️ Zeit aus der Stoppuhr übernommen: ${esc(q.von)}–${esc(q.bis)} Uhr</div>` : ''}
+      ${isNew && lastOfObjekt ? `<button type="button" class="btn ghost block" id="sameAsLast">🔁 Wie beim letzten Mal (${fmtDateLong(lastOfObjekt.datum)})</button>` : ''}
       <div class="label">Was wurde gereinigt?</div>
       <ul class="tasks" id="tasks"></ul>
       <div class="label">Zusatzleistungen <span class="muted small">(werden extra berechnet)</span></div>
@@ -190,7 +193,19 @@ async function visitForm(v, q) {
   `);
 
   const editor = taskEditor($('#tasks'), tasks, true);
-  extrasEditor($('#extras'), extras);
+  const extrasCtl = extrasEditor($('#extras'), extras);
+  $('#sameAsLast')?.addEventListener('click', () => {
+    const f = $('#f');
+    f.von.value = lastOfObjekt.von || '';
+    f.bis.value = lastOfObjekt.bis || '';
+    f.stunden.value = lastOfObjekt.stunden || '';
+    editor.set((lastOfObjekt.aufgaben || []).map((t) => ({ text: t.text, erledigt: true })));
+    extrasCtl.set(lastOfObjekt.extras || []);
+    f.notiz.value = '';
+    vibrate(10);
+    toast('✓ Vom letzten Einsatz übernommen – bitte prüfen');
+    $('#sameAsLast').remove();
+  });
   photoEditor($('#photos'), existing, pending);
 
   const f = $('#f');
