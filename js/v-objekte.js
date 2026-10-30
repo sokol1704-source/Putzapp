@@ -224,6 +224,7 @@ route('/objekt/:id', async ({ id }) => {
       <a href="#/objekt/${id}/vertrag"><span>📜</span>Vertrag</a>
       <a href="#/rechnung/neu?kunde=${o.kundeId}&objekt=${id}"><span>🧾</span>Rechnung</a>
     </div>
+    ${o.aktiv === false ? `<button class="btn ghost block" id="danke">💌 Dankeschön an ${esc(k?.ansprechpartner || k?.name || 'den Auftraggeber')}</button>` : ''}
     <h3 class="section">Anstehend</h3>
     ${plan.slice(0, 3).map((p) => planCard(p, data)).join('') || '<div class="empty small">Nichts geplant.</div>'}
     ${plan.length > 3 ? `<a class="btn ghost block" href="#/termine">Alle ${plan.length} Termine anzeigen</a>` : ''}
@@ -233,6 +234,7 @@ route('/objekt/:id', async ({ id }) => {
     <h3 class="section">Einsätze (${visits.length})</h3>
     ${visits.slice(0, 15).map((v) => visitCard(v, data, false)).join('') || '<div class="empty small">Noch keine Einsätze.</div>'}
   `);
+  $('#danke')?.addEventListener('click', () => shareText(`Guten Tag${k?.ansprechpartner ? ` ${k.ansprechpartner}` : ''},\n\nich möchte mich herzlich für die gute Zusammenarbeit bedanken. Die Reinigung von ${objLabel(o)} endet hiermit. Vielen Dank für Ihr Vertrauen.\n\nSollten Sie jemanden kennen, der eine zuverlässige Reinigung sucht, würde ich mich über eine Empfehlung freuen.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`, 'Dankeschön'));
 });
 
 /* ---------- Reinigungsplan ---------- */

@@ -620,7 +620,7 @@ route('/angebot/:id', async ({ id }) => {
         <button class="btn ghost" id="print">🖨️ Drucken</button>
         ${a.status === 'offen' ? '<button class="btn ghost" id="yes">🎉 Angenommen</button><button class="btn ghost" id="no">Abgelehnt</button>' : ''}
         ${a.objektId ? `<a class="btn ghost" href="#/objekt/${a.objektId}">🏢 Zum Haus</a>` : ''}
-        ${a.status === 'angenommen' && a.objektId ? `<a class="btn ghost" href="#/rechnung/neu?kunde=${a.kundeId}&objekt=${a.objektId}">🧾 Erste Rechnung vorbereiten</a>` : ''}
+        ${a.status === 'angenommen' && a.objektId ? `<a class="btn ghost" href="#/rechnung/neu?kunde=${a.kundeId}&objekt=${a.objektId}">🧾 Erste Rechnung vorbereiten</a><button class="btn ghost" id="willkommen">🎉 Willkommen senden</button>` : ''}
       </div>
     </div>
     ${angebotNachfassen(a) ? `<div class="card hint no-print"><b>⏰ Seit ${daysBetween(a.datum, today())} Tagen keine Antwort</b>
@@ -630,6 +630,7 @@ route('/angebot/:id', async ({ id }) => {
     <button class="btn danger ghost block no-print" id="del">Angebot löschen</button>
   `);
   wireDocButtons(`Angebot ${a.nummer}`, `Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nanbei erhalten Sie mein Angebot für die Treppenhausreinigung ${a.objekt.strasse}. Ich freue mich auf Ihre Rückmeldung!\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`);
+  $('#willkommen')?.addEventListener('click', () => shareText(`Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nvielen Dank für Ihren Auftrag. Ich freue mich auf die Zusammenarbeit für ${a.objekt.strasse}. Bei Fragen melden Sie sich jederzeit bei mir.\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`, 'Willkommen'));
   $('#nachfassen')?.addEventListener('click', () => shareText(`Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nich wollte kurz nachfragen, ob Sie mein Angebot ${a.nummer} für die Treppenhausreinigung ${a.objekt.strasse} schon prüfen konnten. Gern beantworte ich Ihre Fragen.\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`, `Nachfrage ${a.nummer}`));
   $('#no')?.addEventListener('click', async () => { a.status = 'abgelehnt'; await DB.put('angebote', a); router(); });
   $('#yes')?.addEventListener('click', async () => {
