@@ -40,7 +40,7 @@ route('/rechnungen', async (_, q) => {
     <div class="seg mt">
       ${['alle', 'offen', 'bezahlt', 'storniert'].map((f) => `<a href="#/rechnungen?filter=${f}" class="${filter === f ? 'active' : ''}">${f[0].toUpperCase() + f.slice(1)}</a>`).join('')}
     </div>
-    <div class="mt">${shown.map(invoiceCard).join('') || '<div class="empty">Keine Rechnungen.</div>'}</div>
+    <div class="mt">${shown.map(invoiceCard).join('') || (invoices.length ? '<div class="empty">Keine Rechnungen in dieser Auswahl.</div>' : '<div class="empty">Noch keine Rechnungen.<br><span class="small">Sie entstehen aus abgerechneten Einsätzen – am einfachsten über den Monatsabschluss.</span><br><a class="btn small mt" href="#/monatsabschluss">🧾 Zum Monatsabschluss</a></div>')}</div>
   `, { tab: 'rechnungen', back: false });
 });
 

@@ -21,7 +21,7 @@ route('/objekte', async (_, q) => {
         </div>
         ${n ? `<div class="small mt ${n.datum < today() ? 'danger-text' : ''}">Nächste Reinigung: ${esc(whenLabel(n.datum))}</div>` : ''}
       </a>`;
-    }).join('') || '<div class="empty">Keine Häuser gefunden.</div>';
+    }).join('') || (data.objects.length ? '<div class="empty">Keine Häuser gefunden.</div>' : '<div class="empty">Noch kein Haus angelegt.<br><span class="small">Ein Haus gehört zu einem Auftraggeber und bekommt den Reinigungsplan.</span><br><a class="btn small mt" href="#/objekt/neu">+ Haus anlegen</a></div>');
 
   render('Häuser', `
     <div class="row gap">
@@ -317,7 +317,7 @@ route('/kunden', async () => {
         <div class="row between"><b>👥 ${esc(c.name)}</b>${offen.length ? `<span class="badge warn">${money(offen.reduce((s, i) => s + i.summe, 0))} offen</span>` : ''}</div>
         <div class="muted small">${objs.length} ${objs.length === 1 ? 'Haus' : 'Häuser'}${c.ansprechpartner ? ` · ${esc(c.ansprechpartner)}` : ''}</div>
       </a>`;
-    }).join('') || '<div class="empty">Noch keine Auftraggeber.</div>'}</div>
+    }).join('') || '<div class="empty">Noch keine Auftraggeber.<br><span class="small">Lege zuerst die Hausverwaltung oder den Eigentümer an, danach das Haus.</span><br><a class="btn small mt" href="#/kunde/neu">+ Auftraggeber anlegen</a></div>'}</div>
   `);
 });
 
@@ -386,8 +386,8 @@ route('/kunde/:id', async ({ id }) => {
     </div>
     <h3 class="section">Häuser (${objs.length})</h3>
     ${objs.map((o) => `<a class="card link" href="#/objekt/${o.id}"><b>🏢 ${esc(objLabel(o))}</b>
-      <div class="muted small">${esc(objAddress(o))} · ${esc(rhythmLabel(o))} · ${priceLabel(o)}</div></a>`).join('') || '<div class="empty small">Noch keine Häuser.</div>'}
+      <div class="muted small">${esc(objAddress(o))} · ${esc(rhythmLabel(o))} · ${priceLabel(o)}</div></a>`).join('') || '<div class="empty small">Noch keine Häuser.<br><a class="btn small mt" href="#/objekt/neu">+ Haus anlegen</a></div>'}
     <h3 class="section">Rechnungen (${invoices.length})</h3>
-    ${invoices.map((i) => invoiceCard(i)).join('') || '<div class="empty small">Noch keine Rechnungen.</div>'}
+    ${invoices.map((i) => invoiceCard(i)).join('') || '<div class="empty small">Noch keine Rechnungen. Sie entstehen aus abgerechneten Einsätzen.</div>'}
   `);
 });

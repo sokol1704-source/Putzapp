@@ -16,7 +16,7 @@ route('/nachweise', async () => {
         <a class="btn small" href="#/objekt/${o.id}/nachweis?monat=${pm}">${esc(monthLabel(pm))}</a>
         <a class="btn small ghost" href="#/objekt/${o.id}/nachweis?monat=${cm}">${esc(monthLabel(cm))}</a>
         <a class="btn small ghost" href="#/objekt/${o.id}/jahr">📊 Jahr</a>
-      </div></div>`).join('') || '<div class="empty">Noch keine Häuser.</div>'}
+      </div></div>`).join('') || '<div class="empty">Noch keine Häuser.<br><span class="small">Ein Haus gehört zu einem Auftraggeber. Lege es an, dann kannst du Einsätze und Nachweise erstellen.</span><br><a class="btn small mt" href="#/objekt/neu">+ Haus anlegen</a></div>'}
   `);
 });
 

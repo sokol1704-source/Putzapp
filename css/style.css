@@ -827,3 +827,8 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 .abschluss.none { opacity: .7; }
 .ok-text { color: var(--ok); font-weight: 700; }
 .wbar + .small, .hint-line { font-size: 13px; }
+
+/* Filter-Chips (Suche) */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.chips button.active { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }

@@ -176,7 +176,7 @@ route('/einsaetze', async (_, q) => {
       <a href="#/einsaetze" class="${filter === 'alle' ? 'active' : ''}">Alle</a>
       <a href="#/einsaetze?filter=offen" class="${filter === 'offen' ? 'active' : ''}">Nicht abgerechnet</a>
     </div>
-    <div class="mt">${visits.slice(0, 100).map((v) => visitCard(v, data)).join('') || '<div class="empty">Keine Einsätze.</div>'}</div>
+    <div class="mt">${visits.slice(0, 100).map((v) => visitCard(v, data)).join('') || '<div class="empty">Noch keine Einsätze.<br><span class="small">Nach jeder Reinigung erfasst du den Einsatz hier oder direkt aus dem Haus.</span><br><a class="btn small mt" href="#/einsatz/neu">+ Einsatz erfassen</a></div>'}</div>
   `);
 });
 
