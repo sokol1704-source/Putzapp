@@ -3,7 +3,8 @@
   "appName": "Toths Reinigung",
   "webDir": "www",
   "android": {
-    "allowMixedContent": false
+    "allowMixedContent": false,
+    "zoomEnabled": true
   },
   "plugins": {
     "LocalNotifications": {

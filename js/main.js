@@ -184,6 +184,26 @@ async function migrate() {
   await saveSettings();
 }
 
+/* ---------- Android-Zurück-Geste ---------- */
+// Wischen vom Rand bzw. Zurück-Taste: erst offene Fenster schließen, dann eine Seite zurück,
+// nur auf der Startseite wird die App beendet.
+function setupBackButton() {
+  const App = window.Capacitor?.Plugins?.App;
+  if (!NATIVE || !App) return;
+  App.addListener('backButton', () => {
+    const sheet = $('.sheet-backdrop');
+    if (sheet) { sheet.querySelector('[data-act=cancel]')?.click(); return; }
+    if ($('.lightbox')) { $('.lightbox').remove(); return; }
+    const path = location.hash.slice(1) || '/';
+    if (path !== '/') {
+      if (history.length > 1) history.back();
+      else go('#/', true);
+      return;
+    }
+    App.exitApp();
+  });
+}
+
 /* ---------- Start ---------- */
 window.addEventListener('hashchange', router);
 
@@ -193,6 +213,7 @@ window.addEventListener('hashchange', router);
   await applyDuePrices();
   router();
   updateTimerPill();
+  setupBackButton();
   autoBackup();
   scheduleNotifications();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleNotifications(); });
