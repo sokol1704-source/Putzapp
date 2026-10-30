@@ -772,3 +772,50 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 .search-bar input[type=search] { width: 100%; margin: 0 0 12px; font-size: 17px; padding: 14px 16px; border-radius: 16px; box-shadow: var(--shadow); }
 .search-hit b mark, .search-hit mark { background: #fde68a; color: #0f172a; border-radius: 3px; padding: 0 1px; }
 .topbar .gear { margin-left: 4px; }
+
+/* =====================================================================
+   Version 2.11 – Feinschliff: aktiver Tab, Akzente, Zahlen, Tiefe
+   ===================================================================== */
+/* Aktiver Tab: weiche Kapsel hinter dem Symbol statt nur Farbe */
+.tabbar a .ico { display: inline-flex; align-items: center; justify-content: center; width: 54px; height: 30px; border-radius: 15px; transition: background-color .3s ease, transform .3s cubic-bezier(.2, 1.4, .4, 1); }
+.tabbar a.active .ico { background: linear-gradient(135deg, var(--brand-soft), color-mix(in srgb, var(--brand-soft) 40%, transparent)); transform: translateY(-1px); }
+.tabbar a.active { font-weight: 700; }
+
+/* Abschnittsüberschriften mit farbigem Akzent */
+.section { position: relative; padding-left: 12px; color: var(--muted); }
+.section::before { content: ''; position: absolute; left: 0; top: 50%; width: 4px; height: 70%; transform: translateY(-50%); border-radius: 3px; background: linear-gradient(var(--brand-light), var(--brand)); }
+
+/* Kopfzeile mit feinem Lichtstreifen am unteren Rand */
+.topbar { box-shadow: 0 6px 18px -10px rgba(15, 118, 110, .55); }
+.topbar::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: linear-gradient(90deg, transparent, rgba(253, 230, 138, .9), transparent); opacity: .7; }
+.topbar { position: sticky; }
+
+/* Zahlen: sanfter Verlauf */
+.stat b { color: var(--brand-dark); }
+@media (prefers-color-scheme: dark) { .stat b { color: #5eead4; } }
+.kpi.hero-kpi b { color: #fff; }
+.profit-value { color: var(--ok); }
+.profit-value.neg { color: var(--bad); }
+
+/* Karten: etwas mehr Tiefe und Rundung */
+.card { border-color: color-mix(in srgb, var(--border) 80%, transparent); }
+.card.link { position: relative; }
+.card.link::after { content: '›'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--brand-light); font-size: 24px; opacity: .0; transition: opacity .2s, transform .2s; }
+@media (hover: hover) { .card.link:hover::after { opacity: .8; transform: translate(3px, -50%); } }
+
+/* Badges etwas klarer */
+.badge { box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
+
+/* Leere Zustände feiner */
+.empty { color: var(--muted); }
+.empty br + .small, .empty .small { opacity: .85; }
+
+/* Schnellaktionen mit Tiefe */
+.quick .btn { box-shadow: 0 6px 16px -6px rgba(15, 118, 110, .45); }
+.quick .btn.ghost { box-shadow: none; }
+
+/* Weicher Übergang beim Seitenwechsel */
+.view { transition: opacity .2s ease; }
+
+/* Großer Bildschirm (Tablet): inhaltlich breiter, ruhiger */
+@media (min-width: 720px) { .view { max-width: 760px; } .tabbar { max-width: 760px; left: 50%; right: auto; transform: translateX(-50%); border-left: 1px solid var(--border); border-right: 1px solid var(--border); } }
