@@ -15,6 +15,7 @@ route('/nachweise', async () => {
       <div class="row gap mt">
         <a class="btn small" href="#/objekt/${o.id}/nachweis?monat=${pm}">${esc(monthLabel(pm))}</a>
         <a class="btn small ghost" href="#/objekt/${o.id}/nachweis?monat=${cm}">${esc(monthLabel(cm))}</a>
+        <a class="btn small ghost" href="#/objekt/${o.id}/jahr">📊 Jahr</a>
       </div></div>`).join('') || '<div class="empty">Noch keine Häuser.</div>'}
   `);
 });
@@ -128,7 +129,7 @@ function mangelCard(m, data) {
   return `<a class="card link mangel ${m.dringend && m.status !== 'erledigt' ? 'urgent' : ''}" href="#/mangel/${m.id}">
     <div class="row between"><b>${m.dringend ? '🚨' : '⚠️'} ${esc(m.text.split('\n')[0].slice(0, 60))}</b>
       ${m.status === 'erledigt' ? '<span class="badge ok">behoben</span>' : m.gemeldetAm ? '<span class="badge">gemeldet</span>' : '<span class="badge warn">neu</span>'}</div>
-    <div class="muted small">🏢 ${esc(objLabel(data.omap[m.objektId]))} · ${esc(m.ort)} · ${fmtDate(m.datum)}${m.fotoAnzahl ? ` · 📷 ${m.fotoAnzahl}` : ''}</div>
+    <div class="muted small">🏢 ${esc(objLabel(data.omap[m.objektId]))} · ${esc(m.ort)} · ${fmtDate(m.datum)}${m.fotoAnzahl ? ` · 📷 ${m.fotoAnzahl}` : ''}${m.status !== 'erledigt' && daysBetween(m.datum, today()) >= NACHFASS_TAGE ? ` · ⏰ seit ${daysBetween(m.datum, today())} Tagen offen` : ''}</div>
   </a>`;
 }
 
@@ -226,6 +227,68 @@ route('/mangel/:id', async ({ id }) => {
     await DB.del('maengel', id);
     go('#/maengel', true);
   });
+});
+
+/* ---------- Jahresübersicht pro Haus ---------- */
+route('/objekt/:id/jahr', async ({ id }, q) => {
+  const data = await loadAll();
+  const o = data.omap[id];
+  if (!o) return go('#/objekte', true);
+  const k = data.kmap[o.kundeId] || { name: '' };
+  const jahr = q.jahr || today().slice(0, 4);
+  const monthly = isMonthly(o);
+  const thisMonth = today().slice(0, 7);
+  const rows = Array.from({ length: 12 }, (_, i) => {
+    const m = `${jahr}-${pad(i + 1)}`;
+    const visits = data.visits.filter((v) => v.objektId === id && v.datum.startsWith(m));
+    return {
+      m,
+      visits: visits.length,
+      stunden: visits.reduce((s, v) => s + num(v.stunden), 0),
+      maengel: data.maengel.filter((x) => x.objektId === id && x.datum.startsWith(m)).length,
+      pauschale: monthly && m <= thisMonth ? priceFor(o, m) : null,
+    };
+  });
+  const sum = (key) => rows.reduce((s, r) => s + r[key], 0);
+  const pauschalSumme = rows.reduce((s, r) => s + (r.pauschale || 0), 0);
+  const offenMaengel = data.maengel.filter((x) => x.objektId === id && x.status !== 'erledigt').length;
+
+  render(`Jahresübersicht ${jahr}`, `
+    <div class="card no-print row between">
+      <a class="icon-btn" href="#/objekt/${id}/jahr?jahr=${Number(jahr) - 1}" aria-label="Vorjahr">‹</a>
+      <b>${jahr}</b>
+      <a class="icon-btn" href="#/objekt/${id}/jahr?jahr=${Number(jahr) + 1}" aria-label="Nächstes Jahr">›</a>
+    </div>
+    ${docButtons()}
+    <div class="doc-wrap"><article class="invoice-doc">
+      ${docHeader()}
+      <div class="inv-row">
+        ${recipientBlock(k)}
+        <table class="inv-meta">
+          <tr><td>Objekt</td><td><b>${esc(objLabel(o))}</b></td></tr>
+          <tr><td>Adresse</td><td>${esc(objAddress(o))}</td></tr>
+          <tr><td>Zeitraum</td><td>01.01.${jahr} – 31.12.${jahr}</td></tr>
+          <tr><td>Erstellt am</td><td>${fmtDate(today())}</td></tr>
+        </table>
+      </div>
+      <h2 class="inv-title">Jahresübersicht <span>${jahr}</span></h2>
+      <p>Übersicht aller Reinigungen und gemeldeten Mängel im Objekt für das Kalenderjahr ${jahr}.</p>
+      <table class="inv-items">
+        <thead><tr><th>Monat</th><th class="r">Einsätze</th><th class="r">Stunden</th><th class="r">Mängel</th>${monthly ? '<th class="r">Pauschale</th>' : ''}</tr></thead>
+        <tbody>${rows.map((r) => `<tr>
+          <td>${monthLabel(r.m)}</td>
+          <td class="r">${r.visits || '–'}</td>
+          <td class="r">${r.stunden ? `${fmtNum(r.stunden)} Std.` : '–'}</td>
+          <td class="r">${r.maengel || '–'}</td>
+          ${monthly ? `<td class="r">${r.pauschale == null ? '–' : money(r.pauschale)}</td>` : ''}</tr>`).join('')}
+        </tbody>
+        <tfoot><tr><td><b>Gesamt</b></td><td class="r">${sum('visits')}</td><td class="r">${fmtNum(sum('stunden'))} Std.</td><td class="r">${sum('maengel')}</td>${monthly ? `<td class="r inv-total">${money(pauschalSumme)}</td>` : ''}</tr></tfoot>
+      </table>
+      <p class="inv-note">${monthly ? 'Pauschalen bis einschließlich des aktuellen Monats, ohne Umsatzsteuer (Kleinunternehmer). ' : 'Abrechnung nach Stunden – die Beträge stehen in den Rechnungen. '}Derzeit offene Mängel: ${offenMaengel}.</p>
+      ${docFooter()}
+    </article></div>
+  `);
+  wireDocButtons(`Jahresübersicht ${objLabel(o)} ${jahr}`, `Guten Tag,\n\nanbei die Jahresübersicht ${jahr} für ${objLabel(o)}.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`);
 });
 
 /* ---------- Winterdienst ---------- */

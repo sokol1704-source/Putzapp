@@ -161,6 +161,19 @@ async function scheduleNotifications(force = false) {
         schedule: { at: at.toISOString(), allowWhileIdle: true },
       });
     }
+    // Heute Abend an offene Mängel und unbeantwortete Angebote erinnern
+    const tonight = parseISO(today());
+    tonight.setHours(hh, mm, 0, 0);
+    const overdueM = data.maengel.filter((m) => m.status !== 'erledigt' && daysBetween(m.datum, today()) >= NACHFASS_TAGE).length;
+    const overdueA = data.angebote.filter(angebotNachfassen).length;
+    if ((overdueM || overdueA) && tonight > new Date()) {
+      notes.push({
+        id: 3001,
+        title: '⏰ Offene Punkte nachhaken',
+        body: [overdueM && `${overdueM} ${overdueM === 1 ? 'offener Mangel' : 'offene Mängel'}`, overdueA && `${overdueA} ${overdueA === 1 ? 'Angebot' : 'Angebote'} ohne Antwort`].filter(Boolean).join(' · '),
+        schedule: { at: tonight.toISOString(), allowWhileIdle: true },
+      });
+    }
     if (notes.length) await native('LocalNotifications', 'schedule', { notifications: notes });
     S.geplanteErinnerungen = notes.length;
     await saveSettings();

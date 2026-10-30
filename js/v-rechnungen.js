@@ -422,6 +422,8 @@ route('/rechnung/:id', async ({ id }) => {
 
 /* ---------- Angebote ---------- */
 const ANGEBOT_STATUS = { offen: ['offen', 'warn'], angenommen: ['angenommen', 'ok'], abgelehnt: ['abgelehnt', 'soft'] };
+// Offene Angebote, auf die seit NACHFASS_TAGE keine Antwort kam
+const angebotNachfassen = (a) => a.status === 'offen' && daysBetween(a.datum, today()) >= NACHFASS_TAGE;
 const OPTIONS = [
   ['aufzug', 'Aufzug reinigen', 'Aufzug reinigen (Kabine & Türen)', 0],
   ['keller', 'Kellergänge', 'Kellergänge fegen & wischen', 28],
@@ -441,6 +443,7 @@ route('/angebote', async () => {
       return `<a class="card link" href="#/angebot/${a.id}">
         <div class="row between"><b>${esc(a.nummer)}</b><span class="badge ${cls}">${label}</span></div>
         <div class="row between small"><span class="muted">${esc(a.empfaenger.name)} · 🏢 ${esc(a.objekt.strasse)}</span><b>${money(a.monatspreis)}/Monat</b></div>
+        ${angebotNachfassen(a) ? `<div class="danger-text small">⏰ ohne Antwort seit ${daysBetween(a.datum, today())} Tagen</div>` : ''}
       </a>`;
     }).join('') || `<div class="empty">Noch keine Angebote.<br><span class="small">Mit dem Rechner kalkulierst du in einer Minute einen fairen Monatspreis.</span></div>`}</div>
   `);
@@ -604,10 +607,14 @@ route('/angebot/:id', async ({ id }) => {
         ${a.objektId ? `<a class="btn ghost" href="#/objekt/${a.objektId}">🏢 Zum Haus</a>` : ''}
       </div>
     </div>
+    ${angebotNachfassen(a) ? `<div class="card hint no-print"><b>⏰ Seit ${daysBetween(a.datum, today())} Tagen keine Antwort</b>
+      <div class="muted small">Eine kurze Nachfrage bringt oft die Entscheidung.</div>
+      <button class="btn small mt" id="nachfassen">✉️ Nachfrage senden</button></div>` : ''}
     <div class="doc-wrap">${angebotDoc(a)}</div>
     <button class="btn danger ghost block no-print" id="del">Angebot löschen</button>
   `);
   wireDocButtons(`Angebot ${a.nummer}`, `Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nanbei erhalten Sie mein Angebot für die Treppenhausreinigung ${a.objekt.strasse}. Ich freue mich auf Ihre Rückmeldung!\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`);
+  $('#nachfassen')?.addEventListener('click', () => shareText(`Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nich wollte kurz nachfragen, ob Sie mein Angebot ${a.nummer} für die Treppenhausreinigung ${a.objekt.strasse} schon prüfen konnten. Gern beantworte ich Ihre Fragen.\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`, `Nachfrage ${a.nummer}`));
   $('#no')?.addEventListener('click', async () => { a.status = 'abgelehnt'; await DB.put('angebote', a); router(); });
   $('#yes')?.addEventListener('click', async () => {
     if (!confirm('Angebot angenommen? Ich lege dann Auftraggeber und Haus mit Plan und Monatspreis an.')) return;

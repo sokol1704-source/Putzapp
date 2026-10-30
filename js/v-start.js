@@ -24,6 +24,8 @@ route('/', async () => {
 
   // Mit automatischer Sicherung (Android-App) reicht es, ab und zu eine Kopie in die Cloud zu legen
   const backupDue = data.visits.length > 0 && (!S.letzteSicherung || daysBetween(S.letzteSicherung, t) > (S.letzteAutoSicherung ? 30 : 7));
+  const maengelAlt = data.maengel.filter((m) => m.status !== 'erledigt' && daysBetween(m.datum, t) >= NACHFASS_TAGE).length;
+  const angeboteAlt = data.angebote.filter(angebotNachfassen).length;
   const gp = gruendungProgress();
   const hour = new Date().getHours();
   const greet = hour < 11 ? 'Guten Morgen' : hour < 17 ? 'Hallo' : 'Guten Abend';
@@ -42,6 +44,8 @@ route('/', async () => {
         <a class="btn glass" href="#/einsatz/neu">🧽 Einsatz erfassen</a>
       </div>
     </div>
+    ${maengelAlt ? `<a class="card hint" href="#/maengel">⏰ <b>${maengelAlt} ${maengelAlt === 1 ? 'Mangel ist' : 'Mängel sind'} seit über ${NACHFASS_TAGE} Tagen offen.</b> Kurz bei der Verwaltung nachhaken.</a>` : ''}
+    ${angeboteAlt ? `<a class="card hint" href="#/angebote">✉️ <b>${angeboteAlt} ${angeboteAlt === 1 ? 'Angebot wartet' : 'Angebote warten'} auf Antwort.</b> Eine Nachfrage hilft oft.</a>` : ''}
     ${backupDue ? `<a class="card hint" href="#/einstellungen">💾 <b>Zeit für eine Datensicherung!</b> ${S.letzteSicherung ? `Die letzte ist vom ${fmtDate(S.letzteSicherung)}.` : 'Du hast noch keine erstellt.'} Alle Daten liegen nur auf diesem Handy.</a>` : ''}
     ${gp.done < gp.total && !S.gruendungAusgeblendet ? `<a class="card link g-start" href="#/gruendung">
       <div class="row between"><b>🚀 Gründung: ${gp.done} von ${gp.total} erledigt</b><span class="muted">›</span></div>
