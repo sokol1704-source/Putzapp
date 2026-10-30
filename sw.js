@@ -1,6 +1,6 @@
 // Service Worker: hält die App offline verfügbar.
 // Bei Änderungen an den Dateien die Versionsnummer erhöhen.
-const CACHE = 'toths-v8';
+const CACHE = 'toths-v9';
 const FILES = [
   './',
   'index.html',
@@ -11,6 +11,7 @@ const FILES = [
   'js/v-finanzen.js',
   'js/v-extras.js',
   'js/v-material.js',
+  'js/v-auswertung.js',
   'js/vendor/jspdf.umd.min.js',
   'js/vendor/html2canvas.min.js',
   'js/v-start.js',

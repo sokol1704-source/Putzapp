@@ -22,7 +22,7 @@ Gemacht für die **Treppenhaus- und Objektreinigung in Mehrfamilienhäusern**.
 - **Erinnerungen** (Android-App) – am Vorabend an die Häuser von morgen; **Glätte-Warnung** über die Wettervorhersage (Open-Meteo) für Häuser mit Winterdienst
 - **Material & Einkaufsliste** – Lager mit Mindest- und Sollbestand, automatischer Verbrauch je Reinigung bzw. Winter-Einsatz, Reichweite, Einkaufsliste zum Teilen, Einkauf direkt als Ausgabe buchen; Hinweise auf der Startseite, in der Abend-Erinnerung und bei Glättegefahr (Streumittel)
 - **Finanzen** – Ausgaben mit Belegfoto, Fahrtenbuch (0,30 €/km), Gewinn-Übersicht und EÜR-Export als CSV (Excel) für das Steuerbüro
-- **Auswertung** – Umsatz pro Monat und tatsächlicher Stundenlohn je Haus
+- **Auswertung** – Kennzahlen mit Vorjahresvergleich, Hochrechnung zur Kleinunternehmergrenze, Umsatz & Kosten pro Monat, Umsatzanteile je Auftraggeber, Stundenlohn je Haus mit Ziellinie und Preisempfehlung, automatische Erkenntnisse (Diagrammfarben auf Farbsehschwäche geprüft)
 - **Urlaub & Krankheit** – Termine im Zeitraum nachholen oder absagen, fertige Nachricht an jede Hausverwaltung
 - **Preisanpassung** – Preise prozentual erhöhen, ab Stichtag automatisch abrechnen, Anschreiben als PDF
 - **Datensicherung** – Export/Import aller Daten inkl. Fotos; in der Android-App zusätzlich wöchentlich automatisch in *Dokumente/TothsReinigung*
