@@ -377,7 +377,7 @@ route('/rechnung/:id', async ({ id }) => {
         <button class="btn ghost" id="print">🖨️ Drucken</button>
         ${inv.status === 'offen' ? '<button class="btn ghost" id="paid">✓ Bezahlt</button>' : ''}
         ${inv.status === 'bezahlt' ? '<button class="btn ghost" id="unpaid">Wieder offen</button>' : ''}
-        ${overdue ? '<button class="btn ghost" id="remind">⏰ Zahlungserinnerung</button>' : ''}
+        ${overdue ? `<button class="btn ghost" id="remind">${inv.mahnstufe ? `📨 ${inv.mahnstufe + 1}. Mahnung` : '⏰ Zahlungserinnerung'}</button>` : ''}
       </div>
       <p class="muted small">„Als PDF senden“ öffnet WhatsApp, E-Mail & Co. direkt mit der fertigen PDF.</p>
     </div>
@@ -398,15 +398,30 @@ route('/rechnung/:id', async ({ id }) => {
     await DB.put('invoices', inv);
     router();
   });
-  $('#remind')?.addEventListener('click', () => {
-    const text = [`Zahlungserinnerung – Rechnung ${inv.nummer}`, '',
-      `Sehr geehrte Damen und Herren${inv.kunde.ansprechpartner ? `, ${inv.kunde.ansprechpartner}` : ''},`, '',
-      `sicher ist es Ihrer Aufmerksamkeit entgangen: Die Rechnung ${inv.nummer} vom ${fmtDate(inv.datum)} über ${money(inv.summe)} war am ${fmtDate(inv.faellig)} fällig.`,
-      `Bitte überweisen Sie den Betrag innerhalb der nächsten 7 Tage auf folgendes Konto:`,
-      `${inv.absender.bank ? `${inv.absender.bank}, ` : ''}IBAN ${inv.absender.iban}`, `Verwendungszweck: ${inv.nummer}`, '',
-      'Sollte sich Ihre Zahlung mit dieser Erinnerung überschnitten haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.', '',
-      'Mit freundlichen Grüßen', inv.absender.inhaber, inv.absender.firma].join('\n');
-    shareText(text, `Zahlungserinnerung ${inv.nummer}`);
+  $('#remind')?.addEventListener('click', async () => {
+    const stufe = inv.mahnstufe || 0;
+    const frist = fmtDate(addDays(today(), 7));
+    const anrede = `Sehr geehrte Damen und Herren${inv.kunde.ansprechpartner ? `, ${inv.kunde.ansprechpartner}` : ''},`;
+    const konto = `${inv.absender.bank ? `${inv.absender.bank}, ` : ''}IBAN ${inv.absender.iban}`;
+    const text = stufe === 0
+      ? [`Zahlungserinnerung – Rechnung ${inv.nummer}`, '', anrede, '',
+        `sicher ist es Ihrer Aufmerksamkeit entgangen: Die Rechnung ${inv.nummer} vom ${fmtDate(inv.datum)} über ${money(inv.summe)} war am ${fmtDate(inv.faellig)} fällig.`,
+        'Bitte überweisen Sie den Betrag innerhalb der nächsten 7 Tage auf folgendes Konto:',
+        konto, `Verwendungszweck: ${inv.nummer}`, '',
+        'Sollte sich Ihre Zahlung mit dieser Erinnerung überschnitten haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.', '',
+        'Mit freundlichen Grüßen', inv.absender.inhaber, inv.absender.firma].join('\n')
+      : [`${stufe + 1}. Mahnung – Rechnung ${inv.nummer}`, '', anrede, '',
+        `trotz unserer bisherigen Erinnerung ist die Rechnung ${inv.nummer} vom ${fmtDate(inv.datum)} über ${money(inv.summe)} (fällig seit ${fmtDate(inv.faellig)}) noch nicht bei uns eingegangen.`,
+        `Wir bitten Sie, den Betrag bis spätestens ${frist} auf folgendes Konto zu überweisen:`,
+        konto, `Verwendungszweck: ${inv.nummer}`, '',
+        'Bei Fragen zur Rechnung melden Sie sich bitte umgehend bei mir.', '',
+        'Mit freundlichen Grüßen', inv.absender.inhaber, inv.absender.firma].join('\n');
+    shareText(text, `${stufe === 0 ? 'Zahlungserinnerung' : `${stufe + 1}. Mahnung`} ${inv.nummer}`);
+    inv.mahnstufe = stufe + 1;
+    inv.letzteMahnung = today();
+    await DB.put('invoices', inv);
+    toast(`Gemerkt: ${stufe === 0 ? 'Zahlungserinnerung' : `${stufe + 1}. Mahnung`} gesendet`);
+    router();
   });
   $('#storno')?.addEventListener('click', async () => {
     if (!confirm(`Rechnung ${inv.nummer} stornieren? Die Nummer bleibt vergeben, die Einsätze können neu abgerechnet werden.`)) return;

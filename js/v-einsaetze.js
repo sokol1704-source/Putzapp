@@ -78,6 +78,7 @@ async function appointmentForm(a, q) {
       ${isNew ? '' : `
         ${a.erledigt ? '' : `<a class="btn ghost block" href="#/einsatz/neu?objekt=${a.objektId}&termin=${a.id}">✓ Erledigt – Einsatz erfassen</a>`}
         <button class="btn ghost block" type="button" id="ics">📆 In Handy-Kalender übernehmen</button>
+        <button class="btn ghost block" type="button" id="absage">📨 Absage vorbereiten</button>
         <button class="btn danger ghost block" type="button" id="del">Termin löschen</button>`}
     </form>
   `);
@@ -125,6 +126,11 @@ async function appointmentForm(a, q) {
     go('#/termine', true);
   });
   $('#ics')?.addEventListener('click', () => downloadIcs(a, omap[a.objektId]));
+  $('#absage')?.addEventListener('click', () => {
+    const k = kmap[a.kundeId];
+    const text = `Guten Tag${k?.ansprechpartner ? ` ${k.ansprechpartner}` : ''},\n\nleider muss ich unseren Termin am ${fmtDateLong(a.datum)}${a.uhrzeit ? ` um ${a.uhrzeit} Uhr` : ''} für ${objLabel(omap[a.objektId])} absagen. Ich melde mich zeitnah mit einem neuen Termin.\n\nEntschuldigen Sie die Umstände.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`;
+    shareText(text, 'Terminabsage');
+  });
   $('#del')?.addEventListener('click', async () => {
     if (!confirm('Termin löschen?')) return;
     await DB.del('appointments', a.id);

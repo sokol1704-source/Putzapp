@@ -24,6 +24,7 @@ route('/', async () => {
 
   // Mit automatischer Sicherung (Android-App) reicht es, ab und zu eine Kopie in die Cloud zu legen
   const backupDue = data.visits.length > 0 && (!S.letzteSicherung || daysBetween(S.letzteSicherung, t) > (S.letzteAutoSicherung ? 30 : 7));
+  const ueberfaellig = data.invoices.filter((i) => i.status === 'offen' && i.faellig < t);
   const maengelAlt = data.maengel.filter((m) => m.status !== 'erledigt' && daysBetween(m.datum, t) >= NACHFASS_TAGE).length;
   const angeboteAlt = data.angebote.filter(angebotNachfassen).length;
   const gp = gruendungProgress();
@@ -44,6 +45,7 @@ route('/', async () => {
         <a class="btn glass" href="#/einsatz/neu">🧽 Einsatz erfassen</a>
       </div>
     </div>
+    ${ueberfaellig.length ? `<a class="card hint" href="#/rechnungen">💶 <b>${ueberfaellig.length} ${ueberfaellig.length === 1 ? 'Rechnung ist' : 'Rechnungen sind'} überfällig</b> – zusammen ${money(ueberfaellig.reduce((s, i) => s + i.summe, 0))}. Erinnerung oder Mahnung mit einem Klick.</a>` : ''}
     ${maengelAlt ? `<a class="card hint" href="#/maengel">⏰ <b>${maengelAlt} ${maengelAlt === 1 ? 'Mangel ist' : 'Mängel sind'} seit über ${NACHFASS_TAGE} Tagen offen.</b> Kurz bei der Verwaltung nachhaken.</a>` : ''}
     ${angeboteAlt ? `<a class="card hint" href="#/angebote">✉️ <b>${angeboteAlt} ${angeboteAlt === 1 ? 'Angebot wartet' : 'Angebote warten'} auf Antwort.</b> Eine Nachfrage hilft oft.</a>` : ''}
     ${backupDue ? `<a class="card hint" href="#/einstellungen">💾 <b>Zeit für eine Datensicherung!</b> ${S.letzteSicherung ? `Die letzte ist vom ${fmtDate(S.letzteSicherung)}.` : 'Du hast noch keine erstellt.'} Alle Daten liegen nur auf diesem Handy.</a>` : ''}

@@ -162,17 +162,17 @@ async function scheduleNotifications(force = false) {
       });
     }
     // Heute Abend an offene Mängel und unbeantwortete Angebote erinnern
-    const tonight = parseISO(today());
-    tonight.setHours(hh, mm, 0, 0);
+    // An den nächsten 7 Abenden an offene Punkte erinnern (Mängel, Angebote, überfällige Rechnungen)
     const overdueM = data.maengel.filter((m) => m.status !== 'erledigt' && daysBetween(m.datum, today()) >= NACHFASS_TAGE).length;
     const overdueA = data.angebote.filter(angebotNachfassen).length;
-    if ((overdueM || overdueA) && tonight > new Date()) {
-      notes.push({
-        id: 3001,
-        title: '⏰ Offene Punkte nachhaken',
-        body: [overdueM && `${overdueM} ${overdueM === 1 ? 'offener Mangel' : 'offene Mängel'}`, overdueA && `${overdueA} ${overdueA === 1 ? 'Angebot' : 'Angebote'} ohne Antwort`].filter(Boolean).join(' · '),
-        schedule: { at: tonight.toISOString(), allowWhileIdle: true },
-      });
+    const overdueR = data.invoices.filter((i) => i.status === 'offen' && i.faellig < today()).length;
+    if (overdueM || overdueA || overdueR) {
+      const body = [overdueM && `${overdueM} ${overdueM === 1 ? 'offener Mangel' : 'offene Mängel'}`, overdueA && `${overdueA} ${overdueA === 1 ? 'Angebot' : 'Angebote'} ohne Antwort`, overdueR && `${overdueR} ${overdueR === 1 ? 'überfällige Rechnung' : 'überfällige Rechnungen'}`].filter(Boolean).join(' · ');
+      for (let i = 0; i < 7; i++) {
+        const at = parseISO(addDays(today(), i));
+        at.setHours(hh, mm, 0, 0);
+        if (at > new Date()) notes.push({ id: 3001 + i, title: '⏰ Offene Punkte nachhaken', body, schedule: { at: at.toISOString(), allowWhileIdle: true } });
+      }
     }
     if (notes.length) await native('LocalNotifications', 'schedule', { notifications: notes });
     S.geplanteErinnerungen = notes.length;
