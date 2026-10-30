@@ -1,6 +1,6 @@
 {
   "name": "toths-reinigungsservice",
-  "version": "2.16.0",
+  "version": "2.17.0",
   "private": true,
   "description": "Handy-App für Toths Reinigungsservice",
   "scripts": {
