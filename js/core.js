@@ -217,6 +217,8 @@ async function loadSettings() {
 const saveSettings = () => DB.put('settings', S);
 // Ab so vielen Tagen ohne Rückmeldung bzw. Erledigung erinnern (Mängel, Angebote)
 const NACHFASS_TAGE = 14;
+// Qualitätscheck am Einsatz: was nach der Reinigung geprüft werden kann
+const QUALITAET_PUNKTE = ['Treppenhaus gewischt', 'Geländer & Handläufe', 'Briefkästen', 'Hauseingang & Glastür', 'Fenster & Fensterbänke', 'Mülltonnenplatz sauber', 'Keller / Aufzug geprüft'];
 const settingsComplete = () => S.firma && S.inhaber && S.strasse && S.plzOrt && S.steuernummer;
 const absender = () => Object.fromEntries(['firma', 'slogan', 'inhaber', 'strasse', 'plzOrt', 'telefon', 'email', 'steuernummer', 'bank', 'iban', 'bic'].map((k) => [k, S[k]]));
 const UNITS = ['Monat', 'Std.', 'pauschal', 'Mal', 'Etage', 'Tonne', 'Einsatz', 'Stk.', 'Sack', 'km'];

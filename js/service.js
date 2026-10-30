@@ -162,17 +162,17 @@ async function scheduleNotifications(force = false) {
       });
     }
     // Heute Abend an offene Mängel und unbeantwortete Angebote erinnern
-    // An den nächsten 7 Abenden an offene Punkte erinnern (Mängel, Angebote, überfällige Rechnungen)
+    // Offene Punkte (Mängel, Angebote, überfällige Rechnungen): täglich wiederholt, auch wenn die App geschlossen ist.
+    // Der Stand im Text ist der vom letzten Öffnen der App.
     const overdueM = data.maengel.filter((m) => m.status !== 'erledigt' && daysBetween(m.datum, today()) >= NACHFASS_TAGE).length;
     const overdueA = data.angebote.filter(angebotNachfassen).length;
     const overdueR = data.invoices.filter((i) => i.status === 'offen' && i.faellig < today()).length;
     if (overdueM || overdueA || overdueR) {
       const body = [overdueM && `${overdueM} ${overdueM === 1 ? 'offener Mangel' : 'offene Mängel'}`, overdueA && `${overdueA} ${overdueA === 1 ? 'Angebot' : 'Angebote'} ohne Antwort`, overdueR && `${overdueR} ${overdueR === 1 ? 'überfällige Rechnung' : 'überfällige Rechnungen'}`].filter(Boolean).join(' · ');
-      for (let i = 0; i < 7; i++) {
-        const at = parseISO(addDays(today(), i));
-        at.setHours(hh, mm, 0, 0);
-        if (at > new Date()) notes.push({ id: 3001 + i, title: '⏰ Offene Punkte nachhaken', body, schedule: { at: at.toISOString(), allowWhileIdle: true } });
-      }
+      const at = parseISO(today());
+      at.setHours(hh, mm, 0, 0);
+      if (at <= new Date()) at.setDate(at.getDate() + 1);
+      notes.push({ id: 3001, title: '⏰ Offene Punkte nachhaken', body: `${body} (Stand beim letzten Öffnen)`, schedule: { at: at.toISOString(), repeats: true, every: 'day', allowWhileIdle: true } });
     }
     if (notes.length) await native('LocalNotifications', 'schedule', { notifications: notes });
     S.geplanteErinnerungen = notes.length;

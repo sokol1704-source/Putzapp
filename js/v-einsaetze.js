@@ -221,6 +221,8 @@ async function visitForm(v, q) {
       ${isNew && lastOfObjekt ? `<button type="button" class="btn ghost block" id="sameAsLast">🔁 Wie beim letzten Mal (${fmtDateLong(lastOfObjekt.datum)})</button>` : ''}
       <div class="label">Was wurde gereinigt?</div>
       <ul class="tasks" id="tasks"></ul>
+      <div class="label">Qualitätscheck <span class="muted small">(Haken, was du geprüft hast)</span></div>
+      <div class="form" id="quali">${QUALITAET_PUNKTE.map((text, i) => `<label class="check"><input type="checkbox" data-q="${i}" ${(v.qualitaet || []).some((q) => q.text === text && q.ok) ? 'checked' : ''}> ${esc(text)}</label>`).join('')}</div>
       <div class="label">Zusatzleistungen <span class="muted small">(werden extra berechnet)</span></div>
       <ul class="tasks extras" id="extras"></ul>
       <div class="label">Fotos</div>
@@ -290,6 +292,7 @@ async function visitForm(v, q) {
       aufgaben: tasks,
       extras: extras.filter((x) => num(x.menge) > 0).map((x) => ({ ...x, menge: num(x.menge) })),
       notiz: fd.get('notiz').trim(),
+      qualitaet: [...f.querySelectorAll('[data-q]')].map((c) => ({ text: QUALITAET_PUNKTE[c.dataset.q], ok: c.checked })),
     });
     await savePhotos(v.id, pending);
     v.fotoAnzahl = existing.length + pending.length;
@@ -329,6 +332,7 @@ route('/einsatz/:id', async ({ id }) => {
       <ul class="done-list mt">${(v.aufgaben || []).map((t) => `<li class="${t.erledigt ? 'ok' : 'no'}">${t.erledigt ? '✓' : '✗'} ${esc(t.text)}</li>`).join('')}</ul>
       ${v.extras?.length ? `<div class="small muted mt">Zusatzleistungen</div><ul class="done-list">${v.extras.map((x) => `<li class="ok">➕ ${esc(x.name)} · ${fmtNum(x.menge)} ${esc(x.einheit)} à ${money(x.preis)}</li>`).join('')}</ul>` : ''}
       ${v.notiz ? `<div class="mt">📝 ${nl2br(v.notiz)}</div>` : ''}
+      ${v.qualitaet?.length ? `<div class="small mt">🔎 Qualitätscheck: ${v.qualitaet.filter((q) => q.ok).length} von ${v.qualitaet.length} geprüft${v.qualitaet.some((q) => !q.ok) ? ` · nicht geprüft: ${esc(v.qualitaet.filter((q) => !q.ok).map((q) => q.text).join(', '))}` : ''}</div>` : ''}
       ${gallery(photos.filter((p) => p.typ === 'vorher'), 'Vorher')}${gallery(photos.filter((p) => p.typ === 'nachher'), 'Nachher')}
     </div>
     <div class="quick">

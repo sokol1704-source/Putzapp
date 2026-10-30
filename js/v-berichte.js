@@ -66,7 +66,7 @@ route('/objekt/:id/nachweis', async ({ id }, q) => {
         <tbody>${visits.map((v) => `<tr>
           <td class="nowrap">${fmtDateLong(v.datum)}</td>
           <td class="nowrap">${v.von ? `${esc(v.von)}–${esc(v.bis || '')}` : '–'}</td>
-          <td>${esc((v.aufgaben || []).filter((t) => t.erledigt).map((t) => t.text).join(', '))}${v.extras?.length ? `<br><i>Zusätzlich: ${esc(v.extras.map((x) => x.name).join(', '))}</i>` : ''}${v.notiz ? `<br><span class="doc-muted">${esc(v.notiz)}</span>` : ''}</td>
+          <td>${esc((v.aufgaben || []).filter((t) => t.erledigt).map((t) => t.text).join(', '))}${v.extras?.length ? `<br><i>Zusätzlich: ${esc(v.extras.map((x) => x.name).join(', '))}</i>` : ''}${v.notiz ? `<br><span class="doc-muted">${esc(v.notiz)}</span>` : ''}${v.qualitaet?.length ? `<br><span class="doc-muted">Qualitätscheck: ${v.qualitaet.filter((q) => q.ok).length} von ${v.qualitaet.length} geprüft</span>` : ''}</td>
           <td class="r">${v.stunden ? `${fmtNum(v.stunden)} Std.` : '–'}</td></tr>`).join('') || '<tr><td colspan="4">Keine Einsätze in diesem Monat.</td></tr>'}
         </tbody>
         <tfoot><tr><td colspan="2"></td><td class="r inv-total-label">${visits.length} Reinigung${visits.length === 1 ? '' : 'en'}</td><td class="r inv-total">${fmtNum(hours)} Std.</td></tr></tfoot>
