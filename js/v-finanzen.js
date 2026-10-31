@@ -3,6 +3,22 @@
 const KATEGORIEN = ['Reinigungsmittel', 'Streumittel', 'Arbeitsmaterial & Geräte', 'Arbeitskleidung', 'Fahrzeug (Tanken, Werkstatt)', 'Computer, Handy & Software', 'Büromaterial & Porto', 'Telefon & Internet', 'Versicherungen', 'Werbung', 'Sonstiges'];
 // Nur der berufliche Anteil zählt (z. B. Laptop zu 50 % privat genutzt)
 const betrieblich = (a) => Math.round((a.betrag * (100 - (Number(a.privat) || 0))) / 100);
+// Positionen der Anlage EÜR (Bezeichnungen des Formulars). Zeilennummern bitte im ELSTER-Formular des Steuerjahres prüfen.
+const EUER_POSITION = {
+  'Reinigungsmittel': 'Material & Hilfsstoffe', 'Streumittel': 'Material & Hilfsstoffe',
+  'Arbeitsmaterial & Geräte': 'Sonstige Betriebsausgaben', 'Arbeitskleidung': 'Sonstige Betriebsausgaben',
+  'Fahrzeug (Tanken, Werkstatt)': 'Kfz-Kosten', 'Computer, Handy & Software': 'Sonstige Betriebsausgaben',
+  'Büromaterial & Porto': 'Büromaterial & Porto', 'Telefon & Internet': 'Telefon & Internet',
+  'Versicherungen': 'Versicherungsbeiträge', 'Werbung': 'Werbekosten', 'Sonstiges': 'Sonstige Betriebsausgaben',
+};
+// Summen je Position: Betriebseinnahmen, Betriebsausgaben (inkl. Fahrtkosten-Pauschale)
+const euerPositionen = (d) => {
+  const ausgaben = {};
+  d.aus.forEach((a) => { const p = EUER_POSITION[a.kategorie] || 'Sonstige Betriebsausgaben'; ausgaben[p] = (ausgaben[p] || 0) + betrieblich(a); });
+  if (d.fahrtkosten) ausgaben['Fahrtkosten (0,30 € je km)'] = d.fahrtkosten;
+  return { einnahmen: d.sumE, ausgaben: Object.entries(ausgaben).sort((a, b) => b[1] - a[1]), sumA: d.sumA, gewinn: d.gewinn, kfz: d.byKat['Fahrzeug (Tanken, Werkstatt)'] || 0 };
+};
+
 // Was im Fahrtenbuch noch fehlt (Finanzamt verlangt Datum, km-Stand, Strecke, Zweck und Ziel)
 const fahrtMaengel = (f) => {
   const m = [];
@@ -211,6 +227,15 @@ route('/finanzen', async (_, q) => {
       <a class="btn ghost" href="#/fahrt/neu">🚗 Fahrt</a>
       <a class="btn ghost" href="#/auswertung?jahr=${jahr}">📊 Auswertung</a>
     </div>
+    <h3 class="section">Für die Anlage EÜR in ELSTER</h3>
+    <div class="card">
+      <div class="row between small"><span>Betriebseinnahmen</span><b>${money(euerPositionen(d).einnahmen)}</b></div>
+      ${euerPositionen(d).ausgaben.map(([name, v]) => `<div class="row between small"><span>${esc(name)}</span><b>${money(v)}</b></div>`).join('') || '<div class="muted small">Noch keine Ausgaben in diesem Jahr.</div>'}
+      <div class="row between small"><b>Summe Betriebsausgaben</b><b>${money(euerPositionen(d).sumA)}</b></div>
+      <div class="row between small"><b>Gewinn</b><b>${money(euerPositionen(d).gewinn)}</b></div>
+      ${euerPositionen(d).kfz ? `<p class="danger-text small mt">⚠️ Fahrzeug-Kosten (${money(euerPositionen(d).kfz)}) sind mit der Kilometerpauschale von 0,30 € schon abgegolten. Bitte nicht zusätzlich eintragen – kläre das mit dem Finanzamt, bevor du die Erklärung abgibst.</p>` : ''}
+      <p class="muted small">Die Namen entsprechen den Positionen der Anlage EÜR. Die Zeilennummern findest du im ELSTER-Formular deines Steuerjahres.</p>
+    </div>
     <h3 class="section">Für die Steuer</h3>
     <div class="card">
       <p class="small">Die Datei enthält alle Einnahmen, Ausgaben und Fahrten ${jahr} – öffnet sich in Excel, Numbers oder Google Tabellen. Ideal für die Anlage EÜR oder dein Steuerbüro.</p>
@@ -226,6 +251,8 @@ route('/finanzen', async (_, q) => {
     d.aus.forEach((a) => rows.push([fmtDate(a.datum), 'Ausgabe', a.kategorie, `${a.beschreibung} (${a.zahlung})${a.privat ? ` – ${100 - a.privat} % beruflich von ${eur(a.betrag)} €` : ''}`, eur(-betrieblich(a)), a.fotoAnzahl ? 'Foto in App' : 'fehlt']));
     d.fa.forEach((f) => rows.push([fmtDate(f.datum), 'Ausgabe', 'Fahrtkosten (0,30 €/km)', `${fmtNum(f.km)} km – ${f.zweck}`, eur(-Math.round(num(f.km) * KM_SATZ)), 'Fahrtenbuch']));
     rows.push([], ['', 'Ausgaben nach Kategorie'], ...Object.entries(d.byKat).sort((a, b) => b[1] - a[1]).map(([k, v]) => ['', k, '', '', eur(-v)]));
+    const pos = euerPositionen(d);
+    rows.push([], ['', 'Übertrag für die Anlage EÜR (Positionen des Formulars, Zeilennummern im Formular prüfen)'], ['', 'Betriebseinnahmen', '', '', eur(pos.einnahmen)], ...pos.ausgaben.map(([name, v]) => ['', name, '', '', eur(v)]), ['', 'Summe Betriebsausgaben', '', '', eur(pos.sumA)]);
     rows.push([], ['', 'Summe Einnahmen', '', '', eur(d.sumE)], ['', 'Summe Ausgaben', '', '', eur(-d.sumA)], ['', 'Gewinn', '', '', eur(d.gewinn)], ['', 'Steuer-Rücklage (Richtwert)', '', '', eur(d.ruecklage)]);
     const csv = '﻿' + rows.map((r) => r.map(c).join(';')).join('\r\n');
     saveFile(new Blob([csv], { type: 'text/csv' }), `EUeR-${jahr}-Toths-Reinigung.csv`);
