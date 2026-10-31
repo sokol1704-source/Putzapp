@@ -139,6 +139,8 @@ route('/rechnung/neu', async (_, q) => {
   const customers = data.customers.filter((c) => data.objects.some((o) => o.kundeId === c.id));
   const kundeId = q.kunde || data.omap[q.objekt]?.kundeId || (customers.length === 1 ? customers[0].id : '');
   const defaultMonth = q.monat || (new Date().getDate() <= 15 ? prevMonth() : today().slice(0, 7));
+  // Eigene Rechnung nur für einen Einsatz (keine Monatspauschale, kein Winterdienst)
+  const einsatzId = q.einsatz || '';
   let positions = [];
   const objSel = new Set();
   const selV = new Set();
@@ -153,6 +155,7 @@ route('/rechnung/neu', async (_, q) => {
         <label>Rechnungsdatum<input type="date" name="datum" required value="${today()}"></label>
         <label>Zahlungsziel (Tage)<input type="number" name="zahlungsziel" min="0" value="${S.zahlungsziel}"></label>
       </div>
+      ${einsatzId ? '<p class="muted small">Eigene Rechnung nur für diesen Einsatz. Er taucht danach nicht mehr in der Monatsübersicht auf.</p>' : ''}
       <div id="visits"></div>
       <div class="label">Positionen</div>
       <div id="positions"></div>
@@ -168,8 +171,8 @@ route('/rechnung/neu', async (_, q) => {
   const f = $('#f');
   const objsOf = () => data.objects.filter((o) => o.kundeId === f.kundeId.value && (o.aktiv !== false || objSel.has(o.id)));
   const month = () => f.monat.value;
-  const openVisits = () => data.visits.filter((v) => objSel.has(v.objektId) && !v.rechnungId && v.datum.startsWith(month())).sort((a, b) => a.datum.localeCompare(b.datum));
-  const openWinter = () => data.winter.filter((w) => objSel.has(w.objektId) && !w.rechnungId && w.datum.startsWith(month()) && data.omap[w.objektId]?.winterAbrechnung === 'einsatz').sort((a, b) => a.datum.localeCompare(b.datum));
+  const openVisits = () => data.visits.filter((v) => objSel.has(v.objektId) && !v.rechnungId && v.datum.startsWith(month()) && (!einsatzId || v.id === einsatzId)).sort((a, b) => a.datum.localeCompare(b.datum));
+  const openWinter = () => einsatzId ? [] : data.winter.filter((w) => objSel.has(w.objektId) && !w.rechnungId && w.datum.startsWith(month()) && data.omap[w.objektId]?.winterAbrechnung === 'einsatz').sort((a, b) => a.datum.localeCompare(b.datum));
 
   // Positionen aus Häusern, Einsätzen und Winterdienst des Monats
   const autoPositions = () => {
@@ -180,7 +183,9 @@ route('/rechnung/neu', async (_, q) => {
     for (const o of objsOf().filter((x) => objSel.has(x.id))) {
       const prefix = multi ? `${objLabel(o)}: ` : '';
       const sel = openVisits().filter((v) => v.objektId === o.id && selV.has(v.id));
-      if (isMonthly(o)) {
+      if (isMonthly(o) && einsatzId) {
+        // Einzelrechnung: die Monatspauschale gehört nicht dazu
+      } else if (isMonthly(o)) {
         const old = positions.find((p) => p.pauschale && p.objektId === o.id);
         out.push({
           auto: true, pauschale: true, objektId: o.id, visitIds: sel.map((v) => v.id),
@@ -191,7 +196,7 @@ route('/rechnung/neu', async (_, q) => {
       } else {
         out.push(...sel.map((v) => ({ ...visitToPosition(v, o, prefix), objektId: o.id, auto: true })));
       }
-      out.push(...extraPositions(sel, prefix).map((p) => ({ ...p, objektId: o.id })));
+      out.push(...extraPositions(sel, prefix).map((p) => ({ ...p, objektId: o.id, visitIds: sel.map((v) => v.id) })));
       const ws = openWinter().filter((w) => w.objektId === o.id && selW.has(w.id));
       if (ws.length) {
         out.push({
