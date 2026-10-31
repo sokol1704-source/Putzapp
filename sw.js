@@ -1,6 +1,6 @@
 // Service Worker: hält die App offline verfügbar.
 // Bei Änderungen an den Dateien die Versionsnummer erhöhen.
-const CACHE = 'toths-v33';
+const CACHE = 'toths-v34';
 const FILES = [
   './',
   'index.html',
