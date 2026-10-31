@@ -46,6 +46,8 @@ route('/einstellungen', async () => {
 
     <a class="card link mt" href="#/gruendung"><div class="row between"><b>🚀 Gründungs-Checkliste</b><span class="muted">›</span></div></a>
 
+    <button class="btn ghost block mt" type="button" id="einfZeigen">📖 Einführung noch einmal anzeigen</button>
+
     <h3 class="section">🔔 Erinnerungen & Wetter</h3>
     <div class="card form">
       ${NATIVE ? `<label class="check"><input type="checkbox" id="notif" ${S.benachrichtigungen !== false ? 'checked' : ''}> Am Vorabend an die Häuser von morgen erinnern</label>
@@ -121,6 +123,7 @@ route('/einstellungen', async () => {
   });
   $('#import').addEventListener('change', (e) => e.target.files[0] && importBackup(e.target.files[0]));
   $('#factoryReset').addEventListener('click', factoryReset);
+  $('#einfZeigen').addEventListener('click', () => zeigeEinfuehrung(true));
 });
 
 async function factoryReset() {

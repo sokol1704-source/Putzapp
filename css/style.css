@@ -835,3 +835,14 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 
 /* Material: Vorschaubild */
 .mat-thumb { float: left; width: 52px; height: 52px; object-fit: cover; border-radius: 12px; margin: 0 12px 6px 0; }
+
+/* Einführung */
+.einfuehrung { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); display: grid; place-items: center; z-index: 1000; padding: 20px; }
+.einf-card { background: var(--card); color: var(--text); border-radius: 20px; padding: 28px 22px; max-width: 380px; text-align: center; }
+.einf-icon { font-size: 48px; margin-bottom: 8px; }
+.einf-card h2 { font-size: 1.3rem; margin: 0 0 10px; }
+.einf-card p { color: var(--muted); }
+.einf-dots { margin: 16px 0; }
+.einf-dots span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--border); margin: 0 4px; }
+.einf-dots span.on { background: var(--brand); }
+.einf-card .row { justify-content: center; }

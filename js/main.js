@@ -231,6 +231,50 @@ function setupBackButton() {
   });
 }
 
+/* ---------- Einführung: beim ersten Start und nach den Werkseinstellungen ---------- */
+const EINFUEHRUNG = [
+  ['🧽', 'Willkommen bei Toths Reinigungsservice', 'Die App begleitet dich durch den Tag: Häuser, Einsätze, Fotos, Rechnungen und Buchhaltung. Alles bleibt auf diesem Handy.'],
+  ['▶️', 'Zeit messen und erfassen', 'Tippe bei einem Haus auf „Start“. Die Zeit läuft weiter, auch wenn du die App schließt. Mit „Fertig“ übernimmst du sie in den Einsatz.'],
+  ['📷', 'Fotos und Checkliste', 'Mach Fotos vorher und nachher und hake die Aufgaben ab. Manche Häuser verlangen eine feste Anzahl Fotos.'],
+  ['🧾', 'Rechnungen und Monat', 'Der Monatsabschluss zeigt, was abzurechnen ist. Du prüfst jede Rechnung, bevor du sie verschickst.'],
+  ['💾', 'Sicherung nicht vergessen', 'Alle Daten liegen nur auf diesem Handy. Mach regelmäßig eine Sicherung in den Einstellungen und speichere sie z. B. in Google Drive.'],
+];
+function zeigeEinfuehrung(erneut = false) {
+  let i = 0;
+  const huelle = document.createElement('div');
+  huelle.className = 'einfuehrung';
+  huelle.setAttribute('role', 'dialog');
+  huelle.setAttribute('aria-modal', 'true');
+  const zeichne = () => {
+    const [icon, titel, text] = EINFUEHRUNG[i];
+    const letzte = i === EINFUEHRUNG.length - 1;
+    huelle.innerHTML = `<div class="einf-card">
+      <div class="einf-icon">${icon}</div>
+      <h2>${titel}</h2>
+      <p>${text}</p>
+      <div class="einf-dots">${EINFUEHRUNG.map((_, k) => `<span class="${k === i ? 'on' : ''}"></span>`).join('')}</div>
+      <div class="row gap">
+        ${letzte ? '' : '<button class="btn ghost" type="button" data-skip>Überspringen</button>'}
+        <button class="btn" type="button" data-next>${letzte ? 'Los geht’s' : 'Weiter'}</button>
+      </div>
+    </div>`;
+  };
+  const schliessen = async () => {
+    huelle.remove();
+    if (!erneut) { S.einfuehrung = true; await saveSettings(); }
+  };
+  huelle.addEventListener('click', (e) => {
+    if (e.target.closest('[data-skip]')) return schliessen();
+    if (e.target.closest('[data-next]')) {
+      if (i === EINFUEHRUNG.length - 1) return schliessen();
+      i++;
+      zeichne();
+    }
+  });
+  zeichne();
+  document.body.appendChild(huelle);
+}
+
 /* ---------- Start ---------- */
 window.addEventListener('hashchange', router);
 
@@ -248,6 +292,7 @@ window.addEventListener('hashchange', router);
   router();
   updateTimerPill();
   setupBackButton();
+  if (!S.einfuehrung) zeigeEinfuehrung();
   autoBackup();
   scheduleNotifications();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleNotifications(); });
