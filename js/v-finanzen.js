@@ -3,6 +3,20 @@
 const KATEGORIEN = ['Reinigungsmittel', 'Streumittel', 'Arbeitsmaterial & Geräte', 'Arbeitskleidung', 'Fahrzeug (Tanken, Werkstatt)', 'Computer, Handy & Software', 'Büromaterial & Porto', 'Telefon & Internet', 'Versicherungen', 'Werbung', 'Sonstiges'];
 // Nur der berufliche Anteil zählt (z. B. Laptop zu 50 % privat genutzt)
 const betrieblich = (a) => Math.round((a.betrag * (100 - (Number(a.privat) || 0))) / 100);
+// Was im Fahrtenbuch noch fehlt (Finanzamt verlangt Datum, km-Stand, Strecke, Zweck und Ziel)
+const fahrtMaengel = (f) => {
+  const m = [];
+  if (!f.datum) m.push('Datum fehlt');
+  const start = num(f.kmStart);
+  const ende = num(f.kmEnde);
+  if (!f.kmStart || !f.kmEnde) m.push('km-Stand fehlt');
+  else if (ende < start) m.push('km-Stand Ende ist kleiner als Start');
+  else if (num(f.km) !== ende - start) m.push('Strecke passt nicht zum km-Stand');
+  if (!num(f.km)) m.push('Strecke fehlt');
+  if (!String(f.zweck || '').trim()) m.push('Zweck fehlt');
+  if (!String(f.ziel || '').trim() && !f.objektIds?.length) m.push('Ziel fehlt');
+  return m;
+};
 function steuerHinweis(kategorie, betrag) {
   if (kategorie === 'Computer, Handy & Software') return '💻 Computer, Zubehör und Software sind im Kaufjahr komplett absetzbar (Nutzungsdauer 1 Jahr).';
   if (betrag > 80000 && /Geräte|Fahrzeug|Sonstiges/.test(kategorie)) return '📆 Über 800 €: wird in der Regel über mehrere Jahre abgeschrieben – kurz mit dem Steuerbüro klären.';
@@ -102,9 +116,10 @@ route('/fahrten', async (_, q) => {
       <div class="stat"><b data-count="${Math.round(km)}">${fmtNum(km)}</b><span>km in ${jahr}</span></div>
       <div class="stat"><b data-count="${Math.round(km * KM_SATZ)}" data-money>${money(Math.round(km * KM_SATZ))}</b><span>absetzbar (0,30 €/km)</span></div>
     </div>
+    ${list.some((f) => fahrtMaengel(f).length) ? `<div class="card hint mt">⚠️ <b>${list.filter((f) => fahrtMaengel(f).length).length} von ${list.length} Fahrten sind unvollständig.</b> Das Finanzamt verlangt Datum, km-Stand, Strecke, Zweck und Ziel.</div>` : (list.length ? `<div class="card ok-note mt">✓ Alle ${list.length} Fahrten in ${jahr} sind vollständig.</div>` : '')}
     <div class="mt">${list.map((f) => `<a class="card link" href="#/fahrt/${f.id}">
       <div class="row between"><b>${fmtDateLong(f.datum)}</b><b>${fmtNum(f.km)} km</b></div>
-      <div class="muted small">${esc(f.zweck)}${f.objektIds?.length ? ` · 🏢 ${esc(f.objektIds.map((id) => objLabel(omap[id])).join(', '))}` : ''}</div></a>`).join('') || '<div class="empty">Noch keine Fahrten.<br><span class="small">Tipp: In der Tagestour mit einem Tipp eintragen.</span></div>'}</div>
+      <div class="muted small">${esc(f.zweck)}${f.objektIds?.length ? ` · 🏢 ${esc(f.objektIds.map((id) => objLabel(omap[id])).join(', '))}` : f.ziel ? ` · ${esc(f.ziel)}` : ''}</div>${fahrtMaengel(f).length ? `<div class="danger-text small">⚠️ ${esc(fahrtMaengel(f).join(' · '))}</div>` : ''}</a>`).join('') || '<div class="empty">Noch keine Fahrten.<br><span class="small">Tipp: In der Tagestour mit einem Tipp eintragen.</span></div>'}</div>
   `);
 });
 
@@ -125,6 +140,7 @@ async function fahrtForm(f, q) {
         <label>Gefahren (km) *<input name="km" type="number" step="0.1" min="0" inputmode="decimal" required value="${esc(f.km)}"></label>
       </div>
       <label>Zweck<input name="zweck" value="${esc(f.zweck)}" placeholder="z. B. Reinigungstour, Einkauf Großhandel"></label>
+      <label>Ziel, wenn kein Haus <span class="muted small">(z. B. Großhandel, Lager)</span><input name="ziel" value="${esc(f.ziel || '')}"></label>
       <div class="label">Angefahrene Häuser</div>
       <div class="chip-row">${objects.map((o) => `<label class="chip toggle ${f.objektIds.includes(o.id) ? 'on' : ''}"><input type="checkbox" name="objektIds" value="${o.id}" ${f.objektIds.includes(o.id) ? 'checked' : ''} hidden>🏢 ${esc(objLabel(o))}</label>`).join('') || '<span class="muted small">Noch keine Häuser.</span>'}</div>
       <button class="btn block" type="submit">Speichern</button>
@@ -139,7 +155,7 @@ async function fahrtForm(f, q) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
-    Object.assign(f, { datum: fd.get('datum'), kmStart: fd.get('kmStart'), kmEnde: fd.get('kmEnde'), km: num(fd.get('km')), zweck: fd.get('zweck').trim() || 'Betriebliche Fahrt', objektIds: fd.getAll('objektIds') });
+    Object.assign(f, { datum: fd.get('datum'), kmStart: fd.get('kmStart'), kmEnde: fd.get('kmEnde'), km: num(fd.get('km')), zweck: fd.get('zweck').trim() || 'Betriebliche Fahrt', ziel: fd.get('ziel').trim(), objektIds: fd.getAll('objektIds') });
     await DB.put('fahrten', f);
     toast(`🚗 ${fmtNum(f.km)} km eingetragen`);
     go('#/fahrten', true);
@@ -246,6 +262,7 @@ route('/buchhaltung', async () => {
     ['Alle Ausgaben haben ein Belegfoto', belegeFehlen === 0, '#/ausgaben'],
     ['Alle vergangenen Einsätze sind abgerechnet', abzurechnen === 0, '#/monatsabschluss'],
     ['Datensicherung in den letzten 30 Tagen', !!sicherungJung, '#/einstellungen'],
+    ['Fahrtenbuch vollständig', (await DB.all('fahrten')).filter((f) => yearOf(f.datum) === jahr && fahrtMaengel(f).length).length === 0, '#/fahrten'],
   ];
   render('Buchhaltung', `
     <div class="card profit">
