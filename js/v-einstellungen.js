@@ -44,6 +44,8 @@ route('/einstellungen', async () => {
     <a class="card link mt" href="#/leistungen"><div class="row between"><b>💶 Leistungen & Preise</b><span class="muted">›</span></div>
       <div class="muted small">${S.leistungen.length} Zusatzleistungen, z. B. Grundreinigung, Sperrmüll, Winterdienst</div></a>
 
+    <a class="card link mt" href="#/gruendung"><div class="row between"><b>🚀 Gründungs-Checkliste</b><span class="muted">›</span></div></a>
+
     <h3 class="section">🔔 Erinnerungen & Wetter</h3>
     <div class="card form">
       ${NATIVE ? `<label class="check"><input type="checkbox" id="notif" ${S.benachrichtigungen !== false ? 'checked' : ''}> Am Vorabend an die Häuser von morgen erinnern</label>
