@@ -107,13 +107,13 @@ route('/mehr', async () => {
   render('Mehr', `
     <div class="tiles">
       ${tile('#/buchhaltung', '💰', 'Buchhaltung', 'Finanzen, Ausgaben, Fahrten, Auswertung', overdue || '')}
+      ${tile('#/material', '🧴', 'Material', 'Lager & Einkaufsliste', material.filter(isLow).length || '')}
+      ${tile('#/abwesenheit', '🏖️', 'Urlaub & Krankheit', 'Termine verschieben')}
+      ${tile('#/angebote', '📝', 'Angebote', 'Preise berechnen & anbieten', angeboteOffen || '')}
       ${tile('#/kunden', '👥', 'Auftraggeber', `${data.customers.length} Hausverwaltungen & Eigentümer`)}
       ${tile('#/einsaetze', '🧽', 'Einsätze', `${data.visits.length} erfasst`, unbilled || '')}
       ${tile('#/maengel', '⚠️', 'Mängel', 'Schäden melden & verfolgen', maengelOffen || '')}
       ${tile('#/winter', '❄️', 'Winterdienst', `Saison ${season}: ${winterCount} Einsätze`)}
-      ${tile('#/angebote', '📝', 'Angebote', 'Preise berechnen & anbieten', angeboteOffen || '')}
-      ${tile('#/material', '🧴', 'Material', 'Lager & Einkaufsliste', material.filter(isLow).length || '')}
-      ${tile('#/abwesenheit', '🏖️', 'Urlaub & Krankheit', 'Termine verschieben')}
     </div>
   `, { tab: 'mehr', back: false });
 });
