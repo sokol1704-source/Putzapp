@@ -183,11 +183,11 @@ route('/preise', async () => {
       <a class="btn small mt" href="#/preise/schreiben/${kid}">📄 Anschreiben</a></div>`).join('')}` : ''}
     <form id="f" class="form">
       <h3 class="section">Neue Anpassung</h3>
-      <div class="grid3">
+      <div class="grid2">
         <label>Erhöhung (%)<input name="prozent" type="number" step="0.5" value="5" inputmode="decimal"></label>
         <label>Runden auf<select name="rund"><option value="100">1 €</option><option value="500" selected>5 €</option></select></label>
-        <label>Gültig ab<input type="date" name="ab" value="${firstAfter(42)}"></label>
       </div>
+      <label>Gültig ab<input type="date" name="ab" value="${firstAfter(42)}"></label>
       <p class="muted small">Tipp: Mindestens 6 Wochen vorher ankündigen. Bis zum Stichtag wird der alte Preis berechnet, danach automatisch der neue.</p>
       <div id="rows"></div>
       <button class="btn block" type="submit">Preise ankündigen</button>
