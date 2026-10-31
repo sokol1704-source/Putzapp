@@ -51,6 +51,16 @@ route('/', async () => {
       </div>
     </div>
     ${ueberfaellig.length ? `<a class="card hint" href="#/rechnungen">💶 <b>${ueberfaellig.length} ${ueberfaellig.length === 1 ? 'Rechnung ist' : 'Rechnungen sind'} überfällig</b> – zusammen ${money(ueberfaellig.reduce((s, i) => s + i.summe, 0))}. Erinnerung oder Mahnung mit einem Klick.</a>` : ''}
+    ${data.objects.length ? '' : `<div class="card">
+      <b>👋 So fängst du an</b>
+      <ol class="small">
+        <li><a href="#/einstellungen">Firmendaten</a> eintragen (für Rechnungen Pflicht)</li>
+        <li><a href="#/kunde/neu">Auftraggeber</a> anlegen, z. B. die Hausverwaltung</li>
+        <li><a href="#/objekt/neu">Haus</a> mit Adresse, Intervall und Preis anlegen</li>
+        <li><a href="#/einsatz/neu">Einsatz</a> erfassen oder mit „Start“ die Zeit messen</li>
+      </ol>
+      <div class="muted small">Für eine Vertretung: Im Haus stehen Zugang, Aufgaben und die Fotopflicht. Alles bleibt auf diesem Handy, mach deshalb regelmäßig eine Sicherung.</div>
+    </div>`}
     ${morgenPlan.length ? `<a class="card hint" href="#/bestaetigen">📨 <b>Morgen ${morgenPlan.length} ${morgenPlan.length === 1 ? 'Termin' : 'Termine'}</b> – Auftraggeber kurz Bescheid geben.</a>` : ''}
     ${preisAlt.length ? `<a class="card hint" href="#/preise">📈 <b>${preisAlt.length} ${preisAlt.length === 1 ? 'Haus hat' : 'Häuser haben'} seit über einem Jahr keine Preisanpassung.</b> Eine frühe Ankündigung ist fair.</a>` : ''}
     ${maengelAlt ? `<a class="card hint" href="#/maengel">⏰ <b>${maengelAlt} ${maengelAlt === 1 ? 'Mangel ist' : 'Mängel sind'} seit über ${NACHFASS_TAGE} Tagen offen.</b> Kurz bei der Verwaltung nachhaken.</a>` : ''}

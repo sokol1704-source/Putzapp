@@ -2,6 +2,7 @@
 
 const KATEGORIEN = ['Reinigungsmittel', 'Streumittel', 'Arbeitsmaterial & Geräte', 'Arbeitskleidung', 'Fahrzeug (Tanken, Werkstatt)', 'Computer, Handy & Software', 'Büromaterial & Porto', 'Telefon & Internet', 'Versicherungen', 'Werbung', 'Sonstiges'];
 // Nur der berufliche Anteil zählt (z. B. Laptop zu 50 % privat genutzt)
+const KFZ_KATEGORIE = 'Fahrzeug (Tanken, Werkstatt)'; // mit der km-Pauschale (0,30 € je km) abgegolten
 const betrieblich = (a) => Math.round((a.betrag * (100 - (Number(a.privat) || 0))) / 100);
 // Positionen der Anlage EÜR (Bezeichnungen des Formulars). Zeilennummern bitte im ELSTER-Formular des Steuerjahres prüfen.
 const EUER_POSITION = {
@@ -14,9 +15,9 @@ const EUER_POSITION = {
 // Summen je Position: Betriebseinnahmen, Betriebsausgaben (inkl. Fahrtkosten-Pauschale)
 const euerPositionen = (d) => {
   const ausgaben = {};
-  d.aus.forEach((a) => { const p = EUER_POSITION[a.kategorie] || 'Sonstige Betriebsausgaben'; ausgaben[p] = (ausgaben[p] || 0) + betrieblich(a); });
+  d.abzug.forEach((a) => { const p = EUER_POSITION[a.kategorie] || 'Sonstige Betriebsausgaben'; ausgaben[p] = (ausgaben[p] || 0) + betrieblich(a); });
   if (d.fahrtkosten) ausgaben['Fahrtkosten (0,30 € je km)'] = d.fahrtkosten;
-  return { einnahmen: d.sumE, ausgaben: Object.entries(ausgaben).sort((a, b) => b[1] - a[1]), sumA: d.sumA, gewinn: d.gewinn, kfz: d.byKat['Fahrzeug (Tanken, Werkstatt)'] || 0 };
+  return { einnahmen: d.sumE, ausgaben: Object.entries(ausgaben).sort((a, b) => b[1] - a[1]), sumA: d.sumA, gewinn: d.gewinn, kfz: d.kfzKosten };
 };
 
 // Was im Fahrtenbuch noch fehlt (Finanzamt verlangt Datum, km-Stand, Strecke, Zweck und Ziel)
@@ -189,14 +190,17 @@ async function financeData(jahr) {
   const km = fa.reduce((s, f) => s + num(f.km), 0);
   const fahrtkosten = Math.round(km * KM_SATZ);
   const sumE = einnahmen.reduce((s, i) => s + i.summe, 0);
+  // Kfz-Kosten zählen nicht zusätzlich, weil die km-Pauschale sie abdeckt
+  const abzug = aus.filter((a) => a.kategorie !== KFZ_KATEGORIE);
+  const kfzKosten = aus.filter((a) => a.kategorie === KFZ_KATEGORIE).reduce((s, a) => s + betrieblich(a), 0);
   const byKat = {};
-  aus.forEach((a) => { byKat[a.kategorie] = (byKat[a.kategorie] || 0) + betrieblich(a); });
-  const sumA = aus.reduce((s, a) => s + betrieblich(a), 0) + fahrtkosten;
+  abzug.forEach((a) => { byKat[a.kategorie] = (byKat[a.kategorie] || 0) + betrieblich(a); });
+  const sumA = abzug.reduce((s, a) => s + betrieblich(a), 0) + fahrtkosten;
   const offen = invoices.filter((i) => i.status === 'offen').reduce((s, i) => s + i.summe, 0);
   const umsatz = invoices.filter((i) => i.status !== 'storniert' && yearOf(i.datum) === jahr).reduce((s, i) => s + i.summe, 0);
   const gewinn = sumE - sumA;
   const ruecklage = Math.max(0, Math.round((gewinn * (S.steuerRuecklage ?? 25)) / 100));
-  return { einnahmen, aus, fa, km, fahrtkosten, sumE, sumA, byKat, gewinn, ruecklage, offen, umsatz };
+  return { einnahmen, aus, abzug, kfzKosten, fa, km, fahrtkosten, sumE, sumA, byKat, gewinn, ruecklage, offen, umsatz };
 }
 
 route('/finanzen', async (_, q) => {
@@ -219,6 +223,7 @@ route('/finanzen', async (_, q) => {
     <h3 class="section">Ausgaben nach Kategorie</h3>
     <div class="card">
       ${kats.map(([k, v]) => `<div class="row between small"><span>${esc(k)}</span><b>${money(v)}</b></div>`).join('')}
+      ${d.kfzKosten ? `<div class="row between small muted"><span>Fahrzeug (mit km-Pauschale abgegolten)</span><span>${money(d.kfzKosten)}</span></div>` : ''}
       <div class="row between small"><span>Fahrten (${fmtNum(d.km)} km × 0,30 €)</span><b>${money(d.fahrtkosten)}</b></div>
       ${!kats.length && !d.km ? '<div class="muted small">Noch keine Ausgaben erfasst.</div>' : ''}
     </div>
@@ -234,7 +239,7 @@ route('/finanzen', async (_, q) => {
       ${euerPositionen(d).ausgaben.map(([name, v]) => `<div class="row between small"><span>${esc(name)}</span><b>${money(v)}</b></div>`).join('') || '<div class="muted small">Noch keine Ausgaben in diesem Jahr.</div>'}
       <div class="row between small"><b>Summe Betriebsausgaben</b><b>${money(euerPositionen(d).sumA)}</b></div>
       <div class="row between small"><b>Gewinn</b><b>${money(euerPositionen(d).gewinn)}</b></div>
-      ${euerPositionen(d).kfz ? `<p class="danger-text small mt">⚠️ Fahrzeug-Kosten (${money(euerPositionen(d).kfz)}) sind mit der Kilometerpauschale von 0,30 € schon abgegolten. Bitte nicht zusätzlich eintragen – kläre das mit dem Finanzamt, bevor du die Erklärung abgibst.</p>` : ''}
+      ${euerPositionen(d).kfz ? `<p class="muted small mt">Fahrzeug-Kosten (${money(euerPositionen(d).kfz)}) sind nicht enthalten: Die Kilometerpauschale von 0,30 € deckt sie ab. Bestätige das mit dem Finanzamt oder deinem Steuerbüro.</p>` : ''}
       <p class="muted small">Die Namen entsprechen den Positionen der Anlage EÜR. Die Zeilennummern findest du im ELSTER-Formular deines Steuerjahres.</p>
     </div>
     <h3 class="section">Für die Steuer</h3>
@@ -249,7 +254,7 @@ route('/finanzen', async (_, q) => {
     const eur = (cents) => (cents / 100).toFixed(2).replace('.', ',');
     const rows = [[`Einnahmen-Überschuss-Rechnung ${jahr} – ${S.firma}`], [], ['Datum', 'Art', 'Kategorie', 'Beschreibung', 'Betrag (EUR)', 'Beleg']];
     d.einnahmen.forEach((i) => rows.push([fmtDate(i.bezahltAm || i.datum), 'Einnahme', 'Betriebseinnahme (§ 19 UStG)', `${i.nummer} ${i.kunde.name}`, eur(i.summe), i.nummer]));
-    d.aus.forEach((a) => rows.push([fmtDate(a.datum), 'Ausgabe', a.kategorie, `${a.beschreibung} (${a.zahlung})${a.privat ? ` – ${100 - a.privat} % beruflich von ${eur(a.betrag)} €` : ''}`, eur(-betrieblich(a)), a.fotoAnzahl ? 'Foto in App' : 'fehlt']));
+    d.aus.forEach((a) => rows.push([fmtDate(a.datum), 'Ausgabe', a.kategorie === KFZ_KATEGORIE ? `${a.kategorie} (nicht abgezogen, km-Pauschale)` : a.kategorie, `${a.beschreibung} (${a.zahlung})${a.privat ? ` – ${100 - a.privat} % beruflich von ${eur(a.betrag)} €` : ''}`, eur(-betrieblich(a)), a.fotoAnzahl ? 'Foto in App' : 'fehlt']));
     d.fa.forEach((f) => rows.push([fmtDate(f.datum), 'Ausgabe', 'Fahrtkosten (0,30 €/km)', `${fmtNum(f.km)} km – ${f.zweck}`, eur(-Math.round(num(f.km) * KM_SATZ)), 'Fahrtenbuch']));
     rows.push([], ['', 'Ausgaben nach Kategorie'], ...Object.entries(d.byKat).sort((a, b) => b[1] - a[1]).map(([k, v]) => ['', k, '', '', eur(-v)]));
     const pos = euerPositionen(d);
