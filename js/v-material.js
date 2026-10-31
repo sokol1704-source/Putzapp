@@ -5,11 +5,12 @@ const MAT_KATEGORIEN = ['Reinigungsmittel', 'Streumittel', 'Verbrauchsmaterial',
 const MAT_EINHEITEN = ['Kanister', 'Flasche', 'Sack', 'Packung', 'Rolle', 'Stück', 'Paar'];
 // Vorlagen für die Treppenhausreinigung: [Name, Einheit, Kategorie, Verbrauch je Reinigung, je Winter-Einsatz, Mindest, Soll, Preis €]
 const MAT_VORLAGEN = [
+  ['Grundreiniger (Treppenhausboden)', 'Kanister', 'Reinigungsmittel', 0.05, 0, 1, 2, 15],
   ['Neutralreiniger (10 l)', 'Kanister', 'Reinigungsmittel', 0.05, 0, 1, 2, 18],
   ['Glasreiniger', 'Flasche', 'Reinigungsmittel', 0.1, 0, 1, 3, 4],
-  ['Edelstahlpflege (Aufzug, Briefkästen)', 'Flasche', 'Reinigungsmittel', 0.05, 0, 1, 2, 7],
-  ['Allzweckreiniger', 'Flasche', 'Reinigungsmittel', 0.1, 0, 1, 3, 3],
+  ['Müllraum-Reiniger / Geruchsneutralisator', 'Flasche', 'Reinigungsmittel', 0.05, 0, 1, 2, 6],
   ['Mikrofasertücher (10er)', 'Packung', 'Verbrauchsmaterial', 0.05, 0, 1, 2, 9],
+  ['Putztücher (Vlies)', 'Packung', 'Verbrauchsmaterial', 0.1, 0, 1, 2, 5],
   ['Wischbezüge', 'Stück', 'Verbrauchsmaterial', 0.02, 0, 2, 4, 8],
   ['Müllbeutel', 'Rolle', 'Verbrauchsmaterial', 0.05, 0, 1, 3, 3],
   ['Einweghandschuhe', 'Packung', 'Verbrauchsmaterial', 0.02, 0, 1, 2, 7],
@@ -81,7 +82,7 @@ route('/material', async (_, q) => {
       : `<div class="empty">Alles da 👍<br><span class="small">Sobald etwas unter den Mindestbestand fällt, steht es hier.</span></div>`}
     ` : `
       <p class="muted small mt">Tippe auf ein Material, um es zu ändern oder zu löschen. Mit − und + passt du den Bestand an.</p>
-      <div class="row gap mt"><a class="btn" href="#/material/neu">+ Material</a>${items.length ? '' : '<button class="btn ghost" id="vorlagen">📋 Vorlagen laden</button>'}</div>
+      <div class="row gap mt"><a class="btn" href="#/material/neu">+ Material</a><button class="btn ghost" id="vorlagen">${items.length ? '📋 Fehlende Vorlagen ergänzen' : '📋 Vorlagen laden'}</button></div>
       ${MAT_KATEGORIEN.map((k) => { const list = items.filter((m) => m.kategorie === k); return list.length ? `<h3 class="section">${esc(k)}</h3>${list.map(stockCard).join('')}` : ''; }).join('')}
       ${items.length ? '<p class="muted small">Mit − und + korrigierst du den Bestand. Der Verbrauch pro Reinigung bzw. Winter-Einsatz wird beim Speichern automatisch abgezogen.</p>'
         : '<div class="empty">Noch kein Material angelegt.<br><span class="small">Mit „Vorlagen laden“ bekommst du eine typische Grundausstattung für die Treppenhausreinigung.</span></div>'}
@@ -118,10 +119,15 @@ route('/material', async (_, q) => {
   });
 
   $('#vorlagen')?.addEventListener('click', async () => {
+    // Nur Artikel ergänzen, die noch nicht in der Liste stehen – vorhandene bleiben unverändert
+    const vorhanden = new Set((await DB.all('material')).map((m) => m.name.toLowerCase()));
+    let neu = 0;
     for (const [name, einheit, kategorie, proEinsatz, proWinter, mindest, soll, preis] of MAT_VORLAGEN) {
+      if (vorhanden.has(name.toLowerCase())) continue;
       await DB.put('material', { name, einheit, kategorie, proEinsatz, proWinter, mindest, soll, bestand: soll, preis: preis * 100, notiz: '' });
+      neu++;
     }
-    toast('✓ Vorlagen geladen – bitte Bestände prüfen');
+    toast(neu ? `✓ ${neu} Artikel ergänzt – bitte Bestände prüfen` : 'Alle Vorlagen sind schon in der Liste');
     router();
   });
 
