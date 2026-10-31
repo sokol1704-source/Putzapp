@@ -84,7 +84,7 @@ route('/einstellungen', async () => {
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
     </div>`}
-    <p class="muted small center">Toths Reinigungsservice · Version 2.25</p>
+    <p class="muted small center">Toths Reinigungsservice · Version 2.26</p>
   `);
 
   $('#f').addEventListener('submit', async (e) => {
