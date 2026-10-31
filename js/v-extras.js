@@ -103,9 +103,12 @@ route('/abwesenheit', async () => {
   `);
   const f = $('#f');
   const affected = () => data.appointments.filter((a) => !a.erledigt && a.datum >= f.von.value && a.datum <= f.bis.value).sort((a, b) => a.datum.localeCompare(b.datum));
+  // Wiederkehrende Häuser, deren fälliger Termin in den Zeitraum fällt (noch kein eingetragener Termin)
+  const affectedHouses = () => planning(data).filter((p) => p.type === 'faellig' && p.datum >= f.von.value && p.datum <= f.bis.value);
+  const betroffen = () => [...affected(), ...affectedHouses()];
   const newDate = (a) => { const o = data.omap[a.objektId]; return snapWeekday(addDays(f.bis.value, 1), o?.wochentag); };
   const preview = () => {
-    const list = affected();
+    const list = betroffen();
     const nach = f.aktion.value === 'nachholen';
     $('#preview').innerHTML = list.length
       ? `<div class="card"><b>${list.length} Termin${list.length === 1 ? '' : 'e'} betroffen</b>${list.map((a) => `<div class="small">🏢 ${esc(objLabel(data.omap[a.objektId]))}: ${fmtDateLong(a.datum)} ${nach ? `→ <b>${fmtDateLong(newDate(a))}</b>` : '→ <span class="danger-text">entfällt</span>'}</div>`).join('')}</div>`
@@ -118,13 +121,25 @@ route('/abwesenheit', async () => {
   preview();
   f.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const list = affected();
+    const list = betroffen();
     if (!list.length) return toast('Keine Termine im Zeitraum');
     const nach = f.aktion.value === 'nachholen';
     const grund = f.grund.value;
     const changes = [];
     for (const a of list) {
       const target = newDate(a);
+      if (a.type === 'faellig') {
+        const o = data.omap[a.objektId];
+        o.uebersprungen = [...(o.uebersprungen || []), a.datum];
+        if (nach) {
+          await DB.put('appointments', { kundeId: o.kundeId, objektId: o.id, datum: target, uhrzeit: o.uhrzeit || '', aufgaben: a.aufgaben || [], notiz: `Nachholtermin (${grund})`, erledigt: false, typ: 'reinigung', dauer: 0, fahrzeit: 20, ort: '' });
+          changes.push({ a, alt: a.datum, neu: target });
+        } else {
+          changes.push({ a, alt: a.datum, neu: null });
+        }
+        await DB.put('objects', o);
+        continue;
+      }
       const clash = data.appointments.some((x) => x !== a && !x.erledigt && x.objektId === a.objektId && Math.abs(daysBetween(x.datum, target)) < 3);
       if (nach && !clash) {
         changes.push({ a, alt: a.datum, neu: target });

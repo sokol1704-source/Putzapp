@@ -354,7 +354,9 @@ function planning({ objects, visits, appointments }) {
     if (items.some((i) => i.objektId === o.id)) continue;
     const last = lastVisit(visits, o.id);
     if (!last) continue;
-    const datum = snapWeekday(addDays(last.datum, o.intervallTage), o.wochentag);
+    // Ein übersprungener Termin (Abwesenheit) setzt den Zyklus neu auf dieses Datum
+    const basis = [last.datum, ...(o.uebersprungen || [])].sort().pop();
+    const datum = snapWeekday(addDays(basis, o.intervallTage), o.wochentag);
     items.push({ type: 'faellig', datum, uhrzeit: o.uhrzeit, objektId: o.id, aufgaben: dueTasks(o, visits, datum) });
   }
   return items.sort((a, b) => (a.datum + (a.uhrzeit || '')).localeCompare(b.datum + (b.uhrzeit || '')));

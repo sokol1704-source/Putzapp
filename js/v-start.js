@@ -126,6 +126,13 @@ route('/mehr', async () => {
 /* ---------- Tagestour ---------- */
 const tourLegCache = {};
 
+// Luftlinie in km zwischen zwei Koordinaten
+const entfernung = (a, b) => {
+  const rad = (x) => (x * Math.PI) / 180;
+  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+};
+
 route('/tour', async (_, q) => {
   const data = await loadAll();
   const datum = q.datum || today();
@@ -133,7 +140,23 @@ route('/tour', async (_, q) => {
     .filter((p) => p.datum === datum || (datum === today() && p.datum < datum))
     .sort((a, b) => (a.uhrzeit || '99').localeCompare(b.uhrzeit || '99'));
   const done = (oid) => data.visits.some((v) => v.objektId === oid && v.datum === datum);
-  const stops = items.map((it) => ({ it, o: data.omap[it.objektId] })).filter((s) => s.o || (s.it.typ && s.it.typ !== 'reinigung') || s.it.ort);
+  let stops = items.map((it) => ({ it, o: data.omap[it.objektId] })).filter((s) => s.o || (s.it.typ && s.it.typ !== 'reinigung') || s.it.ort);
+  // Kürzeste Route: immer zum nächsten Haus mit Koordinaten (Luftlinie als Näherung); ohne Koordinaten ans Ende
+  const optimiert = q.route === '1';
+  let ohneKoordinaten = 0;
+  if (optimiert) {
+    const rest = stops.filter((s) => s.o?.geo);
+    const reihe = rest.length ? [rest.shift()] : [];
+    while (rest.length) {
+      const last = reihe[reihe.length - 1].o.geo;
+      let best = 0;
+      rest.forEach((s, i) => { if (entfernung(last, s.o.geo) < entfernung(last, rest[best].o.geo)) best = i; });
+      reihe.push(rest.splice(best, 1)[0]);
+    }
+    const ohne = stops.filter((s) => !s.o?.geo);
+    ohneKoordinaten = ohne.filter((s) => s.o).length;
+    stops = [...reihe, ...ohne];
+  }
   // Zeitplan: Dauer je Haus aus den letzten Einsätzen, dazwischen 20 Min. Fahrt
   const avgHours = (oid) => {
     const hs = data.visits.filter((v) => v.objektId === oid && num(v.stunden) > 0).sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 3).map((v) => num(v.stunden));
@@ -168,7 +191,7 @@ route('/tour', async (_, q) => {
     fahrtGesamt += fahrt;
     kmGesamt += km;
     const arrival = addMin(clock, fahrt);
-    const start = it.uhrzeit && it.uhrzeit > arrival ? it.uhrzeit : arrival;
+    const start = !optimiert && it.uhrzeit && it.uhrzeit > arrival ? it.uhrzeit : arrival;
     const dauer = it.dauer || terminTyp(it).dauer || (o ? Math.round(avgHours(o.id) * 60) : 60);
     arbeitGesamt += dauer;
     const end = addMin(start, dauer);
@@ -190,6 +213,8 @@ route('/tour', async (_, q) => {
       </div>
       ${stops.length ? `<div class="bar"><div style="width:${(doneCount / stops.length) * 100}%"></div></div>` : ''}
       ${routeUrl ? `<a class="btn block" href="${routeUrl}" target="_blank" rel="noopener">🧭 Ganze Route in Google Maps</a>` : ''}
+      ${stops.filter((s) => s.o).length > 1 ? `<a class="btn ghost block" href="#/tour?datum=${datum}${optimiert ? '' : '&route=1'}">${optimiert ? '⏰ Nach Uhrzeit sortieren' : '🧭 Kürzeste Route berechnen'}</a>` : ''}
+      ${optimiert && ohneKoordinaten ? `<p class="muted small">${ohneKoordinaten} ${ohneKoordinaten === 1 ? 'Haus hat' : 'Häuser haben'} noch keine Koordinaten und stehen deshalb am Ende. Mit Internet werden sie beim ersten Öffnen der Tour ergänzt.</p>` : ''}
       ${stops.some((s) => s.o) ? `<a class="btn ghost block" href="#/fahrt/neu?datum=${datum}&km=${kmGesamt ? fmtNum(kmGesamt).replace(',', '.') : ''}&objekte=${stops.filter((s) => s.o).map((s) => s.o.id).join(',')}">🚗 Fahrt ins Fahrtenbuch</a>` : ''}
     </div>
     <div class="timeline">
