@@ -420,8 +420,11 @@ route('/winter/protokoll/:id', async ({ id }, q) => {
   const k = await DB.get('customers', o.kundeId) || { name: '' };
   const season = q.saison || seasonOf(today());
   const list = all.filter((w) => seasonOf(w.datum) === season).sort((a, b) => (a.datum + a.von).localeCompare(b.datum + b.von));
+  const sigKunde = `winter_${id}_${season}`;
+  const sigFirma = `${sigKunde}_firma`;
+  const [unterschriftKunde, unterschriftFirma] = await Promise.all([DB.get('unterschriften', sigKunde), DB.get('unterschriften', sigFirma)]);
   render('Streuprotokoll', `
-    ${docButtons()}
+    ${docButtons('<button class="btn ghost" id="signFirma">✍️ Ich unterschreibe</button><button class="btn ghost" id="signKunde">✍️ Auftraggeber unterschreiben lassen</button>')}
     <div class="doc-wrap"><article class="invoice-doc">
       ${docHeader()}
       <div class="inv-row">
@@ -442,9 +445,19 @@ route('/winter/protokoll/:id', async ({ id }, q) => {
         </tbody>
       </table>
       <p class="inv-note">Die Räum- und Streuarbeiten wurden zu den angegebenen Zeiten durchgeführt. Das Protokoll dient als Nachweis der Verkehrssicherung.</p>
-      ${signLines('Ort, Datum', `Unterschrift ${esc(S.firma)}`)}
+      <div class="sign-row">${signSlot(unterschriftFirma, `Unterschrift ${esc(S.firma)}`)}${signSlot(unterschriftKunde, 'Bestätigung Auftraggeber / Hausmeister')}</div>
       ${docFooter()}
     </article></div>
   `);
   wireDocButtons(`Streuprotokoll ${objLabel(o)} ${season}`, `Guten Tag,\n\nanbei das Räum- und Streuprotokoll für ${objLabel(o)} (Winter ${season}).\n\nViele Grüße\n${S.inhaber}\n${S.firma}`);
+  const unterschreiben = async (key, titel, name) => {
+    const sig = await signaturePad(titel, name);
+    if (!sig) return;
+    await DB.put('unterschriften', { id: key, ...sig });
+    vibrate(15);
+    toast('✍️ Unterschrift gespeichert');
+    router();
+  };
+  $('#signFirma')?.addEventListener('click', () => unterschreiben(sigFirma, `Streuprotokoll ${season} für ${S.firma}`, S.inhaber));
+  $('#signKunde')?.addEventListener('click', () => unterschreiben(sigKunde, `Streuprotokoll ${season} bestätigen`, o.vorOrtName || ''));
 });
