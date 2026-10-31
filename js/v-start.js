@@ -114,11 +114,8 @@ route('/mehr', async () => {
       ${tile('#/winter', '❄️', 'Winterdienst', `Saison ${season}: ${winterCount} Einsätze`)}
       ${tile('#/nachweise', '📄', 'Leistungsnachweise', 'Monatsberichte für Verwaltungen')}
       ${tile('#/angebote', '📝', 'Angebote', 'Preise berechnen & anbieten', angeboteOffen || '')}
-      ${tile('#/tour', '🚐', 'Tagestour', 'Alle Häuser von heute')}
-      ${tile('#/leistungen', '💶', 'Leistungen & Preise', `${S.leistungen.length} Zusatzleistungen`)}
       ${tile('#/material', '🧴', 'Material', 'Lager & Einkaufsliste', material.filter(isLow).length || '')}
       ${tile('#/abwesenheit', '🏖️', 'Urlaub & Krankheit', 'Termine verschieben')}
-      ${tile('#/einstellungen', '⚙️', 'Einstellungen', 'Firma, Erinnerungen, Sicherung')}
     </div>
   `, { tab: 'mehr', back: false });
 });
