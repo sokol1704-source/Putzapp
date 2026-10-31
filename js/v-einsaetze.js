@@ -365,6 +365,7 @@ route('/einsatz/:id', async ({ id }) => {
       ${photos.length && (NATIVE || navigator.canShare) ? '<button class="btn ghost" id="share">📤 Fotos teilen</button>' : ''}
       <a class="btn ghost" href="#/mangel/neu?objekt=${v.objektId}">⚠️ Mangel melden</a>
     </div>
+    ${v.rechnungId ? '' : `<a class="btn block" href="#/rechnung/neu?kunde=${v.kundeId}&monat=${v.datum.slice(0, 7)}">🧾 Rechnung für ${esc(monthLabel(v.datum.slice(0, 7)))} erstellen</a>`}
     ${v.rechnungId ? '' : '<button class="btn danger ghost block" id="del">Einsatz löschen</button>'}
   `);
   onView('click', (e) => { const img = e.target.closest('[data-view]'); if (img) lightbox(img.src); });
