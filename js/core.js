@@ -203,6 +203,7 @@ const DEFAULT_SETTINGS = {
   zahlungsziel: 14,
   nrPrefix: 'RE',
   nrStart: 1,
+  steuerRuecklage: 25, // Richtwert in Prozent vom Gewinn, mit dem Steuerbüro abstimmen
   leistungen: DEFAULT_LEISTUNGEN,
   // Richtwerte für den Angebotsrechner (je Reinigung)
   kalk: { proEtage: 1200, aufzug: 800, keller: 1500, dachboden: 1000, aussen: 1000, muellplatz: 700 },

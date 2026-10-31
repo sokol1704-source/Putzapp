@@ -36,6 +36,7 @@ route('/einstellungen', async () => {
         ${field('nrPrefix', 'Nummernkreis-Präfix')}
         <label>Erste Rechnungsnr. im Jahr<input name="nrStart" type="number" min="1" value="${esc(S.nrStart)}"></label>
       </div>
+      <label>Steuer-Rücklage (% vom Gewinn, Richtwert)<input name="steuerRuecklage" type="number" min="0" max="100" inputmode="numeric" value="${esc(S.steuerRuecklage ?? 25)}"></label>
       <p class="muted small">Format: ${esc(S.nrPrefix)}-${new Date().getFullYear()}-001. Die Nummern werden lückenlos fortlaufend vergeben. Als Kleinunternehmer musst du keine E-Rechnung ausstellen – die PDF reicht.</p>
       <button class="btn block" type="submit">Speichern</button>
     </form>
@@ -92,6 +93,7 @@ route('/einstellungen', async () => {
     S.monatspauschale = toCents(fd.get('monatspauschale'));
     S.zahlungsziel = Number(fd.get('zahlungsziel')) || 0;
     S.nrStart = Math.max(1, Number(fd.get('nrStart')) || 1);
+    S.steuerRuecklage = Math.min(100, Math.max(0, Number(fd.get('steuerRuecklage')) || 0));
     await saveSettings();
     toast('✓ Einstellungen gespeichert');
   });

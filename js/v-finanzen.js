@@ -162,7 +162,9 @@ async function financeData(jahr) {
   const sumA = aus.reduce((s, a) => s + betrieblich(a), 0) + fahrtkosten;
   const offen = invoices.filter((i) => i.status === 'offen').reduce((s, i) => s + i.summe, 0);
   const umsatz = invoices.filter((i) => i.status !== 'storniert' && yearOf(i.datum) === jahr).reduce((s, i) => s + i.summe, 0);
-  return { einnahmen, aus, fa, km, fahrtkosten, sumE, sumA, byKat, gewinn: sumE - sumA, offen, umsatz };
+  const gewinn = sumE - sumA;
+  const ruecklage = Math.max(0, Math.round((gewinn * (S.steuerRuecklage ?? 25)) / 100));
+  return { einnahmen, aus, fa, km, fahrtkosten, sumE, sumA, byKat, gewinn, ruecklage, offen, umsatz };
 }
 
 route('/finanzen', async (_, q) => {
@@ -177,6 +179,10 @@ route('/finanzen', async (_, q) => {
       <div class="row between small"><span>Einnahmen (bezahlt)</span><b>${money(d.sumE)}</b></div>
       <div class="row between small"><span>Ausgaben inkl. Fahrten</span><b>− ${money(d.sumA)}</b></div>
       ${d.offen ? `<div class="row between small muted"><span>Noch offen (nicht im Gewinn)</span><span>${money(d.offen)}</span></div>` : ''}
+    </div>
+    <div class="card mt">
+      <div class="row between"><b>🏦 Steuer-Rücklage</b><b>${money(d.ruecklage)}</b></div>
+      <div class="muted small">${S.steuerRuecklage ?? 25} % vom Gewinn ${jahr} – das ist ein Richtwert, keine Steuerberechnung. Pro Monat ca. ${money(Math.round(d.ruecklage / 12))} zur Seite legen. Den Satz änderst du in den Einstellungen.</div>
     </div>
     <h3 class="section">Ausgaben nach Kategorie</h3>
     <div class="card">
@@ -203,7 +209,8 @@ route('/finanzen', async (_, q) => {
     d.einnahmen.forEach((i) => rows.push([fmtDate(i.bezahltAm || i.datum), 'Einnahme', 'Betriebseinnahme (§ 19 UStG)', `${i.nummer} ${i.kunde.name}`, eur(i.summe), i.nummer]));
     d.aus.forEach((a) => rows.push([fmtDate(a.datum), 'Ausgabe', a.kategorie, `${a.beschreibung} (${a.zahlung})${a.privat ? ` – ${100 - a.privat} % beruflich von ${eur(a.betrag)} €` : ''}`, eur(-betrieblich(a)), a.fotoAnzahl ? 'Foto in App' : 'fehlt']));
     d.fa.forEach((f) => rows.push([fmtDate(f.datum), 'Ausgabe', 'Fahrtkosten (0,30 €/km)', `${fmtNum(f.km)} km – ${f.zweck}`, eur(-Math.round(num(f.km) * KM_SATZ)), 'Fahrtenbuch']));
-    rows.push([], ['', 'Summe Einnahmen', '', '', eur(d.sumE)], ['', 'Summe Ausgaben', '', '', eur(-d.sumA)], ['', 'Gewinn', '', '', eur(d.gewinn)]);
+    rows.push([], ['', 'Ausgaben nach Kategorie'], ...Object.entries(d.byKat).sort((a, b) => b[1] - a[1]).map(([k, v]) => ['', k, '', '', eur(-v)]));
+    rows.push([], ['', 'Summe Einnahmen', '', '', eur(d.sumE)], ['', 'Summe Ausgaben', '', '', eur(-d.sumA)], ['', 'Gewinn', '', '', eur(d.gewinn)], ['', 'Steuer-Rücklage (Richtwert)', '', '', eur(d.ruecklage)]);
     const csv = '﻿' + rows.map((r) => r.map(c).join(';')).join('\r\n');
     saveFile(new Blob([csv], { type: 'text/csv' }), `EUeR-${jahr}-Toths-Reinigung.csv`);
   });
@@ -228,7 +235,18 @@ route('/buchhaltung', async () => {
   const offen = invoices.filter((i) => i.status === 'offen');
   const overdue = offen.filter((i) => i.faellig < today());
   const objects = await DB.all('objects');
+  const visits = await DB.all('visits');
   const belegeFehlen = d.aus.filter((a) => !a.fotoAnzahl).length;
+  // Jahresabschluss-Checkliste: was am Jahresende erledigt sein sollte
+  const monatStart = `${today().slice(0, 7)}-01`;
+  const abzurechnen = visits.filter((v) => v.datum.startsWith(jahr) && !v.rechnungId && v.datum < monatStart).length;
+  const sicherungJung = S.letzteSicherung && daysBetween(S.letzteSicherung, today()) <= 30;
+  const checks = [
+    ['Keine offenen Rechnungen', offen.length === 0, '#/rechnungen?filter=offen'],
+    ['Alle Ausgaben haben ein Belegfoto', belegeFehlen === 0, '#/ausgaben'],
+    ['Alle vergangenen Einsätze sind abgerechnet', abzurechnen === 0, '#/monatsabschluss'],
+    ['Datensicherung in den letzten 30 Tagen', !!sicherungJung, '#/einstellungen'],
+  ];
   render('Buchhaltung', `
     <div class="card profit">
       <div class="muted small">Gewinn ${jahr} (vorläufig)</div>
@@ -239,6 +257,11 @@ route('/buchhaltung', async () => {
     </div>
     ${overdue.length ? `<a class="card hint" href="#/rechnungen?filter=offen">⏰ <b>${overdue.length} Rechnung${overdue.length === 1 ? '' : 'en'} überfällig</b> – jetzt Zahlungserinnerung schicken.</a>` : ''}
     ${belegeFehlen ? `<a class="card hint" href="#/ausgaben">🧾 Bei <b>${belegeFehlen} Ausgabe${belegeFehlen === 1 ? '' : 'n'}</b> fehlt noch das Belegfoto.</a>` : ''}
+    <div class="card mt">
+      <b>✅ Jahresabschluss ${jahr}</b>
+      <ul class="done-list mt">${checks.map(([text, ok, href]) => `<li class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'} <a href="${href}">${text}</a></li>`).join('')}</ul>
+      <div class="muted small">${checks.every(([, ok]) => ok) ? 'Alles erledigt – gut gemacht.' : 'Offene Punkte vor der Steuererklärung klären.'}</div>
+    </div>
     <div class="quick">
       <a class="btn" href="#/ausgabe/neu">🧾 Ausgabe erfassen</a>
       <a class="btn ghost" href="#/fahrt/neu">🚗 Fahrt eintragen</a>
