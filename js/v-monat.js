@@ -30,7 +30,9 @@ route('/monatsabschluss', async (_, q) => {
   const prev = isoDate(new Date(parseISO(`${m}-01`).getFullYear(), parseISO(`${m}-01`).getMonth() - 1, 1)).slice(0, 7);
   const next = addDays(lastOfMonth(m), 1).slice(0, 7);
 
+  const vorStart = S.betriebsstart && m < S.betriebsstart.slice(0, 7);
   render('Monatsabschluss', `
+    ${vorStart ? `<div class="card hint">📅 Dein Betrieb startet am <b>${fmtDate(S.betriebsstart)}</b>. Für ${esc(monthLabel(m))} gibt es noch nichts abzurechnen.</div>` : ''}
     <div class="card month-head">
       <div class="row between">
         <a class="icon-btn" href="#/monatsabschluss?monat=${prev}" aria-label="Vormonat">‹</a>

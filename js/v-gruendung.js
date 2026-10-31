@@ -24,7 +24,7 @@ const GRUENDUNG = [
     text: `<p>Beim Gewerbeamt deiner Gemeinde – oft online, Kosten meist 20–60 €. Trag die Tätigkeit so ein, wie mit der Kammer besprochen.</p>
       <p>Auf Rechnungen und Briefen muss dein <b>voller Vor- und Nachname</b> stehen; „Toths Reinigungsservice“ ist der Zusatz. Die App druckt das automatisch so.</p>`,
     links: [['🔎 Gewerbeanmeldung online', () => search('Gewerbeanmeldung online')]],
-    field: { key: 'beginn', label: 'Gewerbebeginn', type: 'date' },
+    field: { key: 'beginn', setting: 'betriebsstart', label: 'Gewerbebeginn (Startdatum)', type: 'date' },
   },
   {
     id: 'elster', icon: '🔐', title: 'ELSTER-Konto anlegen', tag: 'früh starten',
@@ -87,7 +87,8 @@ const gruendungProgress = () => { const v = visibleSteps(); return { done: v.fil
 
 function deadlineInfo(s) {
   if (!s.deadline || isDone(s)) return '';
-  const base = gState()[s.deadline.from];
+  // Der Gewerbebeginn ist das Startdatum in den Einstellungen
+  const base = s.deadline.from === 'beginn' ? S.betriebsstart : gState()[s.deadline.from];
   if (!base) return '';
   const due = addDays(base, s.deadline.days);
   const d = daysBetween(today(), due);

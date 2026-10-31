@@ -43,7 +43,13 @@ function steuerHinweis(kategorie, betrag) {
 }
 const yearOf = (d) => (d || '').slice(0, 4);
 const yearSeg = (base, jahr, years) => `<div class="seg">${years.map((y) => `<a href="${base}?jahr=${y}" class="${String(y) === String(jahr) ? 'active' : ''}">${y}</a>`).join('')}</div>`;
-const lastYears = () => { const y = new Date().getFullYear(); return [y - 2, y - 1, y]; };
+// Jahre ab dem Betriebsstart (sonst die letzten drei Jahre)
+const lastYears = () => {
+  const y = new Date().getFullYear();
+  const start = S.betriebsstart ? Number(S.betriebsstart.slice(0, 4)) : y - 2;
+  const jahre = [y - 2, y - 1, y].filter((x) => x >= start);
+  return jahre.length ? jahre : [y];
+};
 
 /* ---------- Ausgaben ---------- */
 route('/ausgaben', async (_, q) => {
