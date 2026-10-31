@@ -122,6 +122,30 @@ async function notificationsAllowed(ask = true) {
 
 // Plant die Erinnerungen der nächsten Tage neu: am Vorabend die Häuser für morgen, bei Glättegefahr eine Warnung.
 let lastSchedule = 0;
+// Solange die Zeitmessung läuft: feste Benachrichtigung mit Startzeit, bleibt bis zum Beenden stehen
+const TIMER_NOTIFICATION_ID = 4001;
+async function zeigeTimerBenachrichtigung(objektId) {
+  if (!NATIVE) return;
+  try {
+    if (!S.timer) {
+      await native('LocalNotifications', 'cancel', { notifications: [{ id: TIMER_NOTIFICATION_ID }] });
+      return;
+    }
+    const o = await DB.get('objects', objektId || S.timer.objektId);
+    const start = new Date(S.timer.start);
+    await native('LocalNotifications', 'schedule', { notifications: [{
+      id: TIMER_NOTIFICATION_ID,
+      title: `⏱️ Zeitmessung läuft seit ${pad(start.getHours())}:${pad(start.getMinutes())}`,
+      body: `${objLabel(o)} – zum Beenden in der App auf „Fertig“ tippen`,
+      schedule: { at: new Date(Date.now() + 500).toISOString() },
+      ongoing: true,
+      autoCancel: false,
+    }] });
+  } catch {
+    // ohne Benachrichtigungs-Erlaubnis läuft die Zeitmessung trotzdem weiter
+  }
+}
+
 async function scheduleNotifications(force = false) {
   if (!NATIVE || S.benachrichtigungen === false) return;
   if (!force && Date.now() - lastSchedule < 10 * 60e3) return;

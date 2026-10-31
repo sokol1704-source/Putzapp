@@ -389,6 +389,7 @@ async function startTimer(objektId, terminId = '') {
   if (S.timer && !confirm('Es läuft schon eine Zeitmessung. Neu starten?')) return;
   S.timer = { objektId, terminId, start: new Date().toISOString() };
   await saveSettings();
+  zeigeTimerBenachrichtigung(objektId);
   vibrate(20);
   toast('⏱️ Zeit läuft – viel Erfolg!');
   updateTimerPill();
@@ -400,6 +401,7 @@ async function stopTimer() {
   const start = new Date(t.start);
   S.timer = null;
   await saveSettings();
+  zeigeTimerBenachrichtigung();
   updateTimerPill();
   vibrate([20, 60, 20]);
   const von = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
