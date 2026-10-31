@@ -145,7 +145,11 @@ route('/material', async (_, q) => {
     m.bestand = Math.max(0, Math.round((num(m.bestand) + Number(step.dataset.step)) * 10) / 10);
     await DB.put('material', m);
     vibrate(8);
-    $('.stepper b', card).textContent = matNum(m.bestand);
+    const zahl = $('.stepper b', card);
+    zahl.textContent = matNum(m.bestand);
+    zahl.classList.remove('bump');
+    void zahl.offsetWidth; // Animation neu starten
+    zahl.classList.add('bump');
     card.classList.toggle('low', isLow(m));
     const soll = num(m.soll) || num(m.mindest) * 2 || 1;
     const bar = $('.hbar span', card);

@@ -846,3 +846,11 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 .einf-dots span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--border); margin: 0 4px; }
 .einf-dots span.on { background: var(--brand); }
 .einf-card .row { justify-content: center; }
+
+/* Mehr Bewegung */
+.stepper b.bump { animation: pop .3s ease; }
+.g-check:not(:empty) { animation: pop .35s ease; }
+.einfuehrung { animation: fade .25s ease-out; }
+.einf-card { animation: zoom-in .3s cubic-bezier(.2, .8, .2, 1); }
+.einf-dots span { transition: transform .25s ease, background .25s ease; }
+.einf-dots span.on { transform: scale(1.35); }
