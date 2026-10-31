@@ -56,17 +56,11 @@ route('/material', async (_, q) => {
   const fotoVon = {};
   for (const m of items) { const [ph] = await DB.by('photos', 'visitId', m.id); if (ph) fotoVon[m.id] = ph; }
   const einkauf = items.filter(isLow);
-  // Einkaufsliste nach Bezugsquelle gruppiert
-  const gruppen = {};
-  einkauf.forEach((m) => { (gruppen[m.bezugsquelle || 'Ohne Bezugsquelle'] ||= []).push(m); });
-  const shopItem = (m) => {
-    const preise = (m.quellen || []).filter((q) => q.preis > 0);
-    return `<label class="card shop-item">
+  const shopItem = (m) => `<label class="card shop-item">
           <input type="checkbox" data-buy="${m.id}">
-          <span class="grow"><b>${esc(m.name)}</b><br><span class="muted small">noch ${matNum(m.bestand)} ${esc(m.einheit)}${m.preis ? ` · ca. ${money(m.preis)} je ${esc(m.einheit)}` : ''}</span>${preise.length > 1 ? `<br><span class="muted small">Vergleich: ${preise.map((q) => `${esc(q.name || 'ohne Name')} ${money(q.preis)}`).join(' · ')}</span>` : ''}</span>
+          <span class="grow"><b>${esc(m.name)}</b><br><span class="muted small">noch ${matNum(m.bestand)} ${esc(m.einheit)}${m.preis ? ` · ca. ${money(m.preis)} je ${esc(m.einheit)}` : ''}</span></span>
           <span class="qty-box"><input type="number" min="0" step="1" inputmode="numeric" class="buy-qty" data-qty="${m.id}" value="${toBuy(m)}" aria-label="Menge"><small>${esc(m.einheit)}</small></span>
         </label>`;
-  };
 
   const stockCard = (m) => {
     const soll = num(m.soll) || num(m.mindest) * 2 || 1;
@@ -87,7 +81,7 @@ route('/material', async (_, q) => {
       <a href="#/material?tab=lager" class="${tab === 'lager' ? 'active' : ''}">📦 Lager (${items.length})</a>
     </div>
     ${tab === 'einkauf' ? `
-      ${einkauf.length ? `<div class="mt" id="shop">${Object.entries(gruppen).map(([quelle, list]) => `<h3 class="section">🏪 ${esc(quelle)}</h3>${list.map(shopItem).join('')}`).join('')}</div>
+      ${einkauf.length ? `<div class="mt" id="shop">${einkauf.map(shopItem).join('')}</div>
         <div class="total" id="shopTotal"></div>
         <div class="quick"><button class="btn" id="bought">✓ Eingekauft – Bestand auffüllen</button><button class="btn ghost" id="shareList">💬 Liste teilen</button></div>`
       : `<div class="empty">Alles da 👍<br><span class="small">Sobald etwas unter den Mindestbestand fällt, steht es hier.</span></div>`}
@@ -111,7 +105,7 @@ route('/material', async (_, q) => {
   $('#shop')?.addEventListener('input', drawTotal);
   $('#shop')?.addEventListener('change', (e) => { if (e.target.dataset.buy) e.target.closest('.shop-item').classList.toggle('done', e.target.checked); });
 
-  $('#shareList')?.addEventListener('click', () => shareText([`🛒 Einkaufsliste ${S.firma}`, '', ...Object.entries(gruppen).flatMap(([quelle, list]) => [`\n${quelle}:`, ...list.map((m) => `☐ ${$(`[data-qty="${m.id}"]`).value} × ${m.name}`)])].join('\n'), 'Einkaufsliste'));
+  $('#shareList')?.addEventListener('click', () => shareText([`🛒 Einkaufsliste ${S.firma}`, '', ...einkauf.map((m) => `☐ ${$(`[data-qty="${m.id}"]`).value} × ${m.name}`)].join('\n'), 'Einkaufsliste'));
   $('#bought')?.addEventListener('click', async () => {
     const bought = $$('[data-buy]:checked').map((cb) => ({ m: byId[cb.dataset.buy], qty: Number($(`[data-qty="${cb.dataset.buy}"]`).value) || 0 })).filter((x) => x.qty > 0);
     if (!bought.length) return toast('Bitte zuerst abhaken, was du gekauft hast');
@@ -121,7 +115,7 @@ route('/material', async (_, q) => {
     if (confirm(`Bestand aufgefüllt ✓\n\nEinkauf${sum ? ` (ca. ${money(sum)})` : ''} gleich als Ausgabe erfassen? Danach kannst du den Kassenbon fotografieren.`)) {
       const kat = bought.some(({ m }) => m.kategorie === 'Streumittel') && bought.every(({ m }) => m.kategorie === 'Streumittel') ? 'Streumittel'
         : bought.every(({ m }) => m.kategorie === 'Reinigungsmittel') ? 'Reinigungsmittel' : 'Arbeitsmaterial & Geräte';
-      const a = await DB.put('ausgaben', { datum: today(), betrag: sum, kategorie: kat, beschreibung: `Einkauf: ${bought.map(({ m, qty }) => `${qty}× ${m.name}`).join(', ')}${[...new Set(bought.map(({ m }) => m.bezugsquelle).filter(Boolean))].length === 1 ? ` (bei ${bought[0].m.bezugsquelle})` : ''}`, zahlung: 'Karte' });
+      const a = await DB.put('ausgaben', { datum: today(), betrag: sum, kategorie: kat, beschreibung: `Einkauf: ${bought.map(({ m, qty }) => `${qty}× ${m.name}`).join(', ')}`, zahlung: 'Karte' });
       toast('Betrag prüfen und Beleg fotografieren');
       return go(`#/ausgabe/${a.id}`);
     }
@@ -163,16 +157,11 @@ route('/material', async (_, q) => {
 route('/material/neu', () => materialForm(null));
 route('/material/:id', async ({ id }) => materialForm(await DB.get('material', id)));
 
-// Günstigste Bezugsquelle mit Preis (Preise je Einheit, in Cent)
-const bestQuelle = (quellen) => (quellen || []).filter((q) => q.preis > 0).sort((a, b) => a.preis - b.preis)[0] || null;
-
 async function materialForm(m) {
   const isNew = !m;
-  m = m || { id: DB.uid(), name: '', einheit: 'Flasche', kategorie: MAT_KATEGORIEN[0], bestand: 1, mindest: 1, soll: 3, proEinsatz: 0, proWinter: 0, preis: 0, notiz: '', quellen: [] };
+  m = m || { id: DB.uid(), name: '', einheit: 'Flasche', kategorie: MAT_KATEGORIEN[0], bestand: 1, mindest: 1, soll: 3, proEinsatz: 0, proWinter: 0, preis: 0, notiz: '' };
   const existing = isNew ? [] : await DB.by('photos', 'visitId', m.id);
   const pending = [];
-  const zeilen = Math.max(3, (m.quellen || []).length + 1);
-  const quellen = Array.from({ length: zeilen }, (_, i) => m.quellen?.[i] || { name: '', preis: 0, artNr: '' });
   render(isNew ? 'Neues Material' : m.name, `
     <form id="f" class="form">
       <label>Bezeichnung *<input name="name" required value="${esc(m.name)}" placeholder="z. B. Neutralreiniger (10 l)"></label>
@@ -192,13 +181,7 @@ async function materialForm(m) {
         <label>je Winter-Einsatz<input name="proWinter" type="number" step="0.05" min="0" inputmode="decimal" value="${esc(m.proWinter)}"></label>
       </div>
       <p class="muted small">Beispiel: Ein 10-l-Kanister reicht für etwa 20 Reinigungen → 0,05 je Reinigung. Ein Sack Splitt reicht für etwa 3 Einsätze → 0,3.</p>
-      <div class="label">Bezugsquellen <span class="muted small">(Preis je ${esc(m.einheit)}; die günstigste steht auf der Einkaufsliste)</span></div>
-      ${quellen.map((q, i) => `<div class="grid3">
-        <label>Quelle<input name="qn${i}" value="${esc(q.name)}" placeholder="z. B. Großhandel"></label>
-        <label>Preis (€)<input name="qp${i}" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(q.preis)}"></label>
-        <label>Art.-Nr.<input name="qa${i}" value="${esc(q.artNr)}"></label>
-      </div>`).join('')}
-      <label>Preis je Einheit (€) <span class="muted small">(nur, wenn keine Bezugsquelle eingetragen ist)</span><input name="preis" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(m.preis)}"></label>
+      <label>Preis je Einheit (€)<input name="preis" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(m.preis)}"></label>
       <label>Notiz<input name="notiz" value="${esc(m.notiz)}"></label>
       <div class="label">Foto</div>
       <div id="photos"></div>
@@ -210,13 +193,11 @@ async function materialForm(m) {
   $('#f').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const neueQuellen = quellen.map((_, i) => ({ name: fd.get(`qn${i}`).trim(), preis: toCents(fd.get(`qp${i}`)), artNr: fd.get(`qa${i}`).trim() })).filter((q) => q.name || q.preis);
-    const best = bestQuelle(neueQuellen);
     Object.assign(m, {
       name: fd.get('name').trim(), einheit: fd.get('einheit').trim() || 'Stück', kategorie: fd.get('kategorie'),
       bestand: num(fd.get('bestand')), mindest: num(fd.get('mindest')), soll: num(fd.get('soll')),
       proEinsatz: num(fd.get('proEinsatz')), proWinter: num(fd.get('proWinter')),
-      quellen: neueQuellen, preis: best ? best.preis : toCents(fd.get('preis')), bezugsquelle: best?.name || '', notiz: fd.get('notiz').trim(),
+      preis: toCents(fd.get('preis')), notiz: fd.get('notiz').trim(),
     });
     await DB.put('material', m);
     await savePhotos(m.id, pending);
