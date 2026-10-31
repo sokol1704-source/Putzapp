@@ -1,7 +1,7 @@
 'use strict';
 
 /* ---------- Reinigungsvertrag ---------- */
-const DEFAULT_VERTRAG = { beginn: '', frist: 3, werktags: '07:00', sonntags: '09:00', schluessel: 1, versicherung: '' };
+const DEFAULT_VERTRAG = { beginn: '', frist: 3, werktags: '07:00', sonntags: '09:00', schluessel: 1, versicherung: '', haftpflicht: false };
 
 function vertragDoc(o, k, v, sigAG, sigAN) {
   const tl = taskList(o);
@@ -27,7 +27,7 @@ function vertragDoc(o, k, v, sigAG, sigAN) {
     ${winter ? para('Winterdienst', `<p>Der Auftragnehmer übernimmt das Räumen und Streuen des Gehwegs vor dem Haus, des Hauseingangs und der Zugänge sowie des Wegs zu den Mülltonnen. Geräumt und gestreut wird bei Schnee- und Eisglätte werktags ab ${esc(v.werktags)} Uhr, sonn- und feiertags ab ${esc(v.sonntags)} Uhr bis 20 Uhr, soweit die örtliche Satzung nichts anderes bestimmt. Verwendet werden abstumpfende Streumittel; jeder Einsatz wird in einem Räum- und Streuprotokoll dokumentiert.
       Vergütung: ${o.winterAbrechnung === 'einsatz' ? `<b>${money(o.winterPreis || 0)} je Einsatz</b>` : 'in der monatlichen Pauschale enthalten'}.</p>`) : ''}
     ${para('Mitwirkung des Auftraggebers', `<p>Der Auftraggeber stellt den Zugang zum Objekt sowie Wasser und Strom unentgeltlich zur Verfügung. Dem Auftragnehmer werden ${Number(v.schluessel) || 1} Schlüssel bzw. die Zugangscodes übergeben; der Auftragnehmer verwahrt sie sorgfältig und meldet einen Verlust unverzüglich.</p>`)}
-    ${para('Haftung und Versicherung', `<p>Der Auftragnehmer haftet für Schäden, die er bei der Ausführung schuldhaft verursacht, nach den gesetzlichen Bestimmungen. Er unterhält eine Betriebshaftpflichtversicherung${v.versicherung ? ` (${esc(v.versicherung)})` : ''}.</p>`)}
+    ${para('Haftung und Versicherung', `<p>Der Auftragnehmer haftet für Schäden, die er bei der Ausführung schuldhaft verursacht, nach den gesetzlichen Bestimmungen.</p>${v.haftpflicht ? `<p>Der Auftragnehmer unterhält eine Betriebshaftpflichtversicherung${v.versicherung ? ` (${esc(v.versicherung)})` : ''}.</p>` : ''}`)}
     ${para('Laufzeit und Kündigung', `<p>Der Vertrag beginnt am <b>${v.beginn ? fmtDate(v.beginn) : '____________'}</b> und läuft auf unbestimmte Zeit. Er kann von beiden Seiten mit einer Frist von <b>${v.frist} Monat${Number(v.frist) === 1 ? '' : 'en'} zum Monatsende</b> in Textform gekündigt werden. Das Recht zur außerordentlichen Kündigung bleibt unberührt.</p>`)}
     ${para('Preisanpassung', '<p>Ändern sich die Kosten des Auftragnehmers (z. B. Löhne, Material, Energie), kann er die Vergütung mit einer Ankündigungsfrist von sechs Wochen angemessen anpassen. Der Auftraggeber kann in diesem Fall zum Zeitpunkt des Wirksamwerdens außerordentlich kündigen.</p>')}
     ${para('Schlussbestimmungen', '<p>Änderungen und Ergänzungen bedürfen der Textform. Sollte eine Bestimmung unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt.</p>')}
@@ -55,6 +55,8 @@ route('/objekt/:id/vertrag', async ({ id }) => {
         <label>Winter werktags ab<input type="time" name="werktags" value="${esc(v.werktags)}"></label>
         <label>sonntags ab<input type="time" name="sonntags" value="${esc(v.sonntags)}"></label>
       </div>
+      <label class="check"><input type="checkbox" name="haftpflicht" ${v.haftpflicht ? 'checked' : ''}> Ich habe eine Betriebshaftpflicht</label>
+      ${v.haftpflicht ? '' : '<p class="danger-text small">Ohne Betriebshaftpflicht steht das nicht im Vertrag. Bei mehreren Aufträgen solltest du sie abschließen.</p>'}
       <label>Betriebshaftpflicht bei (optional)<input name="versicherung" value="${esc(v.versicherung)}" placeholder="z. B. Versicherung XY, Nr. 123"></label>
       ${docActionButtons(`<button type="button" class="btn ghost" id="signAG">✍️ ${sigAG ? 'Neu: ' : ''}Auftraggeber</button><button type="button" class="btn ghost" id="signAN">✍️ ${sigAN ? 'Neu: ' : ''}Ich</button>`)}
       <p class="muted small">Muster nach bestem Wissen – keine Rechtsberatung. Leistungen, Preis und Winterdienst kommen aus den Angaben beim Haus.</p>
@@ -63,7 +65,7 @@ route('/objekt/:id/vertrag', async ({ id }) => {
   `);
   $('#vf').addEventListener('change', async () => {
     const fd = new FormData($('#vf'));
-    Object.assign(v, { beginn: fd.get('beginn'), frist: Number(fd.get('frist')), schluessel: Number(fd.get('schluessel')), werktags: fd.get('werktags'), sonntags: fd.get('sonntags'), versicherung: fd.get('versicherung').trim() });
+    Object.assign(v, { beginn: fd.get('beginn'), frist: Number(fd.get('frist')), schluessel: Number(fd.get('schluessel')), werktags: fd.get('werktags'), sonntags: fd.get('sonntags'), versicherung: fd.get('versicherung').trim(), haftpflicht: fd.has('haftpflicht') });
     o.vertrag = v;
     await DB.put('objects', o);
     $('#docWrap').innerHTML = vertragDoc(o, k, v, sigAG, sigAN);
