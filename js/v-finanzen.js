@@ -226,6 +226,7 @@ route('/finanzen', async (_, q) => {
       <a class="btn ghost" href="#/ausgabe/neu">🧾 Ausgabe</a>
       <a class="btn ghost" href="#/fahrt/neu">🚗 Fahrt</a>
       <a class="btn ghost" href="#/auswertung?jahr=${jahr}">📊 Auswertung</a>
+      <a class="btn ghost" href="#/ausgaben?jahr=${jahr}">📋 Alle Ausgaben bearbeiten</a>
     </div>
     <h3 class="section">Für die Anlage EÜR in ELSTER</h3>
     <div class="card">
