@@ -10,16 +10,16 @@
     "test:smoke": "node tests/smoke.js"
   },
   "dependencies": {
-    "@capacitor/android": "^7.4.0",
-    "@capacitor/app": "^7.1.2",
-    "@capacitor/core": "^7.4.0",
-    "@capacitor/filesystem": "^7.1.0",
-    "@capacitor/local-notifications": "^7.0.7",
-    "@capacitor/share": "^7.0.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.4.0"
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/share": "^8.0.3"
   }
 }
