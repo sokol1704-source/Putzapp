@@ -49,9 +49,18 @@ async function consumeMaterial(art) {
 
 route('/material', async (_, q) => {
   const [items, objects] = await Promise.all([DB.all('material'), DB.all('objects')]);
-  items.sort((a, b) => MAT_KATEGORIEN.indexOf(a.kategorie) - MAT_KATEGORIEN.indexOf(b.kategorie) || a.name.localeCompare(b.name, 'de'));
-  const tab = q.tab || (items.some(isLow) ? 'einkauf' : 'lager');
   const perWeek = cleaningsPerWeek(objects);
+  // Tage, bis der Bestand aufgebraucht ist (ohne Verbrauchswert: ganz unten)
+  const tageBisLeer = (m) => (num(m.proEinsatz) > 0 && perWeek ? (num(m.bestand) / (num(m.proEinsatz) * perWeek)) * 7 : Infinity);
+  items.sort((a, b) => {
+    const kat = MAT_KATEGORIEN.indexOf(a.kategorie) - MAT_KATEGORIEN.indexOf(b.kategorie);
+    if (kat) return kat;
+    const da = tageBisLeer(a);
+    const db = tageBisLeer(b);
+    if (da !== db) return da < db ? -1 : 1;
+    return a.name.localeCompare(b.name, 'de');
+  });
+  const tab = q.tab || (items.some(isLow) ? 'einkauf' : 'lager');
   // Erstes Foto je Artikel für die Vorschau
   const fotoVon = {};
   for (const m of items) { const [ph] = await DB.by('photos', 'visitId', m.id); if (ph) fotoVon[m.id] = ph; }
