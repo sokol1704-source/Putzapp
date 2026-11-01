@@ -66,7 +66,7 @@ route('/material', async (_, q) => {
     const soll = num(m.soll) || num(m.mindest) * 2 || 1;
     const pct = Math.min(100, (num(m.bestand) / soll) * 100);
     return `<div class="card mat ${isLow(m) ? 'low' : ''}" data-id="${m.id}">
-      ${fotoVon[m.id] ? `<img class="mat-thumb" src="${fotoVon[m.id].url || (fotoVon[m.id].url = objUrl(fotoVon[m.id].blob))}" alt="">` : ''}
+      ${fotoVon[m.id] ? `<img class="mat-thumb" data-info="${m.id}" src="${fotoVon[m.id].url || (fotoVon[m.id].url = objUrl(fotoVon[m.id].blob))}" alt="">` : ''}
       <div class="row between">
         <a class="mat-edit strong" href="#/material/${m.id}" aria-label="${esc(m.name)} ändern">${esc(m.name)}<span class="mat-pen">✏️</span></a>
         <div class="stepper"><button class="icon-btn" data-step="-1" aria-label="Weniger">−</button><b>${matNum(m.bestand)}</b><button class="icon-btn" data-step="1" aria-label="Mehr">+</button></div></div>
@@ -155,6 +155,8 @@ route('/material', async (_, q) => {
   });
 
   onView('click', async (e) => {
+    const info = e.target.closest('[data-info]');
+    if (info) return materialInfo(byId[info.dataset.info], fotoVon[info.dataset.info]);
     const step = e.target.closest('[data-step]');
     if (!step) return;
     e.preventDefault();
@@ -175,6 +177,29 @@ route('/material', async (_, q) => {
     bar.className = isLow(m) ? 'bad' : m.bestand / soll < 0.6 ? 'warn' : 'ok';
   });
 });
+
+// Infofenster zum Artikel: Barcode, Preis, Bestand, Notiz
+function materialInfo(m, foto) {
+  const hulle = document.createElement('div');
+  hulle.className = 'einfuehrung';
+  hulle.innerHTML = `<div class="einf-card mat-info">
+    ${foto ? `<img class="mat-info-foto" src="${foto.url || (foto.url = objUrl(foto.blob))}" alt="">` : '<div class="einf-icon">🧴</div>'}
+    <h2>${esc(m.name)}</h2>
+    <dl class="mat-dl">
+      <dt>Barcode</dt><dd>${m.barcode ? esc(m.barcode) : '<span class="muted">nicht hinterlegt</span>'}</dd>
+      <dt>Preis je ${esc(m.einheit)}</dt><dd>${m.preis ? money(m.preis) : '<span class="muted">nicht hinterlegt</span>'}</dd>
+      <dt>Bestand</dt><dd>${matNum(m.bestand)} ${esc(m.einheit)} <span class="muted">(Mindest ${matNum(m.mindest)})</span></dd>
+      <dt>Kategorie</dt><dd>${esc(m.kategorie)}</dd>
+      ${m.notiz ? `<dt>Notiz</dt><dd>${esc(m.notiz)}</dd>` : ''}
+    </dl>
+    <div class="row gap">
+      <a class="btn ghost" href="#/material/${m.id}">Bearbeiten</a>
+      <button class="btn" type="button" data-close>Schließen</button>
+    </div>
+  </div>`;
+  hulle.addEventListener('click', (e) => { if (e.target === hulle || e.target.closest('[data-close]') || e.target.closest('a')) hulle.remove(); });
+  document.body.appendChild(hulle);
+}
 
 route('/material/neu', (_, q) => materialForm(null, q));
 route('/material/:id', async ({ id }) => materialForm(await DB.get('material', id)));

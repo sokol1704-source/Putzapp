@@ -919,3 +919,8 @@ details.grp.gefahr > summary { color: var(--danger); }
 .aktion:active { transform: scale(.96); }
 .row3 { display: flex; gap: 8px; }
 .row3 .btn { flex: 1; padding: 12px 6px; font-size: 14px; white-space: nowrap; }
+.mat-info { max-width: 380px; width: 100%; }
+.mat-info-foto { width: 100%; max-height: 200px; object-fit: cover; border-radius: 14px; margin-bottom: 12px; }
+.mat-dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; text-align: left; margin: 14px 0; }
+.mat-dl dt { color: var(--muted); font-size: 14px; }
+.mat-dl dd { margin: 0; font-weight: 600; word-break: break-word; }
