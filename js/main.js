@@ -185,20 +185,6 @@ async function umbenennenFirma() {
   await saveSettings();
 }
 
-// Bezugsquellen sind wieder entfernt: alte Einträge einmalig aus dem Material löschen
-async function bereinigeBezugsquellen() {
-  if (S.bezugsquellenBereinigt) return;
-  for (const m of await DB.all('material')) {
-    if (m.quellen || m.bezugsquelle) {
-      delete m.quellen;
-      delete m.bezugsquelle;
-      await DB.put('material', m);
-    }
-  }
-  S.bezugsquellenBereinigt = true;
-  await saveSettings();
-}
-
 async function migrate() {
   if (S.schema >= 2) return;
   const [customers, visits, appts] = await Promise.all([DB.all('customers'), DB.all('visits'), DB.all('appointments')]);
@@ -327,7 +313,6 @@ window.addEventListener('hashchange', router);
 (async () => {
   await loadSettings();
   await migrate();
-  await bereinigeBezugsquellen();
   await umbenennenFirma();
   await applyDuePrices();
   // Alte, zu niedrige Richtwerte für Angebote durch die neuen ersetzen – eigene Änderungen bleiben

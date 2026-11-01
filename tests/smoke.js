@@ -10,13 +10,13 @@ const { chromium, devices } = require('playwright');
 const BASE = process.env.APP_URL || 'http://localhost:8765/';
 const ROUTES = [
   '/', '/abwesenheit', '/angebot/:id', '/angebot/neu', '/angebote', '/ausgabe/:id', '/ausgabe/neu', '/ausgaben',
-  '/auswertung', '/bestaetigen', '/buchhaltung', '/einsaetze', '/einsatz/:id', '/einsatz/:id/bearbeiten', '/einsatz/neu',
+  '/auswertung', '/bestaetigen', '/buchhaltung', '/buchhaltung/tipps', '/einsaetze', '/einsatz/:id', '/einsatz/:id/bearbeiten', '/einsatz/neu',
   '/einstellungen', '/fahrt/:id', '/fahrt/neu', '/fahrten', '/finanzen', '/gruendung', '/kunde/:id', '/kunde/:id/bearbeiten',
   '/kunde/neu', '/kunden', '/leistungen', '/maengel', '/mangel/:id', '/mangel/:id/bearbeiten', '/mangel/neu', '/material',
   '/material/:id', '/material/neu', '/mehr', '/monatsabschluss', '/nachweise', '/objekt/:id', '/objekt/:id/aushang',
   '/objekt/:id/bearbeiten', '/objekt/:id/jahr', '/objekt/:id/nachweis', '/objekt/:id/plan', '/objekt/:id/vertrag',
   '/objekt/neu', '/objekte', '/preise', '/preise/schreiben/:kid', '/rechnung/:id', '/rechnung/neu', '/rechnungen',
-  '/suche', '/termin/:id', '/termin/neu', '/termine', '/tour', '/winter', '/winter/:id', '/winter/:id/bearbeiten',
+  '/suche', '/fotos', '/termin/:id', '/termin/neu', '/termine', '/tour', '/winter', '/winter/:id', '/winter/:id/bearbeiten',
   '/winter/neu', '/winter/protokoll/:id',
 ];
 
