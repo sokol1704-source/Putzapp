@@ -472,6 +472,7 @@ route('/angebote', async () => {
 route('/angebot/neu', async (_, q) => {
   const customers = (await DB.all('customers')).sort(byName);
   const K = S.kalk;
+  const angebotFotos = [];
   render('Angebot berechnen', `
     <form id="f" class="form">
       ${customerSelect(customers, q.kunde || '', { allowNew: true }).replace('Auftraggeber *', 'Empfänger *')}
@@ -503,9 +504,12 @@ route('/angebot/neu', async (_, q) => {
       </details>
       <div class="calc" id="calc"></div>
       <label>Anmerkung im Angebot (optional)<textarea name="notiz" rows="2" placeholder="z. B. Reinigungsmittel sind im Preis enthalten."></textarea></label>
+      <div class="label">Fotos des Hauses <span class="muted small">(erscheinen im Angebot)</span></div>
+      <div id="angebotFotos"></div>
       <button class="btn block" type="submit">Angebot erstellen</button>
     </form>
   `);
+  photoEditor($('#angebotFotos'), [], angebotFotos, [['angebot', 'Fotos']]);
   const f = $('#f');
   f.kundeId.addEventListener('change', () => { $('#newRecipient').hidden = f.kundeId.value !== '__neu'; });
   const calc = () => {
@@ -577,12 +581,13 @@ route('/angebot/neu', async (_, q) => {
       status: 'offen',
     };
     await DB.put('angebote', a);
+    await savePhotos(a.id, angebotFotos);
     toast(`✓ Angebot ${a.nummer} erstellt`);
     go(`#/angebot/${a.id}`, true);
   });
 });
 
-function angebotDoc(a) {
+function angebotDoc(a, fotos = []) {
   const k = a.empfaenger;
   return `<article class="invoice-doc">
     ${docHeader(a.absender)}
@@ -606,6 +611,7 @@ function angebotDoc(a) {
     ${a.winterPreis ? `<p class="inv-note">❄️ <b>Optional Winterdienst:</b> Räumen und Streuen der Zugänge und des Gehwegs bei Schnee und Glätte, inkl. Räum- und Streuprotokoll – ${money(a.winterPreis)} je Einsatz.</p>` : ''}
     <p class="inv-note">Nach jeder Reinigung erhalten Sie auf Wunsch einen monatlichen Leistungsnachweis mit Fotos – ideal für die Betriebskostenabrechnung. Festgestellte Mängel im Objekt melde ich Ihnen direkt mit Foto.</p>
     <p class="inv-note">Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung). Der genannte Preis ist ein Endpreis.</p>
+    ${fotos.length ? `<h3 class="doc-h3">Fotos</h3><div class="doc-photos">${fotos.map((p) => `<figure><img src="${objUrl(p.blob)}" alt=""></figure>`).join('')}</div>` : ''}
     ${a.notiz ? `<p>${nl2br(a.notiz)}</p>` : ''}
     <p>Ich freue mich auf Ihren Auftrag!</p>
     <p>Mit freundlichen Grüßen<br>${esc(a.absender.inhaber)}</p>
@@ -631,7 +637,7 @@ route('/angebot/:id', async ({ id }) => {
     ${angebotNachfassen(a) ? `<div class="card hint no-print"><b>⏰ Seit ${daysBetween(a.datum, today())} Tagen keine Antwort</b>
       <div class="muted small">Eine kurze Nachfrage bringt oft die Entscheidung.</div>
       <button class="btn small mt" id="nachfassen">✉️ Nachfrage senden</button></div>` : ''}
-    <div class="doc-wrap">${angebotDoc(a)}</div>
+    <div class="doc-wrap">${angebotDoc(a, await DB.by('photos', 'visitId', a.id))}</div>
     <button class="btn danger ghost block no-print" id="del">Angebot löschen</button>
   `);
   wireDocButtons(`Angebot ${a.nummer}`, `Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nanbei erhalten Sie mein Angebot für die Treppenhausreinigung ${a.objekt.strasse}. Ich freue mich auf Ihre Rückmeldung!\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`);

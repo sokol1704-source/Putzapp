@@ -372,6 +372,11 @@ route('/kunde/:id', async ({ id }) => {
   const objs = data.objects.filter((o) => o.kundeId === id);
   const invoices = data.invoices.filter((i) => i.kundeId === id).sort((a, b) => b.nummer.localeCompare(a.nummer));
   const addr = [c.strasse, c.plzOrt].filter(Boolean).join(', ');
+  // Überblick für Gespräche
+  const offen = invoices.filter((i) => i.status === 'offen');
+  const pauschale = objs.filter((o) => o.aktiv !== false && isMonthly(o)).reduce((s, o) => s + (o.monatspauschale || 0), 0);
+  const letzterEinsatz = data.visits.filter((v) => objs.some((o) => o.id === v.objektId)).map((v) => v.datum).sort().pop();
+  const maengelOffen = data.maengel.filter((m) => objs.some((o) => o.id === m.objektId) && m.status !== 'erledigt').length;
   render(c.name, `
     <div class="card">
       ${c.ansprechpartner ? `<div>👤 ${esc(c.ansprechpartner)}</div>` : ''}
@@ -381,6 +386,12 @@ route('/kunde/:id', async ({ id }) => {
       <div class="muted small mt">${c.privat ? 'Privatperson' : 'Hausverwaltung / Firma'}</div>
       ${c.notizen ? `<div class="small mt">📝 ${nl2br(c.notizen)}</div>` : ''}
       <a class="btn small ghost mt" href="#/kunde/${id}/bearbeiten">Bearbeiten</a>
+    </div>
+    <div class="stats mt">
+      <div class="stat"><b>${objs.length}</b><span>Häuser</span></div>
+      <div class="stat"><b data-money>${money(pauschale)}</b><span>Pauschale im Monat</span></div>
+      <div class="stat"><b data-money>${money(offen.reduce((s, i) => s + i.summe, 0))}</b><span>${offen.length} offen</span></div>
+      <div class="stat"><b>${letzterEinsatz ? fmtDate(letzterEinsatz) : '–'}</b><span>letzter Einsatz${maengelOffen ? ` · ${maengelOffen} Mängel offen` : ''}</span></div>
     </div>
     <div class="quick">
       <a class="btn" href="#/objekt/neu?kunde=${id}">🏢 Haus hinzufügen</a>
