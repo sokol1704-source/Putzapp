@@ -20,13 +20,11 @@ route('/termine', async () => {
     return diff < 0 ? `Überfällig` : diff === 0 ? `Diese Woche · ${range}` : diff === 1 ? `Nächste Woche · ${range}` : `KW ${range}`;
   };
   render('Termine', `
-    <div class="row gap">
-      <a class="btn" href="#/termin/neu">+ Termin</a>
-      <a class="btn ghost" href="#/tour">🚐 Tour heute</a>
-    </div>
-    <div class="quick">
-      <a class="btn ghost" href="#/termin/neu?typ=besichtigung">📝 Angebot vor Ort</a>
-      <a class="btn ghost" href="#/termin/neu?typ=gespraech">🤝 Kundengespräch</a>
+    <div class="aktionen">
+      <a class="aktion primary" href="#/termin/neu"><span>＋</span>Termin</a>
+      <a class="aktion" href="#/tour"><span>🚐</span>Tour heute</a>
+      <a class="aktion" href="#/termin/neu?typ=besichtigung"><span>📝</span>Angebot vor Ort</a>
+      <a class="aktion" href="#/termin/neu?typ=gespraech"><span>🤝</span>Kundengespräch</a>
     </div>
     ${weeks.map((w) => `<h3 class="section">${weekTitle(w.monday)}</h3>${w.items.map((p) => planCard(p, data)).join('')}`).join('')
       || '<div class="empty mt">Keine anstehenden Termine.<br><span class="small">Tipp: Beim Haus unter „Plan“ alle Termine auf einmal eintragen.</span></div>'}

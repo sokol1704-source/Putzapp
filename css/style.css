@@ -909,3 +909,11 @@ details.grp.gefahr > summary { color: var(--danger); }
 
 /* Schnellzugriffe bündig ausrichten (ohne den Abstand zwischen Karten) */
 .grp-schnell > * { margin: 0 !important; align-self: stretch; }
+
+/* Schnellaktionen (Termine) */
+.aktionen { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.aktion { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 104px; padding: 14px 10px; border-radius: 18px; background: var(--card); color: var(--text); font-weight: 600; font-size: 15px; text-align: center; box-shadow: 0 6px 18px rgba(15, 118, 110, .10); transition: transform .15s ease; }
+.aktion span { width: 50px; height: 50px; border-radius: 16px; display: grid; place-items: center; font-size: 24px; background: var(--brand-soft); }
+.aktion.primary { background: linear-gradient(135deg, #14b8a6, var(--brand)); color: #fff; }
+.aktion.primary span { background: rgba(255, 255, 255, .22); color: #fff; font-weight: 700; }
+.aktion:active { transform: scale(.96); }
