@@ -1,7 +1,7 @@
 'use strict';
 
 /* ---------- Material & Einkaufsliste ---------- */
-const MAT_KATEGORIEN = ['Reinigungsmittel', 'Streumittel', 'Verbrauchsmaterial', 'Werkzeug & Geräte'];
+const MAT_KATEGORIEN = ['Reinigungsmittel', 'Verbrauchsmaterial', 'Werkzeug & Geräte', 'Streumittel'];
 const MAT_EINHEITEN = ['Kanister', 'Flasche', 'Sack', 'Packung', 'Rolle', 'Stück', 'Paar'];
 // Vorlagen für die Treppenhausreinigung: [Name, Einheit, Kategorie, Verbrauch je Reinigung, je Winter-Einsatz, Mindest, Soll, Preis €]
 const MAT_VORLAGEN = [
