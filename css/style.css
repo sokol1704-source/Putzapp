@@ -854,3 +854,32 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 .einf-card { animation: zoom-in .3s cubic-bezier(.2, .8, .2, 1); }
 .einf-dots span { transition: transform .25s ease, background .25s ease; }
 .einf-dots span.on { transform: scale(1.35); }
+
+/* ---------- Design-Feinschliff ---------- */
+:root { --accent: #d97706; }
+@media (prefers-color-scheme: dark) { :root { --accent: #f59e0b; } }
+
+/* Startseite: kompakterer Kopf, Termine stehen schneller oben */
+.hero { padding: 16px 18px !important; }
+.hero-title { font-size: 22px; }
+
+/* Hinweise mit Akzentleiste, damit sie sofort auffallen */
+.card.hint { border-left: 4px solid var(--accent); }
+
+/* Überschriften: etwas größer, mehr Luft davor */
+.section { font-size: 16px; margin: 26px 0 10px; }
+
+/* Abstand zwischen aufeinanderfolgenden Karten */
+.card + .card { margin-top: 12px; }
+
+/* Mehr-Seite: farbige Symbole statt grauer Flächen */
+.tiles .tile:nth-child(4n+1) .tile-icon { background: #ccfbf1; }
+.tiles .tile:nth-child(4n+2) .tile-icon { background: #fde68a; }
+.tiles .tile:nth-child(4n+3) .tile-icon { background: #bfdbfe; }
+.tiles .tile:nth-child(4n+4) .tile-icon { background: #fbcfe8; }
+@media (prefers-color-scheme: dark) {
+  .tiles .tile:nth-child(4n+1) .tile-icon { background: #134e4a; }
+  .tiles .tile:nth-child(4n+2) .tile-icon { background: #78350f; }
+  .tiles .tile:nth-child(4n+3) .tile-icon { background: #1e3a8a; }
+  .tiles .tile:nth-child(4n+4) .tile-icon { background: #831843; }
+}
