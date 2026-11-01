@@ -16,6 +16,10 @@ route('/', async () => {
   const maengelOffen = data.maengel.filter((m) => m.status !== 'erledigt').length;
   const fastLeer = (await DB.all('material')).filter(isLow);
   const umsatzMonat = data.invoices.filter((i) => i.status !== 'storniert' && i.datum.startsWith(t.slice(0, 7))).reduce((s, i) => s + i.summe, 0);
+  // Kennzahlen des laufenden Monats (aus den gespeicherten Einsätzen und Rechnungen)
+  const einsaetzeMonat = data.visits.filter((v) => v.datum.startsWith(t.slice(0, 7)));
+  const stundenMonat = einsaetzeMonat.reduce((s, v) => s + num(v.stunden), 0);
+  const naechster = plan.find((p) => p.datum >= t && p.objektId);
 
   // Auftraggeber mit nicht abgerechneten Einsätzen im Vormonat → Monatsrechnung fällig
   const pm = prevMonth();
@@ -80,12 +84,22 @@ route('/', async () => {
       <a href="#/objekt/neu"><span>🏢</span>Neues Haus</a>
       <a href="#/angebot/neu"><span>📝</span>Angebot</a>
     </div>
-    <div class="stats">
-      <a class="stat" href="#/einsaetze?filter=offen"><b data-count="${unbilled}">${unbilled}</b><span>Einsätze nicht abgerechnet</span></a>
-      <a class="stat" href="#/rechnungen?filter=offen"><b data-count="${offenSumme}" data-money>${money(offenSumme)}</b><span>${offen.length} offene Rechnung${offen.length === 1 ? '' : 'en'}</span></a>
-      <a class="stat" href="#/maengel"><b data-count="${maengelOffen}">${maengelOffen}</b><span>offene Mängel</span></a>
-      <a class="stat" href="#/rechnungen"><b data-count="${umsatzMonat}" data-money>${money(umsatzMonat)}</b><span>Umsatz ${new Date().toLocaleDateString('de-DE', { month: 'long' })}</span></a>
+    <h3 class="section">Dein Überblick</h3>
+    <div class="kpi-grid">
+      <a class="kpi" href="#/rechnungen"><span class="kpi-label">Umsatz ${new Date().toLocaleDateString('de-DE', { month: 'long' })}</span><b data-count="${umsatzMonat}" data-money>${money(umsatzMonat)}</b></a>
+      <a class="kpi" href="#/rechnungen?filter=offen"><span class="kpi-label">Offen</span><b data-count="${offenSumme}" data-money>${money(offenSumme)}</b><small>${offen.length} Rechnung${offen.length === 1 ? '' : 'en'}</small></a>
+      <a class="kpi" href="#/einsaetze"><span class="kpi-label">Einsätze diesen Monat</span><b data-count="${einsaetzeMonat.length}">${einsaetzeMonat.length}</b></a>
+      <a class="kpi" href="#/einsaetze"><span class="kpi-label">Arbeitszeit</span><b>${fmtNum(stundenMonat)} h</b></a>
     </div>
+    <div class="kpi-grid kpi-klein">
+      <a class="kpi" href="#/einsaetze?filter=offen"><span class="kpi-label">Nicht abgerechnet</span><b data-count="${unbilled}">${unbilled}</b></a>
+      <a class="kpi" href="#/maengel"><span class="kpi-label">Offene Mängel</span><b data-count="${maengelOffen}">${maengelOffen}</b></a>
+    </div>
+    ${naechster ? `<h3 class="section">Nächster Einsatz</h3>
+    <a class="card link next" href="#/objekt/${naechster.objektId}">
+      <div class="row between"><b>🏢 ${esc(objLabel(data.omap[naechster.objektId]))}</b><span class="badge soft">${esc(whenLabel(naechster.datum))}${naechster.uhrzeit ? ` · ${esc(naechster.uhrzeit)} Uhr` : ''}</span></div>
+      <div class="muted small">${esc(kundeName(data.kmap, data.omap[naechster.objektId]?.kundeId))}</div>
+    </a>` : ''}
     ${dueCustomers.length ? `<h3 class="section">🧾 Rechnungen für ${esc(monthLabel(pm))}</h3>
       ${dueCustomers.map((c) => `<div class="card plan">
         <div class="row between"><a class="strong" href="#/kunde/${c.id}">👥 ${esc(c.name)}</a><span class="badge warn">fällig</span></div>

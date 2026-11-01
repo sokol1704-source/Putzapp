@@ -924,3 +924,14 @@ details.grp.gefahr > summary { color: var(--danger); }
 .mat-dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; text-align: left; margin: 14px 0; }
 .mat-dl dt { color: var(--muted); font-size: 14px; }
 .mat-dl dd { margin: 0; font-weight: 600; word-break: break-word; }
+
+/* Dashboard auf der Startseite */
+.kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.kpi { display: flex; flex-direction: column; gap: 4px; padding: 14px 14px 12px; border-radius: 18px; background: var(--card); color: var(--text); box-shadow: 0 6px 18px rgba(15, 118, 110, .08); }
+.kpi-label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+.kpi b { font-size: 22px; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.kpi small { color: var(--muted); font-size: 12px; }
+.kpi-klein { margin-top: 10px; }
+.kpi-klein .kpi { padding: 10px 14px; }
+.kpi-klein .kpi b { font-size: 18px; }
+.card.next { border-left: 4px solid var(--brand); }
