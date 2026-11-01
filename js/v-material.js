@@ -87,7 +87,7 @@ route('/material', async (_, q) => {
       : `<div class="empty">Alles da 👍<br><span class="small">Sobald etwas unter den Mindestbestand fällt, steht es hier.</span></div>`}
     ` : `
       <p class="muted small mt">Tippe auf ein Material, um es zu ändern oder zu löschen. Mit − und + passt du den Bestand an.</p>
-      <div class="row3 mt"><a class="btn" href="#/material/neu">+ Material</a><button class="btn ghost" id="scan">📷 Scannen</button><button class="btn ghost" id="vorlagen">${items.length ? '📋 Ergänzen' : '📋 Vorlagen'}</button></div>
+      <div class="row3 mt"><a class="btn" href="#/material/neu">+ Material</a><button class="btn ghost" id="scan">📷 Scannen</button>${items.length ? '' : '<button class="btn ghost" id="vorlagen">📋 Vorlagen</button>'}</div>
       ${MAT_KATEGORIEN.map((k) => { const list = items.filter((m) => m.kategorie === k); return list.length ? `<h3 class="section">${esc(k)}</h3>${list.map(stockCard).join('')}` : ''; }).join('')}
       ${items.length ? '<p class="muted small">Mit − und + korrigierst du den Bestand. Der Verbrauch pro Reinigung bzw. Winter-Einsatz wird beim Speichern automatisch abgezogen.</p>'
         : '<div class="empty">Noch kein Material angelegt.<br><span class="small">Mit „Vorlagen laden“ bekommst du eine typische Grundausstattung für die Treppenhausreinigung.</span></div>'}
