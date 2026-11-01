@@ -143,7 +143,8 @@ async function zeigeTimerBenachrichtigung(objektId) {
     return `${objLabel(o)} · seit ${pad(start.getHours())}:${pad(start.getMinutes())} · ${min} Min.`;
   };
   try {
-    const optionen = () => ({ id: TIMER_NOTIFICATION_ID, title: titel, body: text(), smallIcon: 'ic_stat_toths', silent: true });
+    // serviceType 1 = Datensynchronisierung (passt zum Eintrag im Manifest)
+    const optionen = () => ({ id: TIMER_NOTIFICATION_ID, title: titel, body: text(), smallIcon: 'ic_stat_toths', silent: true, serviceType: 1 });
     await native('ForegroundService', 'startForegroundService', optionen());
     timerUpdate = setInterval(() => native('ForegroundService', 'updateForegroundService', optionen()).catch(() => {}), 60000);
   } catch {
