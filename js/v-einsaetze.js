@@ -251,7 +251,7 @@ async function visitForm(v, q) {
       <div class="label">Fotos</div>
       <p class="small" id="fotoHint"></p>
       <div id="photos"></div>
-      <label>Notiz<textarea name="notiz" rows="3" placeholder="z. B. Besonderheiten, Verschmutzungen, Material verbraucht…">${esc(v.notiz)}</textarea></label>
+      <label>Notiz <span class="muted small">🎤 Diktieren: Mikrofon-Taste der Tastatur</span><textarea name="notiz" rows="3" placeholder="z. B. Besonderheiten, Verschmutzungen, Material verbraucht…">${esc(v.notiz)}</textarea></label>
       ${v.rechnungId ? '<p class="muted small">Dieser Einsatz ist bereits abgerechnet.</p>' : ''}
       <button class="btn block" type="submit" id="save">Speichern</button>
     </form>

@@ -166,7 +166,7 @@ async function mangelForm(m, q) {
         <label>Datum<input type="date" name="datum" value="${esc(m.datum)}"></label>
       </div>
       <datalist id="orte">${ORTE.map((x) => `<option value="${x}">`).join('')}</datalist>
-      <label>Was ist los? *<textarea name="text" rows="3" required placeholder="z. B. Deckenlampe defekt, Graffiti an der Haustür, Sperrmüll im Keller…">${esc(m.text)}</textarea></label>
+      <label>Was ist los? * <span class="muted small">🎤 Diktieren: Mikrofon-Taste der Tastatur</span><textarea name="text" rows="3" required placeholder="z. B. Deckenlampe defekt, Graffiti an der Haustür, Sperrmüll im Keller…">${esc(m.text)}</textarea></label>
       <label class="check"><input type="checkbox" name="dringend" ${m.dringend ? 'checked' : ''}> 🚨 Dringend (z. B. Gefahr, Wasserschaden)</label>
       <div class="label">Fotos</div>
       <div id="photos"></div>
