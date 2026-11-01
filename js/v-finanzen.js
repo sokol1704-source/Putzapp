@@ -354,6 +354,43 @@ route('/buchhaltung', async () => {
       ${tile('#/rechnungen?filter=offen', '💶', 'Offene Rechnungen', `${offen.length} offen`, overdue.length || '')}
       ${tile('#/monatsabschluss', '🗓️', 'Monatsabschluss', 'Was ist abzurechnen?')}
       ${tile('#/preise', '📈', 'Preisanpassung', 'Preise erhöhen & ankündigen', objects.some((o) => o.neuerPreis) ? '!' : '')}
+      ${tile('#/buchhaltung/tipps', '💡', 'Tipps & Infos', 'Was du als Kleingewerbe beachten musst')}
     </div>
   `);
+});
+
+/* ---------- Tipps & Infos zur Buchhaltung (Kleingewerbe) ---------- */
+route('/buchhaltung/tipps', () => {
+  const punkt = (titel, text, offen = false) => `<details class="card grp" ${offen ? 'open' : ''}>
+    <summary>${titel}</summary>
+    <div class="grp-body"><div class="small">${text}</div></div>
+  </details>`;
+  render('Tipps & Infos', `
+    <p class="muted small">Eine Zusammenfassung für Kleingewerbe, Stand 2026. Sie ersetzt keine Steuerberatung. Bei Unsicherheit fragst du die Kammer oder dein Steuerbüro.</p>
+    ${punkt('🧾 Belege aufbewahren', `<p>Buchungsbelege (Rechnungen, Kassenbons, Kontoauszüge) musst du <b>10 Jahre</b> aufbewahren. Die App speichert Belegfotos an der Ausgabe. Halte zusätzlich eine Sicherung bereit.</p>`, true)}
+    ${punkt('💶 Was du absetzen kannst', `<ul>
+      <li>Reinigungsmittel, Material, Arbeitskleidung, Werkzeug</li>
+      <li>Telefon, Internet, Porto, Büromaterial</li>
+      <li>Versicherungen (z. B. Betriebshaftpflicht), Werbung, Gebühren</li>
+      <li><b>Fahrten</b> mit dem eigenen Auto: 0,30 € je km. Damit sind Tanken und Werkstatt abgegolten, sie zählen nicht zusätzlich.</li>
+      <li>Privat genutzte Anteile (z. B. Handy) nicht absetzen, nur den beruflichen Teil.</li>
+    </ul>`)}
+    ${punkt('🔧 Abschreibung und GWG', `<p><b>Geringwertige Wirtschaftsgüter</b> bis <b>800 € netto</b> kannst du im Jahr des Kaufs komplett absetzen (Sofortabschreibung). Zwischen 250 € und 1.000 € gibt es alternativ den <b>Sammelposten</b>, der über 5 Jahre gleichmäßig abgeschrieben wird.</p>
+      <p>Teurere Anschaffungen (z. B. ein größeres Gerät) werden über die Nutzungsdauer abgeschrieben. Bei 800 € netto bringt die Sofortabschreibung dir sofort einen Vorteil, deshalb lohnt sich eine Anschaffung zum Jahresende nur, wenn du sie ohnehin brauchst.</p>
+      <p class="muted small">Für 2027 gibt es einen Entwurf, die Grenze auf 1.200 € anzuheben. Das ist noch nicht beschlossen.</p>`)}
+    ${punkt('🧮 Kleinunternehmer: Umsatzsteuer und Vorsteuer', `<p>Als Kleinunternehmer weist du keine Umsatzsteuer aus. Dafür kannst du auch keine Vorsteuer aus Einkäufen abziehen. Ausgaben zählen daher mit dem <b>vollen Bruttobetrag</b>. Die Umsatzgrenzen sind 25.000 € im Vorjahr und 100.000 € im laufenden Jahr.</p>`)}
+    ${punkt('🏛️ Gewerbesteuer', `<p>Für Einzelunternehmer gibt es einen <b>Freibetrag von 24.500 € Gewinn</b> im Jahr. Liegt dein Gewinn darunter, fällt keine Gewerbesteuer an. Der Freibetrag gilt auch im Nebenberuf.</p>`)}
+    ${punkt('💰 Steuer-Rücklage', `<p>Lege laufend einen Teil des Gewinns zurück. Die App rechnet dir den Richtwert im Finanzen-Tab aus. Die tatsächliche Steuer hängt von deinem Gesamteinkommen ab, deshalb gern mit dem Steuerbüro abstimmen.</p>`)}
+    ${punkt('📅 Fristen und Ablauf', `<ul>
+      <li>Fragebogen zur steuerlichen Erfassung nach der Gewerbeanmeldung (über ELSTER)</li>
+      <li>Einkommensteuererklärung mit <b>Anlage EÜR</b>. Ohne Steuerberater ist die Abgabe in der Regel bis 31. Juli des Folgejahres fällig.</li>
+      <li>Jahresabschluss-Checkliste in der Buchhaltung kurz vor Jahresende durchgehen</li>
+    </ul>`)}
+    ${punkt('📌 Häufige Fehler', `<ul>
+      <li>Belege fehlen oder sind nicht mit dem Betrag und Datum vollständig</li>
+      <li>Private Ausgaben vermischt mit betrieblichen</li>
+      <li>Fahrten ohne Datum, km-Stand oder Ziel – das Finanzamt verlangt diese Angaben</li>
+      <li>Zahlungen vor dem Gewerbebeginn nicht zuordnen (Vorlaufkosten mit dem Steuerbüro klären)</li>
+    </ul>`)}
+  `, { tab: '', back: true });
 });
