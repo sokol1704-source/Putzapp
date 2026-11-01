@@ -386,6 +386,19 @@ route('/buchhaltung/tipps', () => {
       <li>Einkommensteuererklärung mit <b>Anlage EÜR</b>. Ohne Steuerberater ist die Abgabe in der Regel bis 31. Juli des Folgejahres fällig.</li>
       <li>Jahresabschluss-Checkliste in der Buchhaltung kurz vor Jahresende durchgehen</li>
     </ul>`)}
+    <h3 class="section">🔧 Abschreibung Schritt für Schritt</h3>
+    ${[
+      ['Was ist Abschreibung überhaupt?', '<p>Teure Anschaffungen, die länger als ein Jahr nutzbar sind (z. B. ein Hochdruckreiniger), verteilst du über ihre Nutzungsdauer auf mehrere Jahre. Jedes Jahr setzt du einen Teil davon als Betriebsausgabe ab. Das nennt man AfA (Absetzung für Abnutzung).</p>'],
+      ['Wann nutze ich welche Methode?', '<ul><li><b>bis 250 € netto:</b> sofort komplett absetzen (GWG)</li><li><b>250 bis 800 € netto:</b> wahlweise sofort (GWG) oder in den Sammelposten</li><li><b>Sammelposten:</b> alle Anschaffungen zwischen 250 und 1.000 € gemeinsam, 5 Jahre lang je ein Fünftel</li><li><b>über 800 € netto:</b> AfA über die Nutzungsdauer</li></ul>'],
+      ['Was ist die Nutzungsdauer?', '<p>Die Zeit, in der ein Gerät voraussichtlich genutzt werden kann. Die Finanzverwaltung gibt in ihrer AfA-Tabelle Richtwerte vor, passend zu deiner Branche. Dort schaust du nach, wenn du den Wert festlegst.</p>'],
+      ['Beispiel: Gerät für 1.200 € netto, Nutzungsdauer 5 Jahre', '<p>Jährliche AfA: 1.200 € : 5 = <b>240 € pro Jahr</b>.</p><p>Kaufst du es im März, rechnest du monatsgenau ab März: 10 Monate im ersten Jahr, also 200 €. Danach jeweils 240 €, im letzten Jahr der Rest.</p>'],
+      ['Gilt die 800-€-Grenze auch als Kleinunternehmer?', '<p>Als Kleinunternehmer kannst du keine Vorsteuer abziehen. Deshalb zählt für dich der <b>Bruttopreis</b> der Anschaffung. Im Zweifel frag die Kammer oder das Finanzamt, ob sie die Grenze auf den Bruttopreis beziehen.</p>'],
+      ['Wie gehe ich mit Handy und Laptop um?', '<p>Liegt der Preis unter 800 € netto, kannst du das Gerät als GWG sofort absetzen, soweit du es beruflich nutzt. Bei privater Mitnutzung nur den beruflichen Anteil. Das kannst du bei der Ausgabe in der App mit dem privaten Anteil festhalten.</p>'],
+      ['Muss ich auch das Auto abschreiben?', '<p>Nein. Für deinen Privatwagen gilt die Kilometerpauschale von 0,30 € je km. Damit sind die Abschreibung und alle Kfz-Kosten abgegolten. Ein Auto gibst du in der App daher nicht als Anschaffung an.</p>'],
+      ['Was passiert, wenn ich ein Gerät verkaufe?', '<p>Der Verkaufserlös ist eine Betriebseinnahme. Ist das Gerät noch nicht vollständig abgeschrieben, bleibt die Abschreibung bis zum Verkauf bestehen. Bei einem GWG aus dem Sofortabzug gibt es keine Korrektur.</p>'],
+      ['Gebrauchte Geräte: gilt das Gleiche?', '<p>Ja. Entscheidend ist der Kaufpreis, nicht ob das Gerät neu oder gebraucht ist. Für die Nutzungsdauer bei Gebrauchten gibt es Sonderregeln, die du beim Finanzamt nachschlagen kannst.</p>'],
+      ['Zählen Lieferung und Montage zum Preis?', '<p>Ja, Anschaffungsnebenkosten wie Versand oder Montage gehören zum Anschaffungspreis. Für die GWG-Grenze zählen sie also mit.</p>'],
+    ].map(([q, a]) => `<details class="card grp"><summary>${q}</summary><div class="grp-body"><div class="small">${a}</div></div></details>`).join('')}
     <h3 class="section">❓ Häufige Fragen</h3>
     ${[
       ['Muss ich eine Steuererklärung machen, auch bei wenig Umsatz?', 'Wenn das Finanzamt dich dazu auffordert, ja. Auch bei kleinem Gewinn kannst du verpflichtet sein. Im Zweifel fragst du bei der Kammer oder beim Finanzamt nach.'],
