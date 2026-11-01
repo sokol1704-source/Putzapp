@@ -87,7 +87,7 @@ route('/material', async (_, q) => {
       : `<div class="empty">Alles da 👍<br><span class="small">Sobald etwas unter den Mindestbestand fällt, steht es hier.</span></div>`}
     ` : `
       <p class="muted small mt">Tippe auf ein Material, um es zu ändern oder zu löschen. Mit − und + passt du den Bestand an.</p>
-      <div class="row gap mt"><a class="btn" href="#/material/neu">+ Material</a><button class="btn ghost" id="vorlagen">${items.length ? '📋 Fehlende Vorlagen ergänzen' : '📋 Vorlagen laden'}</button></div>
+      <div class="row gap mt"><a class="btn" href="#/material/neu">+ Material</a><button class="btn ghost" id="scan">📷 Barcode scannen</button><button class="btn ghost" id="vorlagen">${items.length ? '📋 Fehlende Vorlagen ergänzen' : '📋 Vorlagen laden'}</button></div>
       ${MAT_KATEGORIEN.map((k) => { const list = items.filter((m) => m.kategorie === k); return list.length ? `<h3 class="section">${esc(k)}</h3>${list.map(stockCard).join('')}` : ''; }).join('')}
       ${items.length ? '<p class="muted small">Mit − und + korrigierst du den Bestand. Der Verbrauch pro Reinigung bzw. Winter-Einsatz wird beim Speichern automatisch abgezogen.</p>'
         : '<div class="empty">Noch kein Material angelegt.<br><span class="small">Mit „Vorlagen laden“ bekommst du eine typische Grundausstattung für die Treppenhausreinigung.</span></div>'}
@@ -121,6 +121,24 @@ route('/material', async (_, q) => {
     }
     toast('✓ Bestand aufgefüllt');
     router();
+  });
+
+  $('#scan')?.addEventListener('click', async () => {
+    if (!NATIVE) return toast('Scannen funktioniert in der Android-App');
+    try {
+      const { available } = await native('BarcodeScanner', 'isGoogleBarcodeScannerModuleAvailable', {});
+      if (!available) {
+        await native('BarcodeScanner', 'installGoogleBarcodeScannerModule', {});
+        return toast('Scanner wird installiert – bitte gleich nochmal tippen');
+      }
+      const { barcodes } = await native('BarcodeScanner', 'scan', {});
+      const code = barcodes?.[0]?.rawValue;
+      if (!code) return toast('Kein Code erkannt');
+      const bekannt = items.find((m) => m.barcode === code);
+      go(bekannt ? `#/material/${bekannt.id}` : `#/material/neu?barcode=${encodeURIComponent(code)}`);
+    } catch {
+      toast('Scannen nicht möglich');
+    }
   });
 
   $('#vorlagen')?.addEventListener('click', async () => {
@@ -158,12 +176,12 @@ route('/material', async (_, q) => {
   });
 });
 
-route('/material/neu', () => materialForm(null));
+route('/material/neu', (_, q) => materialForm(null, q));
 route('/material/:id', async ({ id }) => materialForm(await DB.get('material', id)));
 
-async function materialForm(m) {
+async function materialForm(m, q = {}) {
   const isNew = !m;
-  m = m || { id: DB.uid(), name: '', einheit: 'Flasche', kategorie: MAT_KATEGORIEN[0], bestand: 1, mindest: 1, soll: 3, proEinsatz: 0, proWinter: 0, preis: 0, notiz: '' };
+  m = m || { id: DB.uid(), name: '', einheit: 'Flasche', kategorie: MAT_KATEGORIEN[0], bestand: 1, mindest: 1, soll: 3, proEinsatz: 0, proWinter: 0, preis: 0, notiz: '', barcode: q.barcode || '' };
   const existing = isNew ? [] : await DB.by('photos', 'visitId', m.id);
   const pending = [];
   render(isNew ? 'Neues Material' : m.name, `
@@ -187,6 +205,7 @@ async function materialForm(m) {
       <p class="muted small">Beispiel: Ein 10-l-Kanister reicht für etwa 20 Reinigungen → 0,05 je Reinigung. Ein Sack Splitt reicht für etwa 3 Einsätze → 0,3.</p>
       <label>Preis je Einheit (€)<input name="preis" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(m.preis)}"></label>
       <label>Notiz<input name="notiz" value="${esc(m.notiz)}"></label>
+      <label>Barcode <span class="muted small">(wird beim Scannen eingetragen)</span><input name="barcode" value="${esc(m.barcode || '')}"></label>
       <div class="label">Foto</div>
       <div id="photos"></div>
       <button class="btn block" type="submit">Speichern</button>
@@ -201,7 +220,7 @@ async function materialForm(m) {
       name: fd.get('name').trim(), einheit: fd.get('einheit').trim() || 'Stück', kategorie: fd.get('kategorie'),
       bestand: num(fd.get('bestand')), mindest: num(fd.get('mindest')), soll: num(fd.get('soll')),
       proEinsatz: num(fd.get('proEinsatz')), proWinter: num(fd.get('proWinter')),
-      preis: toCents(fd.get('preis')), notiz: fd.get('notiz').trim(),
+      preis: toCents(fd.get('preis')), notiz: fd.get('notiz').trim(), barcode: fd.get('barcode').trim(),
     });
     await DB.put('material', m);
     await savePhotos(m.id, pending);
