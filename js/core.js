@@ -354,10 +354,12 @@ function planning({ objects, visits, appointments }) {
     if (o.aktiv === false || !(o.intervallTage > 0)) continue;
     if (items.some((i) => i.objektId === o.id)) continue;
     const last = lastVisit(visits, o.id);
-    if (!last) continue;
+    if (!last && !o.startdatum) continue;
     // Ein übersprungener Termin (Abwesenheit) setzt den Zyklus neu auf dieses Datum
-    const basis = [last.datum, ...(o.uebersprungen || [])].sort().pop();
-    const datum = snapWeekday(addDays(basis, o.intervallTage), o.wochentag);
+    const basis = [last?.datum, ...(o.uebersprungen || [])].filter(Boolean).sort().pop();
+    let datum = basis ? snapWeekday(addDays(basis, o.intervallTage), o.wochentag) : snapWeekday(o.startdatum, o.wochentag);
+    // Vor dem Startdatum des Hauses wird nichts geplant
+    if (o.startdatum && datum < o.startdatum) datum = snapWeekday(o.startdatum, o.wochentag);
     items.push({ type: 'faellig', datum, uhrzeit: o.uhrzeit, objektId: o.id, aufgaben: dueTasks(o, visits, datum) });
   }
   return items.sort((a, b) => (a.datum + (a.uhrzeit || '')).localeCompare(b.datum + (b.uhrzeit || '')));

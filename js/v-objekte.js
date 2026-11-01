@@ -54,6 +54,7 @@ async function objectForm(o, q) {
       ${customerSelect(customers, o.kundeId, { allowNew: true })}
       <label id="newCustomer" hidden>Name des neuen Auftraggebers<input name="neuerKunde" placeholder="z. B. Hausverwaltung Schmidt GmbH"></label>
       <label>Straße & Hausnr. *<input name="strasse" required value="${esc(o.strasse)}" placeholder="Musterstraße 5"></label>
+      <label>Startdatum <span class="muted small">(optional: vorher wird nichts geplant)</span><input type="date" name="startdatum" value="${esc(o.startdatum || '')}"></label>
       <div class="grid2">
         <label>PLZ & Ort<input name="plzOrt" value="${esc(o.plzOrt)}"></label>
         <label>Kurzname (optional)<input name="name" value="${esc(o.name)}" placeholder="z. B. Haus A"></label>
@@ -145,7 +146,7 @@ async function objectForm(o, q) {
       fotoPflicht: Number(fd.get('fotoPflicht')) || 0,
       vorOrtName: fd.get('vorOrtName').trim(),
       vorOrtTelefon: fd.get('vorOrtTelefon').trim(),
-      abrechnung: fd.get('abrechnung'),
+      abrechnung: fd.get('abrechnung'), startdatum: fd.get('startdatum') || '',
       monatspauschale: toCents(fd.get('monatspauschale')),
       stundensatz: toCents(fd.get('stundensatz')),
       winterAbrechnung: fd.get('winterAbrechnung'),
@@ -193,7 +194,7 @@ route('/objekt/:id', async ({ id }) => {
   const periodic = tl.filter((t) => t.alleTage > 0);
   const w = effectiveWage(o, data.visits);
   const addr = objAddress(o);
-  const facts = [o.etagen ? `${o.etagen} Etagen` : '', o.eingaenge > 1 ? `${o.eingaenge} Eingänge` : '', o.aufzug ? 'Aufzug' : ''].filter(Boolean);
+  const facts = [o.etagen ? `${o.etagen} Etagen` : '', o.eingaenge > 1 ? `${o.eingaenge} Eingänge` : '', o.aufzug ? 'Aufzug' : '', o.startdatum && o.startdatum > today() ? `Start ${fmtDate(o.startdatum)}` : ''].filter(Boolean);
 
   render(objLabel(o), `
     <div class="card obj-head">
