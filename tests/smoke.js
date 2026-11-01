@@ -16,7 +16,7 @@ const ROUTES = [
   '/material/:id', '/material/neu', '/mehr', '/monatsabschluss', '/nachweise', '/objekt/:id', '/objekt/:id/aushang',
   '/objekt/:id/bearbeiten', '/objekt/:id/jahr', '/objekt/:id/nachweis', '/objekt/:id/plan', '/objekt/:id/vertrag',
   '/objekt/neu', '/objekte', '/preise', '/preise/schreiben/:kid', '/rechnung/:id', '/rechnung/neu', '/rechnungen',
-  '/suche', '/fotos', '/termin/:id', '/termin/neu', '/termine', '/tour', '/winter', '/winter/:id', '/winter/:id/bearbeiten',
+  '/suche', '/fotos', '/akquise', '/akquise/neu', '/termin/:id', '/termin/neu', '/termine', '/tour', '/winter', '/winter/:id', '/winter/:id/bearbeiten',
   '/winter/neu', '/winter/protokoll/:id',
 ];
 

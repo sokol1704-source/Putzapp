@@ -26,6 +26,7 @@ route('/', async () => {
   // Mit automatischer Sicherung (Android-App) reicht es, ab und zu eine Kopie in die Cloud zu legen
   const backupDue = data.visits.length > 0 && (!S.letzteSicherung || daysBetween(S.letzteSicherung, t) > (S.letzteAutoSicherung ? 30 : 7));
   const ueberfaellig = data.invoices.filter((i) => i.status === 'offen' && i.faellig < t);
+  const akquiseDue = (await DB.all('akquise')).filter(akquiseFaellig).length;
   const morgenPlan = plan.filter((p) => p.datum === addDays(t, 1) && p.objektId);
   const preisAlt = data.objects.filter((o) => o.aktiv !== false && isMonthly(o) && !o.neuerPreis && (() => {
     const letzte = o.preisHistorie?.length ? o.preisHistorie[o.preisHistorie.length - 1].ab : data.visits.filter((v) => v.objektId === o.id).map((v) => v.datum).sort()[0];
@@ -62,6 +63,7 @@ route('/', async () => {
     </div>`}
     ${morgenPlan.length ? `<a class="card hint" href="#/bestaetigen">📨 <b>Morgen ${morgenPlan.length} ${morgenPlan.length === 1 ? 'Termin' : 'Termine'}</b> – Auftraggeber kurz Bescheid geben.</a>` : ''}
     ${preisAlt.length ? `<a class="card hint" href="#/preise">📈 <b>${preisAlt.length} ${preisAlt.length === 1 ? 'Haus hat' : 'Häuser haben'} seit über einem Jahr keine Preisanpassung.</b> Eine frühe Ankündigung ist fair.</a>` : ''}
+    ${akquiseDue ? `<a class="card hint" href="#/akquise">🎯 <b>${akquiseDue} ${akquiseDue === 1 ? 'Interessent wartet' : 'Interessenten warten'} auf Nachfassen.</b> Eine kurze Nachricht hilft oft.</a>` : ''}
     ${maengelAlt ? `<a class="card hint" href="#/maengel">⏰ <b>${maengelAlt} ${maengelAlt === 1 ? 'Mangel ist' : 'Mängel sind'} seit über ${NACHFASS_TAGE} Tagen offen.</b> Kurz bei der Verwaltung nachhaken.</a>` : ''}
     ${angeboteAlt ? `<a class="card hint" href="#/angebote">✉️ <b>${angeboteAlt} ${angeboteAlt === 1 ? 'Angebot wartet' : 'Angebote warten'} auf Antwort.</b> Eine Nachfrage hilft oft.</a>` : ''}
     ${backupDue ? `<a class="card hint" href="#/einstellungen">💾 <b>Zeit für eine Datensicherung!</b> ${S.letzteSicherung ? `Die letzte ist vom ${fmtDate(S.letzteSicherung)}.` : 'Du hast noch keine erstellt.'} Alle Daten liegen nur auf diesem Handy.</a>` : ''}

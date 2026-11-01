@@ -1,7 +1,7 @@
 // Kleiner Wrapper um IndexedDB. Alle Daten bleiben lokal auf dem Gerät.
 const DB = (() => {
   const NAME = 'toths-reinigung';
-  const VERSION = 4;
+  const VERSION = 5;
   // Tabelle → Indizes. Fotos gehören über "visitId" zu einem Einsatz, Mangel oder Winterdienst-Eintrag.
   const STORES = {
     customers: [],
@@ -18,6 +18,7 @@ const DB = (() => {
     fahrten: [],
     unterschriften: [],
     material: [],
+    akquise: [],
   };
   let dbPromise;
 

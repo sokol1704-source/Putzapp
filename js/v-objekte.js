@@ -310,10 +310,17 @@ route('/objekt/:id/plan', async ({ id }, q) => {
 });
 
 /* ---------- Auftraggeber ---------- */
+// Umschalter oben: Auftraggeber | Akquise
+const kundenSeg = (aktiv) => `<div class="seg mt">
+  <a href="#/kunden" class="${aktiv === 'kunden' ? 'active' : ''}">👥 Auftraggeber</a>
+  <a href="#/akquise" class="${aktiv === 'akquise' ? 'active' : ''}">🎯 Akquise</a>
+</div>`;
+
 route('/kunden', async () => {
   const data = await loadAll();
   render('Auftraggeber', `
-    <a class="btn block" href="#/kunde/neu">+ Auftraggeber</a>
+    ${kundenSeg('kunden')}
+    <a class="btn block mt" href="#/kunde/neu">+ Auftraggeber</a>
     <div class="mt">${data.customers.map((c) => {
       const objs = data.objects.filter((o) => o.kundeId === c.id);
       const offen = data.invoices.filter((i) => i.kundeId === c.id && i.status === 'offen');
@@ -406,3 +413,80 @@ route('/kunde/:id', async ({ id }) => {
     ${invoices.map((i) => invoiceCard(i)).join('') || '<div class="empty small">Noch keine Rechnungen. Sie entstehen aus abgerechneten Einsätzen.</div>'}
   `);
 });
+
+/* ---------- Akquise: Verwaltungen, die noch kein Auftraggeber sind ---------- */
+const AKQ_STATUS = { neu: ['neu', 'soft'], kontaktiert: ['kontaktiert', 'warn'], termin: ['Termin', 'ok'], gewonnen: ['gewonnen', 'ok'], abgesagt: ['abgesagt', 'soft'] };
+const akquiseFaellig = (a) => ['neu', 'kontaktiert'].includes(a.status) && daysBetween(a.letzterKontakt || a.erstellt, today()) >= NACHFASS_TAGE;
+
+route('/akquise', async (_, q) => {
+  const liste = (await DB.all('akquise')).sort((a, b) => (a.letzterKontakt || a.erstellt).localeCompare(b.letzterKontakt || b.erstellt));
+  const filter = q.filter || 'offen';
+  const gezeigt = liste.filter((a) => (filter === 'offen' ? !['gewonnen', 'abgesagt'].includes(a.status) : a.status === filter));
+  const faellig = liste.filter(akquiseFaellig).length;
+  render('Akquise', `
+    ${kundenSeg('akquise')}
+    <a class="btn block mt" href="#/akquise/neu">+ Interessent</a>
+    <div class="seg mt">
+      <a href="#/akquise?filter=offen" class="${filter === 'offen' ? 'active' : ''}">Offen</a>
+      <a href="#/akquise?filter=gewonnen" class="${filter === 'gewonnen' ? 'active' : ''}">Gewonnen</a>
+      <a href="#/akquise?filter=abgesagt" class="${filter === 'abgesagt' ? 'active' : ''}">Abgesagt</a>
+    </div>
+    ${faellig && filter === 'offen' ? `<div class="card hint mt">⏰ <b>${faellig} ${faellig === 1 ? 'Verwaltung wartet' : 'Verwaltungen warten'} auf Nachfassen.</b> Die Karten sind oben markiert.</div>` : ''}
+    <div class="mt">${gezeigt.map((a) => `<a class="card link ${akquiseFaellig(a) ? 'urgent' : ''}" href="#/akquise/${a.id}">
+      <div class="row between"><b>🎯 ${esc(a.name)}</b><span class="badge ${AKQ_STATUS[a.status][1]}">${AKQ_STATUS[a.status][0]}</span></div>
+      <div class="muted small">${esc(a.ort || '')}${a.letzterKontakt ? ` · letzter Kontakt ${fmtDate(a.letzterKontakt)}` : ' · noch nicht kontaktiert'}${akquiseFaellig(a) ? ' · <b>nachfassen</b>' : ''}</div>
+    </a>`).join('') || `<div class="empty">Keine Interessenten ${filter === 'offen' ? 'offen' : filter}.<br><span class="small">Trag Hausverwaltungen ein, die du gern als Kunden hättest.</span></div>`}</div>
+  `, { tab: '', back: true });
+});
+
+route('/akquise/neu', () => akquiseForm(null));
+route('/akquise/:id', async ({ id }) => akquiseForm(await DB.get('akquise', id)));
+
+async function akquiseForm(a) {
+  const isNew = !a;
+  a = a || { id: DB.uid(), name: '', ansprechpartner: '', ort: '', telefon: '', email: '', status: 'neu', letzterKontakt: '', notiz: '', erstellt: today() };
+  render(isNew ? 'Neuer Interessent' : a.name, `
+    <form id="f" class="form">
+      <label>Name der Verwaltung *<input name="name" required value="${esc(a.name)}" placeholder="z. B. Hausverwaltung Schmidt"></label>
+      <div class="grid2">
+        <label>Ansprechpartner<input name="ansprechpartner" value="${esc(a.ansprechpartner)}"></label>
+        <label>Ort<input name="ort" value="${esc(a.ort)}" placeholder="z. B. Mannheim"></label>
+      </div>
+      <div class="grid2">
+        <label>Telefon<input name="telefon" type="tel" value="${esc(a.telefon)}"></label>
+        <label>E-Mail<input name="email" type="email" value="${esc(a.email)}"></label>
+      </div>
+      <label>Status<select name="status">${Object.entries(AKQ_STATUS).map(([k, [l]]) => `<option value="${k}" ${k === a.status ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label>Letzter Kontakt<input type="date" name="letzterKontakt" value="${esc(a.letzterKontakt)}"></label>
+      <label>Notiz<textarea name="notiz" rows="3">${esc(a.notiz)}</textarea></label>
+      <button class="btn block" type="submit">Speichern</button>
+      ${isNew ? '' : `
+        ${a.status !== 'gewonnen' ? '<button class="btn ghost block" type="button" id="gewonnen">🎉 Gewonnen – als Auftraggeber übernehmen</button>' : (a.kundeId ? `<a class="btn ghost block" href="#/kunde/${a.kundeId}">👥 Zum Auftraggeber</a>` : '')}
+        ${a.telefon ? `<a class="btn ghost block" href="tel:${esc(a.telefon.replace(/\s/g, ''))}">📞 Anrufen</a>` : ''}
+        <button class="btn danger ghost block" type="button" id="del">Löschen</button>`}
+    </form>
+  `, { tab: '', back: true });
+  $('#f').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const alt = a.status;
+    Object.assign(a, { name: fd.get('name').trim(), ansprechpartner: fd.get('ansprechpartner').trim(), ort: fd.get('ort').trim(), telefon: fd.get('telefon').trim(), email: fd.get('email').trim(), status: fd.get('status'), letzterKontakt: fd.get('letzterKontakt') || '', notiz: fd.get('notiz').trim() });
+    if (alt !== a.status && a.status !== 'neu') a.letzterKontakt = a.letzterKontakt || today();
+    await DB.put('akquise', a);
+    toast('✓ Gespeichert');
+    go('#/akquise', true);
+  });
+  $('#gewonnen')?.addEventListener('click', async () => {
+    if (!confirm(`${a.name} als Auftraggeber übernehmen? Der Eintrag wird in die Auftraggeber verschoben.`)) return;
+    const k = await DB.put('customers', { name: a.name, ansprechpartner: a.ansprechpartner || '', strasse: '', plzOrt: a.ort || '', telefon: a.telefon || '', email: a.email || '', privat: false, notizen: a.notiz || '' });
+    Object.assign(a, { status: 'gewonnen', kundeId: k.id, letzterKontakt: today() });
+    await DB.put('akquise', a);
+    toast('🎉 Auftraggeber angelegt');
+    go(`#/kunde/${k.id}`, true);
+  });
+  $('#del')?.addEventListener('click', async () => {
+    if (!confirm(`„${a.name}“ löschen?`)) return;
+    await DB.del('akquise', a.id);
+    go('#/akquise', true);
+  });
+}
