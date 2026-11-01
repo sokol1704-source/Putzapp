@@ -52,7 +52,7 @@ route('/einstellungen', async () => {
         <label>Steuer-Rücklage (% vom Gewinn, Richtwert)<input name="steuerRuecklage" type="number" min="0" max="100" inputmode="numeric" value="${esc(S.steuerRuecklage ?? 25)}"></label>
         <p class="muted small">Format: ${esc(S.nrPrefix)}-${new Date().getFullYear()}-001. Die Nummern werden lückenlos fortlaufend vergeben. Als Kleinunternehmer musst du keine E-Rechnung ausstellen – die PDF reicht.</p>
         <button class="btn block" type="submit">Speichern</button>
-      `, { offen: true })}
+      `)}
     </form>
 
     ${gruppe('🔔 Erinnerungen & Wetter', `
@@ -63,7 +63,7 @@ route('/einstellungen', async () => {
       <label class="mt">Ort für die Wettervorhersage
         <div class="row gap"><input id="wOrt" value="${esc(S.wetterOrt?.name || '')}" placeholder="z. B. Mannheim"><button class="btn small" type="button" id="wSearch">Suchen</button></div>
       </label>
-    `, { offen: true })}
+    `)}
 
     ${gruppe('💾 Datensicherung', `
       <p class="small">Alle Daten und Fotos liegen <b>nur auf diesem Handy</b>. Erstelle regelmäßig eine Sicherung und speichere sie z. B. in Google Drive – Rechnungen musst du 10 Jahre aufbewahren.</p>
@@ -75,7 +75,7 @@ route('/einstellungen', async () => {
         <button class="btn" id="export">⬇️ Sicherung erstellen</button>
         <label class="btn ghost">⬆️ Wiederherstellen<input type="file" id="import" accept="application/json,.json" hidden></label>
       </div>
-    `, { offen: true })}
+    `)}
 
     ${gruppe('🔒 Sicherheit', `
       ${NATIVE ? `<label class="check"><input type="checkbox" id="appSperre" ${S.appSperre ? 'checked' : ''}> App mit Fingerabdruck sperren</label>
