@@ -39,6 +39,22 @@ route('/', async () => {
   const firstName = (S.inhaber || '').split(' ')[0];
   const todayCount = heute.length + overdue.length;
 
+  // Alle offenen Punkte in einer Karte zusammenfassen
+  const punkte = [
+    ueberfaellig.length && ['💶', `${ueberfaellig.length} ${ueberfaellig.length === 1 ? 'Rechnung ist' : 'Rechnungen sind'} überfällig`, '#/rechnungen'],
+    morgenPlan.length && ['📨', `Morgen ${morgenPlan.length} ${morgenPlan.length === 1 ? 'Termin' : 'Termine'} – Auftraggeber Bescheid geben`, '#/bestaetigen'],
+    preisAlt.length && ['📈', `${preisAlt.length} ${preisAlt.length === 1 ? 'Haus ohne' : 'Häuser ohne'} Preisanpassung seit über einem Jahr`, '#/preise'],
+    akquiseDue && ['🎯', `${akquiseDue} ${akquiseDue === 1 ? 'Interessent wartet' : 'Interessenten warten'} auf Nachfassen`, '#/akquise'],
+    maengelAlt && ['⏰', `${maengelAlt} ${maengelAlt === 1 ? 'Mangel' : 'Mängel'} seit über ${NACHFASS_TAGE} Tagen offen`, '#/maengel'],
+    angeboteAlt && ['✉️', `${angeboteAlt} ${angeboteAlt === 1 ? 'Angebot wartet' : 'Angebote warten'} auf Antwort`, '#/angebote'],
+    backupDue && ['💾', 'Zeit für eine Datensicherung', '#/einstellungen'],
+    !settingsComplete() && ['⚠️', 'Firmendaten fehlen für korrekte Rechnungen', '#/einstellungen'],
+  ].filter(Boolean);
+  const hinweisKarte = punkte.length === 0 ? '' : `<div class="card hinweise">
+    <div class="row between"><b>📌 Zu erledigen</b><span class="badge warn">${punkte.length}</span></div>
+    ${punkte.map(([icon, text, href]) => `<a class="hinweis" href="${href}"><span>${icon}</span><span class="grow">${text}</span><span class="muted">›</span></a>`).join('')}
+  </div>`;
+
   render(S.firma, `
     <div class="hero">
       <div class="hero-bubbles"><span></span><span></span><span></span><span></span></div>
@@ -50,7 +66,7 @@ route('/', async () => {
         <a class="btn glass" href="#/einsatz/neu">🧽 Einsatz erfassen</a>
       </div>
     </div>
-    ${ueberfaellig.length ? `<a class="card hint" href="#/rechnungen">💶 <b>${ueberfaellig.length} ${ueberfaellig.length === 1 ? 'Rechnung ist' : 'Rechnungen sind'} überfällig</b> – zusammen ${money(ueberfaellig.reduce((s, i) => s + i.summe, 0))}. Erinnerung oder Mahnung mit einem Klick.</a>` : ''}
+    ${hinweisKarte}
     ${data.objects.length ? '' : `<div class="card">
       <b>👋 So fängst du an</b>
       <ol class="small">
@@ -61,13 +77,6 @@ route('/', async () => {
       </ol>
       <div class="muted small">Für eine Vertretung: Im Haus stehen Zugang, Aufgaben und die Fotopflicht. Alles bleibt auf diesem Handy, mach deshalb regelmäßig eine Sicherung.</div>
     </div>`}
-    ${morgenPlan.length ? `<a class="card hint" href="#/bestaetigen">📨 <b>Morgen ${morgenPlan.length} ${morgenPlan.length === 1 ? 'Termin' : 'Termine'}</b> – Auftraggeber kurz Bescheid geben.</a>` : ''}
-    ${preisAlt.length ? `<a class="card hint" href="#/preise">📈 <b>${preisAlt.length} ${preisAlt.length === 1 ? 'Haus hat' : 'Häuser haben'} seit über einem Jahr keine Preisanpassung.</b> Eine frühe Ankündigung ist fair.</a>` : ''}
-    ${akquiseDue ? `<a class="card hint" href="#/akquise">🎯 <b>${akquiseDue} ${akquiseDue === 1 ? 'Interessent wartet' : 'Interessenten warten'} auf Nachfassen.</b> Eine kurze Nachricht hilft oft.</a>` : ''}
-    ${maengelAlt ? `<a class="card hint" href="#/maengel">⏰ <b>${maengelAlt} ${maengelAlt === 1 ? 'Mangel ist' : 'Mängel sind'} seit über ${NACHFASS_TAGE} Tagen offen.</b> Kurz bei der Verwaltung nachhaken.</a>` : ''}
-    ${angeboteAlt ? `<a class="card hint" href="#/angebote">✉️ <b>${angeboteAlt} ${angeboteAlt === 1 ? 'Angebot wartet' : 'Angebote warten'} auf Antwort.</b> Eine Nachfrage hilft oft.</a>` : ''}
-    ${backupDue ? `<a class="card hint" href="#/einstellungen">💾 <b>Zeit für eine Datensicherung!</b> ${S.letzteSicherung ? `Die letzte ist vom ${fmtDate(S.letzteSicherung)}.` : 'Du hast noch keine erstellt.'} Alle Daten liegen nur auf diesem Handy.</a>` : ''}
-    ${settingsComplete() ? '' : `<a class="card hint" href="#/einstellungen">⚠️ <b>Firmendaten fehlen.</b> Für korrekte Rechnungen bitte Name, Anschrift und Steuernummer eintragen.</a>`}
     ${fastLeer.length ? `<a class="card link shop-hint" href="#/material?tab=einkauf"><div class="row between"><b>🛒 ${fastLeer.length} ${fastLeer.length === 1 ? 'Sache' : 'Sachen'} fast leer</b><span class="muted">›</span></div>
       <div class="muted small">${esc(fastLeer.map((m) => m.name).join(', '))}</div></a>` : ''}
     <div id="weather"></div>

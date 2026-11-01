@@ -935,3 +935,8 @@ details.grp.gefahr > summary { color: var(--danger); }
 .kpi-klein .kpi { padding: 10px 14px; }
 .kpi-klein .kpi b { font-size: 18px; }
 .card.next { border-left: 4px solid var(--brand); }
+
+/* Zu erledigen (Startseite) */
+.hinweise a.hinweis { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--border); color: var(--text); font-size: 15px; }
+.hinweise a.hinweis span:first-child { width: 26px; text-align: center; }
+.hinweise .grow { flex: 1; }

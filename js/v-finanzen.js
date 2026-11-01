@@ -366,7 +366,7 @@ route('/buchhaltung/tipps', () => {
     <div class="grp-body"><div class="small">${text}</div></div>
   </details>`;
   render('Tipps & Infos', `
-    <p class="muted small">Eine Zusammenfassung für Kleingewerbe, Stand 2026. Sie ersetzt keine Steuerberatung. Bei Unsicherheit fragst du die Kammer oder dein Steuerbüro.</p>
+    <div class="card hint"><b>Stand 2026, ohne Gewähr.</b> Maßgeblich sind das Einkommensteuergesetz, das Umsatzsteuergesetz und die Verwaltungsanweisungen. Bei Unsicherheit frag das Finanzamt, die Kammer oder einen Steuerberater. Die offiziellen Quellen findest du bei ELSTER und beim Bundesfinanzministerium.</div>
     ${punkt('🧾 Belege aufbewahren', `<p>Buchungsbelege (Rechnungen, Kassenbons, Kontoauszüge) musst du <b>10 Jahre</b> aufbewahren. Die App speichert Belegfotos an der Ausgabe. Halte zusätzlich eine Sicherung bereit.</p>`, true)}
     ${punkt('💶 Was du absetzen kannst', `<ul>
       <li>Reinigungsmittel, Material, Arbeitskleidung, Werkzeug</li>
