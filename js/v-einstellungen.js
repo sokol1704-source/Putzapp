@@ -47,6 +47,7 @@ route('/einstellungen', async () => {
     <a class="card link mt" href="#/gruendung"><div class="row between"><b>🚀 Gründungs-Checkliste</b><span class="muted">›</span></div></a>
 
     <button class="btn ghost block mt" type="button" id="einfZeigen">📖 Einführung noch einmal anzeigen</button>
+    ${NATIVE ? `<label class="check mt"><input type="checkbox" id="appSperre" ${S.appSperre ? 'checked' : ''}> App mit Fingerabdruck sperren</label>` : ''}
 
     <h3 class="section">🔔 Erinnerungen & Wetter</h3>
     <div class="card form">
@@ -84,7 +85,7 @@ route('/einstellungen', async () => {
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
     </div>`}
-    <p class="muted small center">Toths Reinigungsservice · Version 2.31</p>
+    <p class="muted small center">Toths Reinigungsservice · Version 2.32</p>
   `);
 
   $('#f').addEventListener('submit', async (e) => {
@@ -124,6 +125,7 @@ route('/einstellungen', async () => {
   $('#import').addEventListener('change', (e) => e.target.files[0] && importBackup(e.target.files[0]));
   $('#factoryReset').addEventListener('click', factoryReset);
   $('#einfZeigen').addEventListener('click', () => zeigeEinfuehrung(true));
+  $('#appSperre')?.addEventListener('change', async (e) => { S.appSperre = e.target.checked; await saveSettings(); toast(S.appSperre ? '🔒 Sperre aktiv' : 'Sperre aus'); });
 });
 
 async function factoryReset() {

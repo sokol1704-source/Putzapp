@@ -1,6 +1,6 @@
 {
   "name": "toths-reinigungsservice",
-  "version": "2.31.0",
+  "version": "2.32.0",
   "private": true,
   "description": "Handy-App für Toths Reinigungsservice",
   "scripts": {
@@ -10,6 +10,7 @@
     "test:smoke": "node tests/smoke.js"
   },
   "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "^10.0.0",
     "@capacitor-mlkit/barcode-scanning": "^8.2.2",
     "@capacitor-mlkit/text-recognition": "^8.2.2",
     "@capawesome-team/capacitor-android-foreground-service": "^8.1.0",

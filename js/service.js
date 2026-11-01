@@ -122,27 +122,44 @@ async function notificationsAllowed(ask = true) {
 
 // Plant die Erinnerungen der nächsten Tage neu: am Vorabend die Häuser für morgen, bei Glättegefahr eine Warnung.
 let lastSchedule = 0;
-// Solange die Zeitmessung läuft: feste Benachrichtigung mit Startzeit, bleibt bis zum Beenden stehen
+// Solange die Zeitmessung läuft: Vordergrunddienst mit laufender Zeit (Minuten, aktualisiert sich jede Minute).
+// Schlägt der Dienst fehl, bleibt die feste Benachrichtigung mit Startzeit.
 const TIMER_NOTIFICATION_ID = 4001;
+let timerUpdate = null;
 async function zeigeTimerBenachrichtigung(objektId) {
   if (!NATIVE) return;
+  clearInterval(timerUpdate);
+  timerUpdate = null;
+  if (!S.timer) {
+    await native('ForegroundService', 'stopForegroundService', {}).catch(() => {});
+    await native('LocalNotifications', 'cancel', { notifications: [{ id: TIMER_NOTIFICATION_ID }] }).catch(() => {});
+    return;
+  }
+  const o = await DB.get('objects', objektId || S.timer.objektId);
+  const start = new Date(S.timer.start);
+  const titel = '⏱️ Zeitmessung läuft';
+  const text = () => {
+    const min = Math.max(0, Math.floor((Date.now() - start) / 60000));
+    return `${objLabel(o)} · seit ${pad(start.getHours())}:${pad(start.getMinutes())} · ${min} Min.`;
+  };
   try {
-    if (!S.timer) {
-      await native('LocalNotifications', 'cancel', { notifications: [{ id: TIMER_NOTIFICATION_ID }] });
-      return;
-    }
-    const o = await DB.get('objects', objektId || S.timer.objektId);
-    const start = new Date(S.timer.start);
-    await native('LocalNotifications', 'schedule', { notifications: [{
-      id: TIMER_NOTIFICATION_ID,
-      title: `⏱️ Zeitmessung läuft seit ${pad(start.getHours())}:${pad(start.getMinutes())}`,
-      body: `${objLabel(o)} – zum Beenden in der App auf „Fertig“ tippen`,
-      schedule: { at: new Date(Date.now() + 500).toISOString() },
-      ongoing: true,
-      autoCancel: false,
-    }] });
+    const optionen = () => ({ id: TIMER_NOTIFICATION_ID, title: titel, body: text(), smallIcon: 'ic_stat_toths', silent: true });
+    await native('ForegroundService', 'startForegroundService', optionen());
+    timerUpdate = setInterval(() => native('ForegroundService', 'updateForegroundService', optionen()).catch(() => {}), 60000);
   } catch {
-    // ohne Benachrichtigungs-Erlaubnis läuft die Zeitmessung trotzdem weiter
+    // Rückfall: feste Benachrichtigung mit Startzeit
+    try {
+      await native('LocalNotifications', 'schedule', { notifications: [{
+        id: TIMER_NOTIFICATION_ID,
+        title: `${titel} seit ${pad(start.getHours())}:${pad(start.getMinutes())}`,
+        body: `${objLabel(o)} – zum Beenden in der App auf „Fertig“ tippen`,
+        schedule: { at: new Date(Date.now() + 500).toISOString() },
+        ongoing: true,
+        autoCancel: false,
+      }] });
+    } catch {
+      // ohne Benachrichtigungs-Erlaubnis läuft die Zeitmessung trotzdem weiter
+    }
   }
 }
 

@@ -885,3 +885,9 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 }
 .foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .foto-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }
+
+/* App-Sperre */
+.sperre { position: fixed; inset: 0; background: var(--bg); display: grid; place-items: center; z-index: 2000; padding: 20px; }
+.sperre-card { background: var(--card); color: var(--text); border-radius: 20px; padding: 28px 22px; max-width: 360px; text-align: center; }
+.sperre-card p { color: var(--muted); }
+.gesperrt .topbar, .gesperrt .tabbar { filter: blur(4px); }

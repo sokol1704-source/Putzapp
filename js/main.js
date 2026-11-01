@@ -275,6 +275,43 @@ function zeigeEinfuehrung(erneut = false) {
   document.body.appendChild(huelle);
 }
 
+/* ---------- App-Sperre mit Fingerabdruck (nur Android) ---------- */
+const SPERRE_NACH_MS = 30000; // nach 30 Sekunden im Hintergrund wieder sperren
+let entsperrtUm = Date.now();
+
+async function sperrenWennNoetig(sofort = false) {
+  if (!NATIVE || !S.appSperre) return;
+  if (!sofort && Date.now() - entsperrtUm < SPERRE_NACH_MS) return;
+  document.body.classList.add('gesperrt');
+  let sperre = document.querySelector('.sperre');
+  if (!sperre) {
+    sperre = document.createElement('div');
+    sperre.className = 'sperre';
+    sperre.innerHTML = '<div class="sperre-card"><div class="einf-icon">🔒</div><h2>Toths Reinigungsservice</h2><p>Bitte mit Fingerabdruck oder Gerätesperre entsperren.</p><button class="btn" type="button" id="entsperren">Entsperren</button></div>';
+    document.body.appendChild(sperre);
+    sperre.querySelector('#entsperren').addEventListener('click', () => entsperren());
+  }
+  entsperren();
+}
+
+async function entsperren() {
+  try {
+    const { isAvailable } = await native('BiometricAuthNative', 'checkBiometry', {});
+    // Ohne Fingerabdruck oder Gerätesperre nicht aussperren
+    if (!isAvailable) return entsperrtVerlassen();
+    await native('BiometricAuthNative', 'internalAuthenticate', { reason: 'Toths Reinigungsservice entsperren', androidTitle: 'Entsperren', cancelTitle: 'Abbrechen', allowDeviceCredential: true });
+    entsperrtVerlassen();
+  } catch {
+    // Abgebrochen: Sperre bleibt, der Knopf zum Erneutversuchen steht darauf
+  }
+}
+
+function entsperrtVerlassen() {
+  entsperrtUm = Date.now();
+  document.querySelector('.sperre')?.remove();
+  document.body.classList.remove('gesperrt');
+}
+
 /* ---------- Start ---------- */
 window.addEventListener('hashchange', router);
 
@@ -293,6 +330,9 @@ window.addEventListener('hashchange', router);
   updateTimerPill();
   setupBackButton();
   if (!S.einfuehrung) zeigeEinfuehrung();
+  if (S.timer) zeigeTimerBenachrichtigung(S.timer.objektId);
+  sperrenWennNoetig(true);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sperrenWennNoetig(); });
   autoBackup();
   scheduleNotifications();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleNotifications(); });
