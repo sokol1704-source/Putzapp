@@ -906,3 +906,6 @@ details.grp .grp-body { padding: 0 18px 18px; }
 details.grp .grp-sub { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; font-weight: 600; }
 details.grp.gefahr { border: 1px solid var(--danger); }
 details.grp.gefahr > summary { color: var(--danger); }
+
+/* Schnellzugriffe bündig ausrichten (ohne den Abstand zwischen Karten) */
+.grp-schnell > * { margin: 0 !important; align-self: stretch; }
