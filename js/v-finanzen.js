@@ -331,19 +331,7 @@ route('/buchhaltung', async () => {
   const offen = invoices.filter((i) => i.status === 'offen');
   const overdue = offen.filter((i) => i.faellig < today());
   const objects = await DB.all('objects');
-  const visits = await DB.all('visits');
   const belegeFehlen = d.aus.filter((a) => !a.fotoAnzahl).length;
-  // Jahresabschluss-Checkliste: was am Jahresende erledigt sein sollte
-  const monatStart = `${today().slice(0, 7)}-01`;
-  const abzurechnen = visits.filter((v) => v.datum.startsWith(jahr) && !v.rechnungId && v.datum < monatStart).length;
-  const sicherungJung = S.letzteSicherung && daysBetween(S.letzteSicherung, today()) <= 30;
-  const checks = [
-    ['Keine offenen Rechnungen', offen.length === 0, '#/rechnungen?filter=offen'],
-    ['Alle Ausgaben haben ein Belegfoto', belegeFehlen === 0, '#/ausgaben'],
-    ['Alle vergangenen Einsätze sind abgerechnet', abzurechnen === 0, '#/monatsabschluss'],
-    ['Datensicherung in den letzten 30 Tagen', !!sicherungJung, '#/einstellungen'],
-    ['Fahrtenbuch vollständig', (await DB.all('fahrten')).filter((f) => yearOf(f.datum) === jahr && fahrtMaengel(f).length).length === 0, '#/fahrten'],
-  ];
   render('Buchhaltung', `
     <div class="card profit">
       <div class="muted small">Gewinn ${jahr} (vorläufig)</div>
@@ -354,11 +342,6 @@ route('/buchhaltung', async () => {
     </div>
     ${overdue.length ? `<a class="card hint" href="#/rechnungen?filter=offen">⏰ <b>${overdue.length} Rechnung${overdue.length === 1 ? '' : 'en'} überfällig</b> – jetzt Zahlungserinnerung schicken.</a>` : ''}
     ${belegeFehlen ? `<a class="card hint" href="#/ausgaben">🧾 Bei <b>${belegeFehlen} Ausgabe${belegeFehlen === 1 ? '' : 'n'}</b> fehlt noch das Belegfoto.</a>` : ''}
-    <div class="card mt">
-      <b>✅ Jahresabschluss ${jahr}</b>
-      <ul class="done-list mt">${checks.map(([text, ok, href]) => `<li class="${ok ? 'ok' : 'no'}">${ok ? '✓' : '✗'} <a href="${href}">${text}</a></li>`).join('')}</ul>
-      <div class="muted small">${checks.every(([, ok]) => ok) ? 'Alles erledigt – gut gemacht.' : 'Offene Punkte vor der Steuererklärung klären.'}</div>
-    </div>
     <div class="quick">
       <a class="btn" href="#/ausgabe/neu">🧾 Ausgabe erfassen</a>
       <a class="btn ghost" href="#/fahrt/neu">🚗 Fahrt eintragen</a>
