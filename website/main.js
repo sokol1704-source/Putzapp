@@ -7,7 +7,8 @@ const KONTAKT = {
   email: '',          // z. B. 'info@toths-reinigung.de'
 };
 // Richtwerte für den Preis-Schnellcheck (Euro je Reinigung)
-const PREISE = { proEtage: 8, aufzug: 6, keller: 10, aussen: 8, winterJeEinsatz: 25 };
+// Gleiche Richtwerte wie in der App (Angebotsrechner), je Reinigung in Euro
+const PREISE = { proEtage: 12, aufzug: 8, keller: 15, aussen: 10, muellplatz: 7, dachboden: 10, winterJeEinsatz: 25 };
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -54,6 +55,8 @@ function updatePrice() {
   if (f.aufzug.checked) jeReinigung += PREISE.aufzug * eingaenge;
   if (f.keller.checked) jeReinigung += PREISE.keller;
   if (f.aussen.checked) jeReinigung += PREISE.aussen;
+  if (f.muellplatz.checked) jeReinigung += PREISE.muellplatz;
+  if (f.dachboden.checked) jeReinigung += PREISE.dachboden;
   const proMonat = Math.ceil((jeReinigung * (52 / 12) / (intervall / 7)) / 5) * 5;
   const target = $('#price');
   const from = Number(target.dataset.v || 0);
