@@ -26,6 +26,10 @@ route('/termine', async () => {
       <a class="aktion" href="#/termin/neu?typ=besichtigung"><span>📝</span>Angebot vor Ort</a>
       <a class="aktion" href="#/termin/neu?typ=gespraech"><span>🤝</span>Kundengespräch</a>
     </div>
+    ${data.objects.filter((o) => o.aktiv !== false && o.startdatum && o.startdatum > today()).length ? `<h3 class="section">Noch nicht gestartet</h3>
+      ${data.objects.filter((o) => o.aktiv !== false && o.startdatum && o.startdatum > today()).sort((a, b) => a.startdatum.localeCompare(b.startdatum)).map((o) => `<a class="card link" href="#/objekt/${o.id}">
+        <div class="row between"><b>🏢 ${esc(objLabel(o))}</b><span class="badge soft">ab ${fmtDate(o.startdatum)}</span></div>
+        <div class="muted small">${esc(kundeName(data.kmap, o.kundeId))}</div></a>`).join('')}` : ''}
     ${weeks.map((w) => `<h3 class="section">${weekTitle(w.monday)}</h3>${w.items.map((p) => planCard(p, data)).join('')}`).join('')
       || '<div class="empty mt">Keine anstehenden Termine.<br><span class="small">Tipp: Beim Haus unter „Plan“ alle Termine auf einmal eintragen.</span></div>'}
     ${done.length ? `<details class="mt"><summary>Erledigte Termine</summary>
