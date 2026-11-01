@@ -97,6 +97,10 @@ async function ausgabeForm(a) {
     </form>
   `);
   photoEditor($('#photos'), existing, pending, [['beleg', 'Beleg']]);
+  $('#photos').addEventListener('change', (e) => {
+    const datei = e.target.files?.[0];
+    if (datei && e.target.dataset.typ === 'beleg') belegLesen(datei, $('#f'));
+  });
   const hint = () => {
     const f = $('#f');
     const t = steuerHinweis(f.kategorie.value, toCents(f.betrag.value));
@@ -277,6 +281,45 @@ route('/finanzen', async (_, q) => {
     if (!(await shareFiles(files, `Belege ${jahr}`))) toast('Teilen wird auf diesem Gerät nicht unterstützt');
   });
 });
+// Betrag und Datum aus dem erkannten Text eines Kassenbons
+function parseBon(text) {
+  const betragRe = /(\d{1,3}(?:\.\d{3})*|\d+),(\d{2})/g;
+  const betraege = (zeile) => [...String(zeile).matchAll(betragRe)].map((m) => Math.round(parseFloat(m[1].replace(/\./g, '') + '.' + m[2]) * 100));
+  const zeilen = String(text || '').split('\n');
+  // Zuerst die Zeile mit Summe/Gesamt, sonst den größten Betrag auf dem Bon
+  const summe = zeilen.filter((z) => /zu zahlen|gesamt|summe|total/i.test(z) && betraege(z).length);
+  let betrag = summe.length ? betraege(summe[summe.length - 1]).pop() : null;
+  if (!betrag) {
+    const alle = zeilen.flatMap(betraege).filter((b) => b > 0 && b < 1000000);
+    betrag = alle.length ? Math.max(...alle) : null;
+  }
+  const datum = (() => {
+    const m = String(text || '').match(/(\d{2})\.(\d{2})\.(\d{4}|\d{2})/);
+    if (!m) return null;
+    const jahr = m[3].length === 2 ? `20${m[3]}` : m[3];
+    const iso = `${jahr}-${m[2]}-${m[1]}`;
+    return Number(m[2]) >= 1 && Number(m[2]) <= 12 && Number(m[1]) >= 1 && Number(m[1]) <= 31 ? iso : null;
+  })();
+  return { betrag, datum };
+}
+
+// Bon-Foto lesen (nur in der Android-App, im Browser gibt es keine Texterkennung)
+async function belegLesen(file, form) {
+  if (!NATIVE) return;
+  toast('🔎 Bon wird gelesen…');
+  try {
+    const data = (await blobToDataUrl(file)).split(',')[1];
+    const { uri } = await native('Filesystem', 'writeFile', { path: `bon-${Date.now()}.jpg`, data, directory: 'CACHE' });
+    const { text } = await native('TextRecognition', 'processImage', { path: uri });
+    const { betrag, datum } = parseBon(text);
+    if (betrag) form.betrag.value = (betrag / 100).toFixed(2).replace('.', ',');
+    if (datum) form.datum.value = datum;
+    toast(betrag || datum ? '✓ Gelesen – bitte Betrag und Datum prüfen' : 'Nichts erkannt – bitte von Hand eintragen');
+  } catch {
+    toast('Bon konnte nicht gelesen werden');
+  }
+}
+
 const eur2 = (cents) => (cents / 100).toFixed(2).replace('.', ',') + 'EUR';
 
 
