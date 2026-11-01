@@ -891,3 +891,18 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
 .sperre-card { background: var(--card); color: var(--text); border-radius: 20px; padding: 28px 22px; max-width: 360px; text-align: center; }
 .sperre-card p { color: var(--muted); }
 .gesperrt .topbar, .gesperrt .tabbar { filter: blur(4px); }
+
+/* Einstellungen: Gruppen */
+.grp-schnell { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.grp-schnell .card { padding: 12px; text-align: left; font: inherit; color: inherit; background: var(--card); border: 0; }
+.grp-schnell b { font-size: 14px; display: block; }
+.grp-schnell .muted { font-size: 12px; }
+details.grp { margin-top: 12px; padding: 0; overflow: hidden; }
+details.grp > summary { list-style: none; cursor: pointer; padding: 16px 18px; font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+details.grp > summary::-webkit-details-marker { display: none; }
+details.grp > summary::after { content: '›'; font-size: 22px; color: var(--muted); transition: transform .2s ease; }
+details.grp[open] > summary::after { transform: rotate(90deg); }
+details.grp .grp-body { padding: 0 18px 18px; }
+details.grp .grp-sub { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 8px; font-weight: 600; }
+details.grp.gefahr { border: 1px solid var(--danger); }
+details.grp.gefahr > summary { color: var(--danger); }

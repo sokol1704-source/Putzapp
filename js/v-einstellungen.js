@@ -5,52 +5,57 @@ route('/einstellungen', async () => {
   const field = (name, label, attrs = '') => `<label>${label}<input name="${name}" value="${esc(S[name])}" ${attrs}></label>`;
   const est = navigator.storage?.estimate ? await navigator.storage.estimate() : null;
   const persisted = navigator.storage?.persisted ? await navigator.storage.persisted() : false;
+  const gruppe = (titel, inhalt, { offen = false, klasse = '' } = {}) => `<details class="card grp ${klasse}" ${offen ? 'open' : ''}>
+      <summary>${titel}</summary>
+      <div class="grp-body">${inhalt}</div>
+    </details>`;
+  const unter = (titel) => `<div class="grp-sub">${titel}</div>`;
+
   render('Einstellungen', `
+    <div class="grp-schnell">
+      <a class="card link" href="#/leistungen"><b>💶 Leistungen & Preise</b><div class="muted small">${S.leistungen.length} Zusatzleistungen</div></a>
+      <a class="card link" href="#/gruendung"><b>🚀 Gründung</b><div class="muted small">Checkliste für den Start</div></a>
+      <button class="card link" type="button" id="einfZeigen"><b>📖 Einführung</b><div class="muted small">Noch einmal anzeigen</div></button>
+    </div>
+
     <form id="f" class="form">
-      <h3 class="section">🏷️ Firma (erscheint auf Rechnungen)</h3>
-      ${field('firma', 'Firmenname *', 'required')}
-      ${field('slogan', 'Slogan (unter dem Namen)')}
-      ${field('inhaber', 'Inhaber/in (Vor- und Nachname) *')}
-      ${field('strasse', 'Straße & Hausnr. *')}
-      ${field('plzOrt', 'PLZ & Ort *')}
-      <div class="grid2">${field('telefon', 'Telefon', 'type="tel"')}${field('email', 'E-Mail', 'type="email"')}</div>
-      ${field('steuernummer', 'Steuernummer (vom Finanzamt) *')}
-      <h3 class="section">🏦 Bankverbindung</h3>
-      ${field('bank', 'Bank')}
-      <div class="grid2">${field('iban', 'IBAN')}${field('bic', 'BIC')}</div>
-      <h3 class="section">🧾 Rechnungen & neue Häuser</h3>
-      <div class="grid2">
-        <label>Standard-Abrechnung
-          <select name="abrechnung">
-            <option value="monat" ${S.abrechnung === 'monat' ? 'selected' : ''}>Monatspauschale</option>
-            <option value="stunde" ${S.abrechnung === 'monat' ? '' : 'selected'}>Nach Stunden</option>
-          </select>
-        </label>
-        <label>Standard-Monatspauschale (€)<input name="monatspauschale" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(S.monatspauschale)}"></label>
-      </div>
-      <div class="grid2">
-        <label>Standard-Stundensatz (€)<input name="stundensatz" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(S.stundensatz)}"></label>
-        <label>Zahlungsziel (Tage)<input name="zahlungsziel" type="number" min="0" value="${esc(S.zahlungsziel)}"></label>
-      </div>
-      <div class="grid2">
-        ${field('nrPrefix', 'Nummernkreis-Präfix')}
-        <label>Erste Rechnungsnr. im Jahr<input name="nrStart" type="number" min="1" value="${esc(S.nrStart)}"></label>
-      </div>
-      <label>Steuer-Rücklage (% vom Gewinn, Richtwert)<input name="steuerRuecklage" type="number" min="0" max="100" inputmode="numeric" value="${esc(S.steuerRuecklage ?? 25)}"></label>
-      <p class="muted small">Format: ${esc(S.nrPrefix)}-${new Date().getFullYear()}-001. Die Nummern werden lückenlos fortlaufend vergeben. Als Kleinunternehmer musst du keine E-Rechnung ausstellen – die PDF reicht.</p>
-      <button class="btn block" type="submit">Speichern</button>
+      ${gruppe('🏷️ Firma & Rechnungen', `
+        ${unter('Firma (erscheint auf Rechnungen)')}
+        ${field('firma', 'Firmenname *', 'required')}
+        ${field('slogan', 'Slogan (unter dem Namen)')}
+        ${field('inhaber', 'Inhaber/in (Vor- und Nachname) *')}
+        ${field('strasse', 'Straße & Hausnr. *')}
+        ${field('plzOrt', 'PLZ & Ort *')}
+        <div class="grid2">${field('telefon', 'Telefon', 'type="tel"')}${field('email', 'E-Mail', 'type="email"')}</div>
+        ${field('steuernummer', 'Steuernummer (vom Finanzamt) *')}
+        ${unter('Bankverbindung')}
+        ${field('bank', 'Bank')}
+        <div class="grid2">${field('iban', 'IBAN')}${field('bic', 'BIC')}</div>
+        ${unter('Rechnungen & neue Häuser')}
+        <div class="grid2">
+          <label>Standard-Abrechnung
+            <select name="abrechnung">
+              <option value="monat" ${S.abrechnung === 'monat' ? 'selected' : ''}>Monatspauschale</option>
+              <option value="stunde" ${S.abrechnung === 'monat' ? '' : 'selected'}>Nach Stunden</option>
+            </select>
+          </label>
+          <label>Standard-Monatspauschale (€)<input name="monatspauschale" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(S.monatspauschale)}"></label>
+        </div>
+        <div class="grid2">
+          <label>Standard-Stundensatz (€)<input name="stundensatz" type="number" step="0.01" min="0" inputmode="decimal" value="${centsInput(S.stundensatz)}"></label>
+          <label>Zahlungsziel (Tage)<input name="zahlungsziel" type="number" min="0" value="${esc(S.zahlungsziel)}"></label>
+        </div>
+        <div class="grid2">
+          ${field('nrPrefix', 'Nummernkreis-Präfix')}
+          <label>Erste Rechnungsnr. im Jahr<input name="nrStart" type="number" min="1" value="${esc(S.nrStart)}"></label>
+        </div>
+        <label>Steuer-Rücklage (% vom Gewinn, Richtwert)<input name="steuerRuecklage" type="number" min="0" max="100" inputmode="numeric" value="${esc(S.steuerRuecklage ?? 25)}"></label>
+        <p class="muted small">Format: ${esc(S.nrPrefix)}-${new Date().getFullYear()}-001. Die Nummern werden lückenlos fortlaufend vergeben. Als Kleinunternehmer musst du keine E-Rechnung ausstellen – die PDF reicht.</p>
+        <button class="btn block" type="submit">Speichern</button>
+      `, { offen: true })}
     </form>
 
-    <a class="card link mt" href="#/leistungen"><div class="row between"><b>💶 Leistungen & Preise</b><span class="muted">›</span></div>
-      <div class="muted small">${S.leistungen.length} Zusatzleistungen, z. B. Grundreinigung, Sperrmüll, Winterdienst</div></a>
-
-    <a class="card link mt" href="#/gruendung"><div class="row between"><b>🚀 Gründungs-Checkliste</b><span class="muted">›</span></div></a>
-
-    <button class="btn ghost block mt" type="button" id="einfZeigen">📖 Einführung noch einmal anzeigen</button>
-    ${NATIVE ? `<label class="check mt"><input type="checkbox" id="appSperre" ${S.appSperre ? 'checked' : ''}> App mit Fingerabdruck sperren</label>` : ''}
-
-    <h3 class="section">🔔 Erinnerungen & Wetter</h3>
-    <div class="card form">
+    ${gruppe('🔔 Erinnerungen & Wetter', `
       ${NATIVE ? `<label class="check"><input type="checkbox" id="notif" ${S.benachrichtigungen !== false ? 'checked' : ''}> Am Vorabend an die Häuser von morgen erinnern</label>
       <label>Uhrzeit der Erinnerung<input type="time" id="notifTime" value="${esc(S.erinnerungUhrzeit || '19:00')}"></label>
       <p class="muted small">Bei Häusern mit Winterdienst warnt die App zusätzlich am Vorabend vor Schnee und Glätte.${S.geplanteErinnerungen != null ? ` Aktuell geplant: ${S.geplanteErinnerungen} Erinnerungen.` : ''}</p>
@@ -58,10 +63,9 @@ route('/einstellungen', async () => {
       <label class="mt">Ort für die Wettervorhersage
         <div class="row gap"><input id="wOrt" value="${esc(S.wetterOrt?.name || '')}" placeholder="z. B. Mannheim"><button class="btn small" type="button" id="wSearch">Suchen</button></div>
       </label>
-    </div>
+    `, { offen: true })}
 
-    <h3 class="section" id="sicherung">💾 Datensicherung</h3>
-    <div class="card">
+    ${gruppe('💾 Datensicherung', `
       <p class="small">Alle Daten und Fotos liegen <b>nur auf diesem Handy</b>. Erstelle regelmäßig eine Sicherung und speichere sie z. B. in Google Drive – Rechnungen musst du 10 Jahre aufbewahren.</p>
       ${NATIVE ? `<label class="check"><input type="checkbox" id="autoBk" ${S.autoSicherung !== false ? 'checked' : ''}> Jede Woche automatisch sichern</label>
       <p class="muted small">${S.letzteAutoSicherung ? `Letzte automatische Sicherung: ${fmtDateLong(S.letzteAutoSicherung)} · ${esc(S.autoSicherungOrt || '')}` : 'Noch keine automatische Sicherung.'}${S.autoSicherungFehler ? ` <span class="danger-text">Fehler: ${esc(S.autoSicherungFehler)}</span>` : ''}</p>
@@ -71,20 +75,23 @@ route('/einstellungen', async () => {
         <button class="btn" id="export">⬇️ Sicherung erstellen</button>
         <label class="btn ghost">⬆️ Wiederherstellen<input type="file" id="import" accept="application/json,.json" hidden></label>
       </div>
-    </div>
+    `, { offen: true })}
 
-    <h3 class="section">⚠️ Werkseinstellungen</h3>
-    <div class="card small">
+    ${gruppe('🔒 Sicherheit', `
+      ${NATIVE ? `<label class="check"><input type="checkbox" id="appSperre" ${S.appSperre ? 'checked' : ''}> App mit Fingerabdruck sperren</label>
+      <p class="muted small">Nach 30 Sekunden im Hintergrund fragt die App nach Fingerabdruck oder Gerätesperre.</p>` : '<p class="muted small">Die Sperre gibt es in der Android-App.</p>'}
+    `)}
+
+    ${gruppe('⚠️ Gefahrenbereich', `
       <p>Setzt die App auf null zurück: Kunden, Objekte, Einsätze, Fotos, Rechnungen, Angebote, Finanzen, Material und Einstellungen werden auf diesem Handy gelöscht.</p>
       <p class="danger-text">Das lässt sich nicht rückgängig machen. Erstelle vorher eine Sicherung.</p>
       <button class="btn danger block" type="button" id="factoryReset">Alles löschen und neu beginnen</button>
-    </div>
+    `, { klasse: 'gefahr' })}
 
-    ${NATIVE ? '' : `<h3 class="section">📱 App auf den Startbildschirm</h3>
-    <div class="card small">
+    ${NATIVE ? '' : gruppe('📱 App auf den Startbildschirm', `
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
-    </div>`}
+    `)}
     <p class="muted small center">Toths Reinigungsservice · Version 2.33</p>
   `);
 
