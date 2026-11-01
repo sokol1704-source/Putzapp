@@ -114,7 +114,15 @@ route('/material', async (_, q) => {
   $('#shop')?.addEventListener('input', drawTotal);
   $('#shop')?.addEventListener('change', (e) => { if (e.target.dataset.buy) e.target.closest('.shop-item').classList.toggle('done', e.target.checked); });
 
-  $('#shareList')?.addEventListener('click', () => shareText([`🛒 Einkaufsliste ${S.firma}`, '', ...einkauf.map((m) => `☐ ${$(`[data-qty="${m.id}"]`).value} × ${m.name}`)].join('\n'), 'Einkaufsliste'));
+  $('#shareList')?.addEventListener('click', () => {
+    // Mengen aus den Eingabefeldern, mit Einheit, Preis und geschätzter Summe
+    const zeilen = einkauf
+      .map((m) => ({ m, menge: Number($(`[data-qty="${m.id}"]`).value) || 0 }))
+      .filter((x) => x.menge > 0)
+      .map(({ m, menge }) => `☐ ${menge} ${m.einheit} × ${m.name}${m.preis ? ` (ca. ${money(m.preis * menge)})` : ''}`);
+    const summe = einkauf.reduce((s, m) => s + (m.preis || 0) * (Number($(`[data-qty="${m.id}"]`).value) || 0), 0);
+    shareText([`🛒 Einkaufsliste ${S.firma}`, '', ...zeilen, '', summe ? `Geschätzt: ${money(summe)}` : ''].join('\n'), 'Einkaufsliste');
+  });
   $('#bought')?.addEventListener('click', async () => {
     const bought = $$('[data-buy]:checked').map((cb) => ({ m: byId[cb.dataset.buy], qty: Number($(`[data-qty="${cb.dataset.buy}"]`).value) || 0 })).filter((x) => x.qty > 0);
     if (!bought.length) return toast('Bitte zuerst abhaken, was du gekauft hast');
