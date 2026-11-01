@@ -386,6 +386,19 @@ route('/buchhaltung/tipps', () => {
       <li>Einkommensteuererklärung mit <b>Anlage EÜR</b>. Ohne Steuerberater ist die Abgabe in der Regel bis 31. Juli des Folgejahres fällig.</li>
       <li>Jahresabschluss-Checkliste in der Buchhaltung kurz vor Jahresende durchgehen</li>
     </ul>`)}
+    <h3 class="section">❓ Häufige Fragen</h3>
+    ${[
+      ['Muss ich eine Steuererklärung machen, auch bei wenig Umsatz?', 'Wenn das Finanzamt dich dazu auffordert, ja. Auch bei kleinem Gewinn kannst du verpflichtet sein. Im Zweifel fragst du bei der Kammer oder beim Finanzamt nach.'],
+      ['Welche Anlagen brauche ich?', 'Die Einkommensteuererklärung mit der Anlage EÜR. Die Zahlen für die Anlage EÜR übernimmst du aus dem Übertrag im Finanzen-Tab der App.'],
+      ['Muss ich Umsatzsteuer auf die Rechnung schreiben?', 'Nein, als Kleinunternehmer weist du keine Umsatzsteuer aus. Stattdessen steht auf der Rechnung der Hinweis nach § 19 UStG. Den setzt die App automatisch.'],
+      ['Was zählt als Betriebsausgabe?', 'Alles, was für deine Reinigungsarbeit nötig ist: Material, Telefon, Versicherung, Fahrten, Werbung. Private Anteile zählen nicht.'],
+      ['Was passiert mit Ausgaben vor dem Gewerbebeginn?', 'Sie können absetzbar sein, aber die genaue Zuordnung hängt vom Einzelfall ab. Halte die Belege bereit und frag die Kammer oder das Finanzamt.'],
+      ['Brauche ich eine Betriebshaftpflicht?', 'Nicht gesetzlich vorgeschrieben, aber dringend empfohlen, sobald du für mehrere Auftraggeber in fremden Gebäuden arbeitest. Der Vertrag sollte Reinigungsarbeiten ausdrücklich einschließen.'],
+      ['Muss ich in die Kammer?', 'Oft ja. Bei geringem Gewinn gibt es häufig Ermäßigungen oder Befreiungen. Frag bei der IHK oder Handwerkskammer nach.'],
+      ['Was mache ich, wenn ich einen Fehler gemacht habe?', 'Du kannst die Erklärung in ELSTER korrigieren oder dagegen Einspruch einlegen. Dafür gibt es eine Frist, die im Bescheid steht.'],
+      ['Wie lange muss ich Belege aufbewahren?', '10 Jahre. Die Belegfotos in der App und eine Sicherung helfen dabei.'],
+      ['Wann ist die Abgabefrist?', 'Ohne Steuerberater in der Regel bis 31. Juli des Folgejahres. Wenn du einen Berater beauftragst, gibt es meist eine längere Frist.'],
+    ].map(([q, a]) => `<details class="card grp"><summary>${q}</summary><div class="grp-body"><div class="small">${a}</div></div></details>`).join('')}
     ${punkt('📌 Häufige Fehler', `<ul>
       <li>Belege fehlen oder sind nicht mit dem Betrag und Datum vollständig</li>
       <li>Private Ausgaben vermischt mit betrieblichen</li>
