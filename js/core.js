@@ -186,8 +186,8 @@ const OLD_LEISTUNG_IDS = 'muell,tonnen,fenster,buegeln,waesche,betten,kuehlschra
 
 const DEFAULT_SETTINGS = {
   id: 'main',
-  firma: 'Toths Reinigungsservice',
-  slogan: 'Sauber · Zuverlässig · Persönlich',
+  firma: 'PURE TOTH',
+  slogan: 'Sauberkeit mit Anspruch',
   inhaber: '',
   strasse: '',
   plzOrt: '',

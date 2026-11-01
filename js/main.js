@@ -176,6 +176,15 @@ $('#timerPill').addEventListener('click', () => {
 
 /* ---------- Übernahme der Daten aus Version 1.x ---------- */
 // Früher hatte jeder Kunde genau ein „Objekt“ (Adresse, Plan, Preis). Jetzt: Auftraggeber → Häuser.
+// Firmenname auf PURE TOTH umstellen (nur einmal, eigene Änderungen bleiben erhalten)
+async function umbenennenFirma() {
+  if (S.firmaUmbenannt) return;
+  if (S.firma === 'Toths Reinigungsservice') S.firma = 'PURE TOTH';
+  if (S.slogan === 'Sauber · Zuverlässig · Persönlich') S.slogan = 'Sauberkeit mit Anspruch';
+  S.firmaUmbenannt = true;
+  await saveSettings();
+}
+
 // Bezugsquellen sind wieder entfernt: alte Einträge einmalig aus dem Material löschen
 async function bereinigeBezugsquellen() {
   if (S.bezugsquellenBereinigt) return;
@@ -233,7 +242,7 @@ function setupBackButton() {
 
 /* ---------- Einführung: beim ersten Start und nach den Werkseinstellungen ---------- */
 const EINFUEHRUNG = [
-  ['🧽', 'Willkommen bei Toths Reinigungsservice', 'Die App begleitet dich durch den Tag: Häuser, Einsätze, Fotos, Rechnungen und Buchhaltung. Alles bleibt auf diesem Handy.'],
+  ['🧽', 'Willkommen bei PURE TOTH', 'Die App begleitet dich durch den Tag: Häuser, Einsätze, Fotos, Rechnungen und Buchhaltung. Alles bleibt auf diesem Handy.'],
   ['▶️', 'Zeit messen und erfassen', 'Tippe bei einem Haus auf „Start“. Die Zeit läuft weiter, auch wenn du die App schließt. Mit „Fertig“ übernimmst du sie in den Einsatz.'],
   ['📷', 'Fotos und Checkliste', 'Mach Fotos vorher und nachher und hake die Aufgaben ab. Manche Häuser verlangen eine feste Anzahl Fotos.'],
   ['🧾', 'Rechnungen und Monat', 'Der Monatsabschluss zeigt, was abzurechnen ist. Du prüfst jede Rechnung, bevor du sie verschickst.'],
@@ -287,7 +296,7 @@ async function sperrenWennNoetig(sofort = false) {
   if (!sperre) {
     sperre = document.createElement('div');
     sperre.className = 'sperre';
-    sperre.innerHTML = '<div class="sperre-card"><div class="einf-icon">🔒</div><h2>Toths Reinigungsservice</h2><p>Bitte mit Fingerabdruck oder Gerätesperre entsperren.</p><button class="btn" type="button" id="entsperren">Entsperren</button></div>';
+    sperre.innerHTML = '<div class="sperre-card"><div class="einf-icon">🔒</div><h2>PURE TOTH</h2><p>Bitte mit Fingerabdruck oder Gerätesperre entsperren.</p><button class="btn" type="button" id="entsperren">Entsperren</button></div>';
     document.body.appendChild(sperre);
     sperre.querySelector('#entsperren').addEventListener('click', () => entsperren());
   }
@@ -299,7 +308,7 @@ async function entsperren() {
     const { isAvailable } = await native('BiometricAuthNative', 'checkBiometry', {});
     // Ohne Fingerabdruck oder Gerätesperre nicht aussperren
     if (!isAvailable) return entsperrtVerlassen();
-    await native('BiometricAuthNative', 'internalAuthenticate', { reason: 'Toths Reinigungsservice entsperren', androidTitle: 'Entsperren', cancelTitle: 'Abbrechen', allowDeviceCredential: true });
+    await native('BiometricAuthNative', 'internalAuthenticate', { reason: 'PURE TOTH entsperren', androidTitle: 'Entsperren', cancelTitle: 'Abbrechen', allowDeviceCredential: true });
     entsperrtVerlassen();
   } catch {
     // Abgebrochen: Sperre bleibt, der Knopf zum Erneutversuchen steht darauf
@@ -319,6 +328,7 @@ window.addEventListener('hashchange', router);
   await loadSettings();
   await migrate();
   await bereinigeBezugsquellen();
+  await umbenennenFirma();
   await applyDuePrices();
   // Alte, zu niedrige Richtwerte für Angebote durch die neuen ersetzen – eigene Änderungen bleiben
   if (!S.kalkV3) {

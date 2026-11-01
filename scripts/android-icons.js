@@ -53,7 +53,7 @@ const dens = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
     const logo = Math.round(Math.min(w, h) * 0.3);
     await shot(file, w, h, `<div class="c" style="background:linear-gradient(160deg,#14b8a6,#0f766e 45%,#134e4a);flex-direction:column;gap:${logo * 0.15}px;font-family:sans-serif;color:#fff">
       ${svg.replace('<svg', `<svg width="${logo}" height="${logo}"`)}
-      <div style="font-size:${logo * 0.16}px;font-weight:600">Toths Reinigungsservice</div></div>`);
+      <div style="font-size:${logo * 0.16}px;font-weight:600">PURE TOTH</div></div>`);
   }
   await browser.close();
   console.log('Android-Icons und Splash-Screens erzeugt');

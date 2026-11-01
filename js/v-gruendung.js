@@ -22,7 +22,7 @@ const GRUENDUNG = [
   {
     id: 'gewerbe', icon: '🏛️', title: 'Gewerbe anmelden', tag: 'Pflicht',
     text: `<p>Beim Gewerbeamt deiner Gemeinde – oft online, Kosten meist 20–60 €. Trag die Tätigkeit so ein, wie mit der Kammer besprochen.</p>
-      <p>Auf Rechnungen und Briefen muss dein <b>voller Vor- und Nachname</b> stehen; „Toths Reinigungsservice“ ist der Zusatz. Die App druckt das automatisch so.</p>`,
+      <p>Auf Rechnungen und Briefen muss dein <b>voller Vor- und Nachname</b> stehen; „PURE TOTH“ ist der Zusatz. Die App druckt das automatisch so.</p>`,
     links: [['🔎 Gewerbeanmeldung online', () => search('Gewerbeanmeldung online')]],
     field: { key: 'beginn', setting: 'betriebsstart', label: 'Gewerbebeginn (Startdatum)', type: 'date' },
   },

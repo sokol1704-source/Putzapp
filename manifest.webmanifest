@@ -1,7 +1,7 @@
 {
-  "name": "Toths Reinigungsservice",
-  "short_name": "Toths Reinigung",
-  "description": "Kunden, Reinigungen mit Fotos, Termine und Rechnungen für Toths Reinigungsservice",
+  "name": "PURE TOTH",
+  "short_name": "PURE TOTH",
+  "description": "Kunden, Reinigungen mit Fotos, Termine und Rechnungen für PURE TOTH",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

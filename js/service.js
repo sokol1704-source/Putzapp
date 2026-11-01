@@ -225,8 +225,8 @@ async function scheduleNotifications(force = false) {
 }
 
 async function testNotification() {
-  if (!(await notificationsAllowed())) return toast('Benachrichtigungen sind nicht erlaubt (Android-Einstellungen → Apps → Toths Reinigung)');
-  await native('LocalNotifications', 'schedule', { notifications: [{ id: 99, title: '✨ Toths Reinigungsservice', body: 'So sehen deine Erinnerungen aus.', schedule: { at: new Date(Date.now() + 3000).toISOString() } }] });
+  if (!(await notificationsAllowed())) return toast('Benachrichtigungen sind nicht erlaubt (Android-Einstellungen → Apps → PURE TOTH)');
+  await native('LocalNotifications', 'schedule', { notifications: [{ id: 99, title: '✨ PURE TOTH', body: 'So sehen deine Erinnerungen aus.', schedule: { at: new Date(Date.now() + 3000).toISOString() } }] });
   toast('Test kommt in 3 Sekunden');
 }
 

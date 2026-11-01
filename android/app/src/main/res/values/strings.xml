@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Toths Reinigung</string>
-    <string name="title_activity_main">Toths Reinigung</string>
+    <string name="app_name">PURE TOTH</string>
+    <string name="title_activity_main">PURE TOTH</string>
     <string name="package_name">de.toths.reinigung</string>
     <string name="custom_url_scheme">de.toths.reinigung</string>
 </resources>

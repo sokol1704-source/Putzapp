@@ -174,7 +174,7 @@ function downloadIcs(a, o) {
     dt = `DTSTART;VALUE=DATE:${d}\r\nDTEND;VALUE=DATE:${addDays(a.datum, 1).replace(/-/g, '')}`;
   }
   const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Toths Reinigungsservice//DE', 'BEGIN:VEVENT',
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//PURE TOTH//DE', 'BEGIN:VEVENT',
     `UID:${a.id}@toths-reinigung`,
     `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
     dt,
