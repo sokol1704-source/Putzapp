@@ -5,11 +5,8 @@ route('/', async () => {
   const data = await loadAll();
   const plan = planning(data);
   const t = today();
-  const week = addDays(t, 7);
   const overdue = plan.filter((p) => p.datum < t);
   const heute = plan.filter((p) => p.datum === t);
-  const woche = plan.filter((p) => p.datum > t && p.datum <= week);
-  const spaeter = plan.filter((p) => p.datum > week).slice(0, 3);
   const unbilled = data.visits.filter((v) => !v.rechnungId).length;
   const offen = data.invoices.filter((i) => i.status === 'offen');
   const offenSumme = offen.reduce((s, i) => s + i.summe, 0);
@@ -41,7 +38,6 @@ route('/', async () => {
   const greet = hour < 11 ? 'Guten Morgen' : hour < 17 ? 'Hallo' : 'Guten Abend';
   const firstName = (S.inhaber || '').split(' ')[0];
   const todayCount = heute.length + overdue.length;
-  const section = (title, items) => (items.length ? `<h3 class="section">${title}</h3>${items.map((i) => planCard(i, data)).join('')}` : '');
 
   render(S.firma, `
     <div class="hero">
@@ -105,10 +101,6 @@ route('/', async () => {
         <div class="row between"><a class="strong" href="#/kunde/${c.id}">👥 ${esc(c.name)}</a><span class="badge warn">fällig</span></div>
         <div class="row gap mt"><a class="btn small" href="#/rechnung/neu?kunde=${c.id}&monat=${pm}">Rechnung erstellen</a></div>
       </div>`).join('')}` : ''}
-    ${section('⚠️ Überfällig', overdue)}
-    ${section('📍 Heute', heute)}
-    ${section('🗓️ Nächste 7 Tage', woche)}
-    ${section('Später', spaeter)}
     ${plan.length ? '' : `<div class="empty">
       <p>Noch keine anstehenden Reinigungen.</p>
       <p class="muted small">Lege Häuser mit Reinigungsplan an – dann siehst du hier, wann du wo putzen musst.</p>
