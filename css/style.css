@@ -917,3 +917,5 @@ details.grp.gefahr > summary { color: var(--danger); }
 .aktion.primary { background: linear-gradient(135deg, #14b8a6, var(--brand)); color: #fff; }
 .aktion.primary span { background: rgba(255, 255, 255, .22); color: #fff; font-weight: 700; }
 .aktion:active { transform: scale(.96); }
+.row3 { display: flex; gap: 8px; }
+.row3 .btn { flex: 1; padding: 12px 6px; font-size: 14px; white-space: nowrap; }
