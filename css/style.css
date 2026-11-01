@@ -883,3 +883,5 @@ body { background: radial-gradient(120% 60% at 50% -10%, rgba(20, 184, 166, .10)
   .tiles .tile:nth-child(4n+3) .tile-icon { background: #1e3a8a; }
   .tiles .tile:nth-child(4n+4) .tile-icon { background: #831843; }
 }
+.foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.foto-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; }

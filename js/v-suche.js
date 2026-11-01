@@ -44,6 +44,7 @@ route('/suche', async (_, q) => {
     </form>
     <div class="chips mt" id="chips">${SUCHE_GRUPPEN.map(([key, label]) => `<button type="button" data-g="${key}" class="${key === gruppe ? 'active' : ''}">${label}</button>`).join('')}</div>
     <label class="check small mt"><input type="checkbox" id="nurOffen" ${nurOffen ? 'checked' : ''}> Nur offene Rechnungen & Angebote</label>
+    <a class="btn ghost block mt" href="#/fotos">📷 Alle Fotos durchsuchen</a>
     <div id="res">${results()}</div>
   `, { tab: '', back: true });
   const input = $('#sf input');
@@ -68,3 +69,38 @@ function hl(text, term) {
   if (i < 0) return esc(s);
   return `${esc(s.slice(0, i))}<mark>${esc(s.slice(i, i + term.length))}</mark>${esc(s.slice(i + term.length))}`;
 }
+
+/* ---------- Fotosuche: alle Fotos nach Haus und Monat ---------- */
+route('/fotos', async (_, q) => {
+  const [photos, visits, maengel, ausgaben, objects] = await Promise.all(['photos', 'visits', 'maengel', 'ausgaben', 'objects'].map((s) => DB.all(s)));
+  // Wem gehört ein Foto? Einsatz, Mangel oder Ausgabe (mit Datum und Haus)
+  const herkunft = new Map();
+  visits.forEach((v) => herkunft.set(v.id, { datum: v.datum, objektId: v.objektId, href: `#/einsatz/${v.id}` }));
+  maengel.forEach((m) => herkunft.set(m.id, { datum: m.datum, objektId: m.objektId, href: `#/mangel/${m.id}` }));
+  ausgaben.forEach((a) => herkunft.set(a.id, { datum: a.datum, objektId: '', href: `#/ausgabe/${a.id}` }));
+  const haus = q.haus || '';
+  const monat = q.monat || '';
+  const treffer = photos
+    .map((p) => ({ p, h: herkunft.get(p.visitId) }))
+    .filter((x) => x.h && (!haus || x.h.objektId === haus) && (!monat || x.h.datum.startsWith(monat)))
+    .sort((a, b) => b.h.datum.localeCompare(a.h.datum));
+  const gruppen = new Map();
+  treffer.forEach((x) => { if (!gruppen.has(x.h.datum)) gruppen.set(x.h.datum, []); gruppen.get(x.h.datum).push(x); });
+
+  render('Fotos', `
+    <form class="card form" id="ff">
+      <div class="grid2">
+        <label>Haus<select name="haus"><option value="">Alle Häuser</option>${objects.map((o) => `<option value="${o.id}" ${o.id === haus ? 'selected' : ''}>${esc(objLabel(o))}</option>`).join('')}</select></label>
+        <label>Monat<input type="month" name="monat" value="${esc(monat)}"></label>
+      </div>
+    </form>
+    <p class="muted small">${treffer.length} Foto${treffer.length === 1 ? '' : 's'}${treffer.length > 300 ? ' – die ersten 300 werden angezeigt' : ''}</p>
+    ${[...gruppen].slice(0, 40).map(([datum, liste]) => `<h3 class="section">${fmtDateLong(datum)}</h3>
+      <div class="foto-grid">${liste.slice(0, 12).map(({ p, h }) => `<a href="${h.href}"><img src="${p.url || (p.url = objUrl(p.blob))}" alt="" loading="lazy"></a>`).join('')}</div>`).join('')
+      || '<div class="empty">Keine Fotos für diese Auswahl.</div>'}
+  `, { tab: '', back: true });
+  $('#ff').addEventListener('change', () => {
+    const fd = new FormData($('#ff'));
+    go(`#/fotos?haus=${fd.get('haus')}&monat=${fd.get('monat')}`, true);
+  });
+});
