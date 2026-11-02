@@ -92,7 +92,7 @@ route('/einstellungen', async () => {
       <p><b>iPhone (Safari):</b> Teilen-Symbol → „Zum Home-Bildschirm“.</p>
       <p><b>Android (Chrome):</b> Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.</p>
     `)}
-    <p class="muted small center">PURE TOTH · Version 2.48</p>
+    <p class="muted small center">PURE TOTH · Version 2.49</p>
   `);
 
   $('#f').addEventListener('submit', async (e) => {
