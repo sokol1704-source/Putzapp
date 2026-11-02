@@ -221,6 +221,8 @@ details summary { cursor: pointer; color: var(--muted); padding: 8px 0; }
 .inv-items tbody tr:nth-child(even) td { background: #f0fdfa; }
 .inv-items td { border-bottom: 1px solid #e2e8e7; padding: 7px 6px; vertical-align: top; }
 .inv-items tfoot td { border-bottom: 0; padding-top: 12px; }
+.inv-items tr.lv-gruppe th { background: #ccfbf1; color: #134e4a; border-radius: 0; padding-top: 10px; }
+.inv-items.lv-tabelle td:last-child { white-space: nowrap; font-weight: 600; }
 .inv-items .inv-total-label { font-weight: 700; font-size: 13px; vertical-align: middle; }
 .inv-items .inv-total { font-size: 16px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #14b8a6, #0f766e); border-radius: 8px; padding: 8px 10px; }
 .inv-items .r { text-align: right; white-space: nowrap; }

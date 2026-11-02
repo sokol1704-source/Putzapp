@@ -388,6 +388,8 @@ route('/rechnung/:id', async ({ id }) => {
     </div>
     <div class="doc-wrap">${invoiceDoc(inv)}</div>
     ${inv.status !== 'storniert' ? '<button class="btn danger ghost block no-print" id="storno">Rechnung stornieren</button>' : ''}
+    <button class="btn danger ghost block no-print mt" id="loeschen">🗑️ Rechnung ${esc(inv.nummer)} löschen</button>
+    <p class="muted small no-print">Nur löschen, wenn die Rechnung noch nicht an den Kunden gegangen ist. Sonst bitte stornieren. Die Nummer ${esc(inv.nummer)} wird danach wieder für die nächste Rechnung vergeben, wenn es die neueste war.</p>
   `);
   wireDocButtons(`Rechnung ${inv.nummer}`, `Guten Tag${inv.kunde.ansprechpartner ? ` ${inv.kunde.ansprechpartner}` : ''},\n\nanbei erhalten Sie die Rechnung ${inv.nummer} über ${money(inv.summe)}.\n\nViele Grüße\n${inv.absender.inhaber}\n${inv.absender.firma}`);
   $('#paid')?.addEventListener('click', async () => {
@@ -437,6 +439,14 @@ route('/rechnung/:id', async ({ id }) => {
     for (const w of await DB.all('winter')) if (w.rechnungId === inv.id) { w.rechnungId = null; await DB.put('winter', w); }
     toast('Rechnung storniert');
     router();
+  });
+  $('#loeschen')?.addEventListener('click', async () => {
+    if (!confirm(`Rechnung ${inv.nummer} endgültig löschen? Das geht nicht rückgängig. Die Einsätze werden wieder als „nicht abgerechnet“ markiert.`)) return;
+    for (const v of await DB.by('visits', 'kundeId', inv.kundeId)) if (v.rechnungId === inv.id) { v.rechnungId = null; await DB.put('visits', v); }
+    for (const w of await DB.all('winter')) if (w.rechnungId === inv.id) { w.rechnungId = null; await DB.put('winter', w); }
+    await DB.del('invoices', inv.id);
+    toast(`Rechnung ${inv.nummer} gelöscht`);
+    go('#/rechnungen', true);
   });
 });
 

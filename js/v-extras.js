@@ -340,21 +340,47 @@ route('/objekt/:id/zusatz', async ({ id }) => {
 });
 
 /* ---------- Leistungsverzeichnis als PDF für Kunden ---------- */
+const LV_GRUPPEN = [['arbeit', 'Reinigungsleistungen'], ['material', 'Material'], ['fahrt', 'Anfahrt']];
+
+function leistungsverzeichnisDoc() {
+  const leistungen = S.leistungen || [];
+  const gruppen = LV_GRUPPEN.map(([art, titel]) => {
+    const rows = leistungen.filter((l) => (l.art || 'arbeit') === art);
+    if (!rows.length) return '';
+    return `<tr class="lv-gruppe"><th colspan="3">${titel}</th></tr>` + rows.map((l) => `<tr>
+      <td>${esc(l.name)}</td>
+      <td>${l.einheit === 'pauschal' ? 'pauschal' : `je ${esc(l.einheit)}`}</td>
+      <td class="r">${money(l.preis)}</td></tr>`).join('');
+  }).join('');
+  const sonst = leistungen.filter((l) => !LV_GRUPPEN.some(([art]) => (l.art || 'arbeit') === art));
+  const sonstRows = sonst.length ? `<tr class="lv-gruppe"><th colspan="3">Weitere Leistungen</th></tr>` + sonst.map((l) => `<tr>
+      <td>${esc(l.name)}</td><td>${l.einheit === 'pauschal' ? 'pauschal' : `je ${esc(l.einheit)}`}</td><td class="r">${money(l.preis)}</td></tr>`).join('') : '';
+  let n = 0;
+  const para = (title, body) => `<h3 class="doc-h3">§ ${++n} ${title}</h3>${body}`;
+  return `<article class="invoice-doc vertrag">
+    ${docHeader()}
+    <h2 class="inv-title">Leistungsverzeichnis <span>Treppenhaus- und Objektreinigung</span></h2>
+    <div class="parties">
+      <div><span class="doc-muted">Auftragnehmer</span><br><b>${esc(S.firma)}</b><br>Inh. ${esc(S.inhaber)}<br>${esc(S.strasse)}<br>${esc(S.plzOrt)}</div>
+      <div><span class="doc-muted">Gültig ab</span><br><b>${fmtDate(today())}</b><br><span class="doc-muted">bis auf Weiteres</span></div>
+    </div>
+    ${para('Leistungen und Preise', `<p>Der Auftragnehmer bietet dem Auftraggeber folgende Leistungen zu den nachstehenden Preisen an:</p>
+      <table class="inv-items lv-tabelle">
+        <thead><tr><th>Leistung</th><th>Einheit</th><th class="r">Preis</th></tr></thead>
+        <tbody>${gruppen}${sonstRows || (gruppen ? '' : '<tr><td colspan="3">Noch keine Leistungen eingetragen.</td></tr>')}</tbody>
+      </table>
+      <p>Die regelmäßige Reinigung richtet sich nach dem Angebot bzw. Vertrag für das jeweilige Objekt. Die Leistungen oben gelten für zusätzliche Arbeiten.</p>`)}
+    ${para('Umsatzsteuer', '<p>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung). Alle Preise sind Endpreise.</p>')}
+    ${para('Zusatzleistungen', '<p>Zusätzliche Arbeiten werden nur nach vorheriger Freigabe durch den Auftraggeber ausgeführt und nach Aufwand bzw. nach obigen Preisen abgerechnet.</p>')}
+    ${para('Zahlungsziel', `<p>Rechnungen sind innerhalb von <b>${S.zahlungsziel || 0} Tagen</b> nach Rechnungsdatum ohne Abzug zahlbar.${S.iban ? ` Bankverbindung: IBAN ${esc(S.iban)}${S.bank ? `, ${esc(S.bank)}` : ''}.` : ''}</p>`)}
+    ${para('Preisanpassung', '<p>Ändern sich die Kosten des Auftragnehmers, kann er die Preise mit einer Ankündigungsfrist von sechs Wochen angemessen anpassen.</p>')}
+  </article>`;
+}
+
 route('/leistungsverzeichnis', () => {
-  const zeilen = S.leistungen.map((l) => `<tr><td>${esc(l.name)}</td><td class="r">${unitPrice(l)}</td></tr>`).join('');
   render('Leistungsverzeichnis', `
     ${docButtons()}
-    <div class="doc-wrap"><article class="invoice-doc">
-      ${docHeader()}
-      <h2 class="inv-title">Leistungsverzeichnis <span>Treppenhaus- und Objektreinigung</span></h2>
-      <p>Hier finden Sie meine Leistungen mit den Preisen. Alle Preise verstehen sich ohne Umsatzsteuer, da ich als Kleinunternehmer gemäß § 19 UStG keine Umsatzsteuer ausweise.</p>
-      <table class="inv-items">
-        <thead><tr><th>Leistung</th><th class="r">Preis</th></tr></thead>
-        <tbody>${zeilen || '<tr><td colspan="2">Noch keine Leistungen eingetragen.</td></tr>'}</tbody>
-      </table>
-      <p class="inv-note">Für die regelmäßige Reinigung gilt das Angebot für Ihr Haus. Zusatzleistungen rechne ich nach Ihrer Freigabe ab. Zahlungsziel: ${S.zahlungsziel || 0} Tage nach Rechnungsdatum.</p>
-      ${docFooter()}
-    </article></div>
+    <div class="doc-wrap">${leistungsverzeichnisDoc()}</div>
   `, { tab: '', back: true });
   wireDocButtons('Leistungsverzeichnis', `Guten Tag,\n\nanbei mein Leistungsverzeichnis mit den Preisen.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`);
 });
