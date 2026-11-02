@@ -61,6 +61,7 @@ route('/objekt/:id/vertrag', async ({ id }) => {
       ${docActionButtons(`<button type="button" class="btn ghost" id="signAG">✍️ ${sigAG ? 'Neu: ' : ''}Auftraggeber</button><button type="button" class="btn ghost" id="signAN">✍️ ${sigAN ? 'Neu: ' : ''}Ich</button>`)}
       <p class="muted small">Muster nach bestem Wissen – keine Rechtsberatung. Leistungen, Preis und Winterdienst kommen aus den Angaben beim Haus.</p>
     </form>
+    <a class="btn ghost block no-print" href="#/objekt/${id}/zusatz">🧾 Zusätzliche Arbeit abrechnen</a>
     <div class="doc-wrap" id="docWrap">${vertragDoc(o, k, v, sigAG, sigAN)}</div>
   `);
   $('#vf').addEventListener('change', async () => {
@@ -256,4 +257,61 @@ route('/preise/schreiben/:kid', async ({ kid }) => {
     </article></div>
   `);
   wireDocButtons(`Preisanpassung ${k.name}`, `Guten Tag${k.ansprechpartner ? ` ${k.ansprechpartner}` : ''},\n\nanbei meine Mitteilung zur Anpassung der Vergütung ab ${fmtDate(ab)}.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`);
+});
+
+/* ---------- Zusätzliche Arbeit: sofort eine Rechnung für gewählte Leistungen ---------- */
+route('/objekt/:id/zusatz', async ({ id }) => {
+  const o = await DB.get('objects', id);
+  if (!o) return go('#/objekte', true);
+  const k = await DB.get('customers', o.kundeId) || { name: '' };
+  const heute = today();
+  render('Zusätzliche Arbeit', `
+    <form id="zf" class="form">
+      <p class="muted small">🏢 ${esc(objLabel(o))} · ${esc(k.name)}</p>
+      <label>Datum der Arbeit<input type="date" name="datum" required value="${heute}"></label>
+      <div class="label">Leistungen</div>
+      ${S.leistungen.map((l, i) => `<div class="card pos">
+        <div class="row between"><b>${esc(l.name)}</b><span class="muted small">${unitPrice(l)}</span></div>
+        <label>Menge<input type="number" min="0" step="0.5" inputmode="decimal" name="m${i}" value="0"></label>
+      </div>`).join('') || '<div class="empty">Noch keine Leistungen. Lege sie unter Einstellungen → Leistungen & Preise an.</div>'}
+      <label>Notiz für die Rechnung (optional)<textarea name="notiz" rows="2" placeholder="z. B. Graffiti am Eingang entfernt"></textarea></label>
+      <div class="total" id="zTotal"></div>
+      <button class="btn block" type="submit" id="zSave">🧾 Rechnung erstellen</button>
+    </form>
+  `, { tab: '', back: true });
+  const f = $('#zf');
+  const summe = () => S.leistungen.reduce((s, l, i) => s + Math.round((l.preis || 0) * num(f[`m${i}`].value)), 0);
+  const zeigeSumme = () => { $('#zTotal').innerHTML = `Gesamt: <b>${money(summe())}</b> <span class="muted small">(ohne Umsatzsteuer, Kleinunternehmer)</span>`; };
+  f.addEventListener('input', zeigeSumme);
+  zeigeSumme();
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(f);
+    const positionen = S.leistungen
+      .map((l, i) => ({ beschreibung: l.name, menge: num(fd.get(`m${i}`)), einheit: l.einheit, preis: l.preis || 0, art: l.art || 'arbeit' }))
+      .filter((p) => p.menge > 0)
+      .map((p) => ({ ...p, betrag: Math.round(p.preis * p.menge) }));
+    if (!positionen.length) return toast('Bitte mindestens eine Menge eintragen');
+    $('#zSave').disabled = true;
+    const datum = fd.get('datum');
+    const inv = {
+      nummer: await nextNumber('invoices', S.nrPrefix || 'RE', datum, S.nrStart),
+      datum,
+      faellig: addDays(datum, Number(S.zahlungsziel) || 0),
+      monat: '',
+      kundeId: o.kundeId,
+      kunde: { name: k.name, ansprechpartner: k.ansprechpartner || '', strasse: k.strasse || '', plzOrt: k.plzOrt || '', privat: !!k.privat },
+      objekte: [{ id: o.id, name: objLabel(o), adresse: objAddress(o) }],
+      absender: absender(),
+      positionen,
+      summe: positionen.reduce((s, p) => s + p.betrag, 0),
+      arbeitskosten: positionen.filter((p) => p.art !== 'material').reduce((s, p) => s + p.betrag, 0),
+      notiz: fd.get('notiz').trim(),
+      status: 'offen',
+      erstellt: new Date().toISOString(),
+    };
+    await DB.put('invoices', inv);
+    toast(`✓ Rechnung ${inv.nummer} erstellt`);
+    go(`#/rechnung/${inv.id}`, true);
+  });
 });
