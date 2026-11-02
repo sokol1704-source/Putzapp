@@ -795,6 +795,17 @@ async function docToPdf(docEl) {
   clone.querySelectorAll('img[src="icons/icon.svg"]').forEach((img) => { img.src = 'icons/icon-512.png'; });
   holder.appendChild(clone);
   document.body.appendChild(holder);
+  // CSS-Großschreibung macht aus „ß“ zwei Zeichen („SS“) – daran scheitert html2canvas.
+  // Deshalb den Text selbst in Großbuchstaben setzen und die CSS-Umwandlung abschalten.
+  // Erst alle Stile erfassen, dann ändern – sonst erben Kinder schon das „none“ des Elternelements.
+  const umwandeln = { uppercase: (t) => t.toUpperCase(), lowercase: (t) => t.toLowerCase() };
+  [clone, ...clone.querySelectorAll('*')]
+    .map((el) => [el, umwandeln[getComputedStyle(el).textTransform]])
+    .filter(([, fn]) => fn)
+    .forEach(([el, fn]) => {
+      for (const n of el.childNodes) if (n.nodeType === 3) n.textContent = fn(n.textContent);
+      el.style.textTransform = 'none';
+    });
   try {
     await Promise.all([...clone.querySelectorAll('img')].map((img) => (img.complete ? null : new Promise((r) => { img.onload = img.onerror = r; }))));
     const top = clone.getBoundingClientRect().top;

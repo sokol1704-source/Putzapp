@@ -7,7 +7,10 @@
     "build:web": "node scripts/build-web.js",
     "sync": "npm run build:web && npx cap sync android",
     "apk": "npm run sync && cd android && ./gradlew assembleRelease",
-    "test:smoke": "node tests/smoke.js"
+    "test": "npm run test:smoke && npm run test:ablauf && npm run test:logik",
+    "test:smoke": "node tests/smoke.js",
+    "test:ablauf": "node tests/ablauf.js",
+    "test:logik": "node tests/logik.js"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
