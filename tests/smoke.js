@@ -14,7 +14,7 @@ const ROUTES = [
   '/einstellungen', '/fahrt/:id', '/fahrt/neu', '/fahrten', '/finanzen', '/gruendung', '/kunde/:id', '/kunde/:id/bearbeiten',
   '/kunde/neu', '/kunden', '/leistungen', '/maengel', '/mangel/:id', '/mangel/:id/bearbeiten', '/mangel/neu', '/material',
   '/material/:id', '/material/neu', '/mehr', '/monatsabschluss', '/nachweise', '/objekt/:id', '/objekt/:id/aushang',
-  '/objekt/:id/bearbeiten', '/objekt/:id/jahr', '/objekt/:id/nachweis', '/objekt/:id/plan', '/objekt/:id/vertrag',
+  '/objekt/:id/bearbeiten', '/objekt/:id/jahr', '/objekt/:id/nachweis', '/objekt/:id/plan', '/objekt/:id/vertrag', '/objekt/:id/zusatz', '/leistungsverzeichnis',
   '/objekt/neu', '/objekte', '/preise', '/preise/schreiben/:kid', '/rechnung/:id', '/rechnung/neu', '/rechnungen',
   '/suche', '/fotos', '/akquise', '/akquise/neu', '/termin/:id', '/termin/neu', '/termine', '/tour', '/winter', '/winter/:id', '/winter/:id/bearbeiten',
   '/winter/neu', '/winter/protokoll/:id',

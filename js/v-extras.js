@@ -265,7 +265,29 @@ route('/objekt/:id/zusatz', async ({ id }) => {
   if (!o) return go('#/objekte', true);
   const k = await DB.get('customers', o.kundeId) || { name: '' };
   const heute = today();
+  const aktiv = (l) => !o.katalogIds || o.katalogIds.includes(l.id);
+  const katalogItems = () => S.leistungen.filter(aktiv);
   render('Zusätzliche Arbeit', `
+    <h3 class="doc-h3">📋 Katalog als PDF</h3>
+    <form id="kf" class="card form">
+      <p class="muted small">Haken setzen, welche Leistungen im PDF für ${esc(k.name)} stehen.</p>
+      ${S.leistungen.map((l) => `<label class="check"><input type="checkbox" name="${esc(l.id)}" ${aktiv(l) ? 'checked' : ''}> ${esc(l.name)} <span class="muted small">${unitPrice(l)}</span></label>`).join('') || '<div class="empty small">Noch keine Leistungen.</div>'}
+    </form>
+    <details class="card no-print">
+      <summary>＋ Neue Leistung hinzufügen</summary>
+      <form id="neuLs" class="form mt">
+        <label>Bezeichnung<input name="name" required placeholder="z. B. Fassade säubern"></label>
+        <div class="grid2">
+          <label>Preis (€)<input type="number" step="0.01" min="0" name="preis" inputmode="decimal" required></label>
+          <label>Einheit<input name="einheit" value="Std." placeholder="Std., pauschal, Sack …"></label>
+        </div>
+        <label>Art<select name="art"><option value="arbeit">Arbeit</option><option value="material">Material</option><option value="fahrt">Anfahrt</option></select></label>
+        <button class="btn block" type="submit">＋ Hinzufügen</button>
+      </form>
+    </details>
+    ${docButtons()}
+    <div class="doc-wrap" id="katDoc">${zusatzKatalogDoc(o, k, katalogItems())}</div>
+    <h3 class="doc-h3">🧾 Rechnung für eine Arbeit</h3>
     <form id="zf" class="form">
       <p class="muted small">🏢 ${esc(objLabel(o))} · ${esc(k.name)}</p>
       <label>Datum der Arbeit<input type="date" name="datum" required value="${heute}"></label>
@@ -280,6 +302,28 @@ route('/objekt/:id/zusatz', async ({ id }) => {
       <button class="btn ghost block" type="submit" id="zSave">🧾 Rechnung erstellen</button>
     </form>
   `, { tab: '', back: true });
+  // Katalog: Haken ändern → Vorschau und Auswahl aktualisieren
+  $('#kf').addEventListener('change', async () => {
+    o.katalogIds = [...$('#kf').querySelectorAll('input[type=checkbox]')].filter((c) => c.checked).map((c) => c.name);
+    await DB.put('objects', o);
+    $('#katDoc').innerHTML = zusatzKatalogDoc(o, k, katalogItems());
+  });
+  // Neue Leistung: in die Leistungsliste aufnehmen und für dieses Objekt auswählen
+  $('#neuLs').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const name = fd.get('name').trim();
+    if (!name) return;
+    const bisher = katalogItems().map((l) => l.id);
+    const l = { id: DB.uid(), name, preis: toCents(fd.get('preis')), einheit: fd.get('einheit').trim() || 'pauschal', art: fd.get('art') };
+    S.leistungen = [...S.leistungen, l];
+    await saveSettings();
+    o.katalogIds = [...bisher, l.id];
+    await DB.put('objects', o);
+    toast(`✓ „${name}“ hinzugefügt`);
+    router();
+  });
+  wireDocButtons(`Leistungskatalog ${objLabel(o)}`, `Guten Tag${k.ansprechpartner ? ` ${k.ansprechpartner}` : ''},\n\nanbei mein Leistungskatalog mit den zusätzlichen Leistungen für ${objLabel(o)}.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`);
   const f = $('#zf');
   const summe = () => S.leistungen.reduce((s, l, i) => s + Math.round((l.preis || 0) * num(f[`m${i}`].value)), 0);
   const zeigeSumme = () => { $('#zTotal').innerHTML = `Gesamt: <b>${money(summe())}</b> <span class="muted small">(ohne Umsatzsteuer, Kleinunternehmer)</span>`; };
@@ -342,39 +386,54 @@ route('/objekt/:id/zusatz', async ({ id }) => {
 /* ---------- Leistungsverzeichnis als PDF für Kunden ---------- */
 const LV_GRUPPEN = [['arbeit', 'Reinigungsleistungen'], ['material', 'Material'], ['fahrt', 'Anfahrt']];
 
-function leistungsverzeichnisDoc() {
-  const leistungen = S.leistungen || [];
-  const gruppen = LV_GRUPPEN.map(([art, titel]) => {
-    const rows = leistungen.filter((l) => (l.art || 'arbeit') === art);
+// Gemeinsames Katalog-Layout (Vertragsstil) für Leistungsverzeichnis und Zusatzkatalog je Objekt
+function katalogDoc({ titel, untertitel, rechts, intro, geltung = '', items }) {
+  const art = (l) => (LV_GRUPPEN.some(([a]) => a === (l.art || 'arbeit')) ? (l.art || 'arbeit') : 'sonst');
+  const zeilen = [...LV_GRUPPEN, ['sonst', 'Weitere Leistungen']].map(([a, t]) => {
+    const rows = items.filter((l) => art(l) === a);
     if (!rows.length) return '';
-    return `<tr class="lv-gruppe"><th colspan="3">${titel}</th></tr>` + rows.map((l) => `<tr>
-      <td>${esc(l.name)}</td>
-      <td>${l.einheit === 'pauschal' ? 'pauschal' : `je ${esc(l.einheit)}`}</td>
-      <td class="r">${money(l.preis)}</td></tr>`).join('');
+    return `<tr class="lv-gruppe"><th colspan="3">${t}</th></tr>` + rows.map((l) => `<tr>
+      <td>${esc(l.name)}</td><td>${l.einheit === 'pauschal' ? 'pauschal' : `je ${esc(l.einheit)}`}</td><td class="r">${money(l.preis)}</td></tr>`).join('');
   }).join('');
-  const sonst = leistungen.filter((l) => !LV_GRUPPEN.some(([art]) => (l.art || 'arbeit') === art));
-  const sonstRows = sonst.length ? `<tr class="lv-gruppe"><th colspan="3">Weitere Leistungen</th></tr>` + sonst.map((l) => `<tr>
-      <td>${esc(l.name)}</td><td>${l.einheit === 'pauschal' ? 'pauschal' : `je ${esc(l.einheit)}`}</td><td class="r">${money(l.preis)}</td></tr>`).join('') : '';
   let n = 0;
-  const para = (title, body) => `<h3 class="doc-h3">§ ${++n} ${title}</h3>${body}`;
+  const para = (t, body) => `<h3 class="doc-h3">§ ${++n} ${t}</h3>${body}`;
   return `<article class="invoice-doc vertrag">
     ${docHeader()}
-    <h2 class="inv-title">Leistungsverzeichnis <span>Treppenhaus- und Objektreinigung</span></h2>
+    <h2 class="inv-title">${titel} <span>${untertitel}</span></h2>
     <div class="parties">
       <div><span class="doc-muted">Auftragnehmer</span><br><b>${esc(S.firma)}</b><br>Inh. ${esc(S.inhaber)}<br>${esc(S.strasse)}<br>${esc(S.plzOrt)}</div>
-      <div><span class="doc-muted">Gültig ab</span><br><b>${fmtDate(today())}</b><br><span class="doc-muted">bis auf Weiteres</span></div>
+      <div>${rechts}</div>
     </div>
-    ${para('Leistungen und Preise', `<p>Der Auftragnehmer bietet dem Auftraggeber folgende Leistungen zu den nachstehenden Preisen an:</p>
+    ${geltung ? para('Geltungsbereich', `<p>${geltung}</p>`) : ''}
+    ${para('Leistungen und Preise', `<p>${intro}</p>
       <table class="inv-items lv-tabelle">
         <thead><tr><th>Leistung</th><th>Einheit</th><th class="r">Preis</th></tr></thead>
-        <tbody>${gruppen}${sonstRows || (gruppen ? '' : '<tr><td colspan="3">Noch keine Leistungen eingetragen.</td></tr>')}</tbody>
-      </table>
-      <p>Die regelmäßige Reinigung richtet sich nach dem Angebot bzw. Vertrag für das jeweilige Objekt. Die Leistungen oben gelten für zusätzliche Arbeiten.</p>`)}
+        <tbody>${zeilen || '<tr><td colspan="3">Keine Leistungen ausgewählt.</td></tr>'}</tbody>
+      </table>`)}
     ${para('Umsatzsteuer', '<p>Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung). Alle Preise sind Endpreise.</p>')}
     ${para('Zusatzleistungen', '<p>Zusätzliche Arbeiten werden nur nach vorheriger Freigabe durch den Auftraggeber ausgeführt und nach Aufwand bzw. nach obigen Preisen abgerechnet.</p>')}
     ${para('Zahlungsziel', `<p>Rechnungen sind innerhalb von <b>${S.zahlungsziel || 0} Tagen</b> nach Rechnungsdatum ohne Abzug zahlbar.${S.iban ? ` Bankverbindung: IBAN ${esc(S.iban)}${S.bank ? `, ${esc(S.bank)}` : ''}.` : ''}</p>`)}
     ${para('Preisanpassung', '<p>Ändern sich die Kosten des Auftragnehmers, kann er die Preise mit einer Ankündigungsfrist von sechs Wochen angemessen anpassen.</p>')}
   </article>`;
+}
+
+function leistungsverzeichnisDoc() {
+  return katalogDoc({
+    titel: 'Leistungsverzeichnis', untertitel: 'Treppenhaus- und Objektreinigung',
+    rechts: `<span class="doc-muted">Gültig ab</span><br><b>${fmtDate(today())}</b><br><span class="doc-muted">bis auf Weiteres</span>`,
+    intro: 'Der Auftragnehmer bietet folgende Leistungen zu den nachstehenden Preisen an:',
+    items: S.leistungen || [],
+  });
+}
+
+function zusatzKatalogDoc(o, k, items) {
+  return katalogDoc({
+    titel: 'Leistungskatalog', untertitel: 'Zusätzliche Leistungen',
+    rechts: `<span class="doc-muted">für</span><br><b>${esc(k.name)}</b>${k.ansprechpartner ? `<br>z. H. ${esc(k.ansprechpartner)}` : ''}<br>${esc(k.strasse || '')}<br>${esc(k.plzOrt || '')}<br><span class="doc-muted">– nachfolgend „Auftraggeber“ –</span>`,
+    intro: 'Der Auftragnehmer bietet dem Auftraggeber folgende zusätzliche Leistungen zu den nachstehenden Preisen an:',
+    geltung: `Die Leistungen beziehen sich auf das Objekt <b>${esc(objAddress(o) || objLabel(o))}</b>.`,
+    items,
+  });
 }
 
 route('/leistungsverzeichnis', () => {
