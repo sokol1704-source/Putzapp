@@ -276,7 +276,8 @@ route('/objekt/:id/zusatz', async ({ id }) => {
       </div>`).join('') || '<div class="empty">Noch keine Leistungen. Lege sie unter Einstellungen → Leistungen & Preise an.</div>'}
       <label>Notiz für die Rechnung (optional)<textarea name="notiz" rows="2" placeholder="z. B. Graffiti am Eingang entfernt"></textarea></label>
       <div class="total" id="zTotal"></div>
-      <button class="btn block" type="submit" id="zSave">🧾 Rechnung erstellen</button>
+      <button class="btn block" type="button" id="zSenden">📤 An Kunden senden</button>
+      <button class="btn ghost block" type="submit" id="zSave">🧾 Rechnung erstellen</button>
     </form>
   `, { tab: '', back: true });
   const f = $('#zf');
@@ -284,6 +285,28 @@ route('/objekt/:id/zusatz', async ({ id }) => {
   const zeigeSumme = () => { $('#zTotal').innerHTML = `Gesamt: <b>${money(summe())}</b> <span class="muted small">(ohne Umsatzsteuer, Kleinunternehmer)</span>`; };
   f.addEventListener('input', zeigeSumme);
   zeigeSumme();
+  // Nachricht an den Kunden: Leistungen, Preise, Summe und Zahlungsziel
+  const gewaehlte = () => S.leistungen
+    .map((l, i) => ({ beschreibung: l.name, menge: num(f[`m${i}`].value), einheit: l.einheit, preis: l.preis || 0 }))
+    .filter((p) => p.menge > 0)
+    .map((p) => ({ ...p, betrag: Math.round(p.preis * p.menge) }));
+  $('#zSenden').addEventListener('click', () => {
+    const positionen = gewaehlte();
+    if (!positionen.length) return toast('Bitte mindestens eine Menge eintragen');
+    const datum = f.datum.value;
+    const faellig = fmtDate(addDays(datum, Number(S.zahlungsziel) || 0));
+    const zeilen = positionen.map((p) => `• ${fmtNum(p.menge)} ${p.einheit} ${p.beschreibung} – ${money(p.betrag)}`);
+    const text = [
+      `Guten Tag${k.ansprechpartner ? ` ${k.ansprechpartner}` : ''},`, '',
+      `für die Arbeiten am ${fmtDate(datum)} an ${objLabel(o)} berechne ich folgende Zusatzleistungen:`, '',
+      ...zeilen, '',
+      `Gesamt: ${money(positionen.reduce((s, p) => s + p.betrag, 0))} (ohne Umsatzsteuer, Kleinunternehmer gemäß § 19 UStG)`,
+      `Zahlbar bis ${faellig} (Zahlungsziel ${S.zahlungsziel || 0} Tage).`,
+      S.iban ? `Bitte überweisen Sie den Betrag auf IBAN ${S.iban}${S.bank ? ` (${S.bank})` : ''}.` : '',
+      '', 'Viele Grüße', S.inhaber, S.firma,
+    ].join('\n');
+    shareText(text, 'Zusätzliche Leistungen');
+  });
   f.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(f);
