@@ -59,9 +59,9 @@ route('/objekt/:id/vertrag', async ({ id }) => {
       ${v.haftpflicht ? '' : '<p class="danger-text small">Ohne Betriebshaftpflicht steht das nicht im Vertrag. Bei mehreren Aufträgen solltest du sie abschließen.</p>'}
       <label>Betriebshaftpflicht bei (optional)<input name="versicherung" value="${esc(v.versicherung)}" placeholder="z. B. Versicherung XY, Nr. 123"></label>
       ${docActionButtons(`<button type="button" class="btn ghost" id="signAG">✍️ ${sigAG ? 'Neu: ' : ''}Auftraggeber</button><button type="button" class="btn ghost" id="signAN">✍️ ${sigAN ? 'Neu: ' : ''}Ich</button>`)}
+      <a class="btn ghost block no-print" href="#/objekt/${id}/zusatz">🧾 Zusätzliche Arbeit abrechnen</a>
       <p class="muted small">Muster nach bestem Wissen – keine Rechtsberatung. Leistungen, Preis und Winterdienst kommen aus den Angaben beim Haus.</p>
     </form>
-    <a class="btn ghost block no-print" href="#/objekt/${id}/zusatz">🧾 Zusätzliche Arbeit abrechnen</a>
     <div class="doc-wrap" id="docWrap">${vertragDoc(o, k, v, sigAG, sigAN)}</div>
   `);
   $('#vf').addEventListener('change', async () => {
