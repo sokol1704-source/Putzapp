@@ -165,6 +165,7 @@ route('/leistungen', () => {
     <div id="items" class="form"></div>
     <button type="button" class="btn ghost block" id="add">+ Leistung hinzufügen</button>
     <button type="button" class="btn block" id="save">Speichern</button>
+    <a class="btn ghost block" href="#/leistungsverzeichnis">📄 Leistungsverzeichnis als PDF</a>
     <button type="button" class="btn ghost block" id="reset">Vorlagen für Mehrfamilienhäuser laden</button>
     <details class="mt"><summary>💡 Woher kommen die Vorschlagspreise?</summary>
       <div class="card small mt">Richtwerte für ein Kleingewerbe ohne Umsatzsteuer. Treppenhausreinigung kostet bei Firmen meist 25–80 € pro Etage und Monat (wöchentlich), für ein kleines Mehrfamilienhaus 80–250 € im Monat – zzgl. 19 % USt. Mülltonnen-Service ca. 2–4 € pro Tonne und Leerung. Passe die Preise an deine Region an.</div>

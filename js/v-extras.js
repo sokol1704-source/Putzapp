@@ -338,3 +338,23 @@ route('/objekt/:id/zusatz', async ({ id }) => {
     go(`#/rechnung/${inv.id}`, true);
   });
 });
+
+/* ---------- Leistungsverzeichnis als PDF für Kunden ---------- */
+route('/leistungsverzeichnis', () => {
+  const zeilen = S.leistungen.map((l) => `<tr><td>${esc(l.name)}</td><td class="r">${unitPrice(l)}</td></tr>`).join('');
+  render('Leistungsverzeichnis', `
+    ${docButtons()}
+    <div class="doc-wrap"><article class="invoice-doc">
+      ${docHeader()}
+      <h2 class="inv-title">Leistungsverzeichnis <span>Treppenhaus- und Objektreinigung</span></h2>
+      <p>Hier finden Sie meine Leistungen mit den Preisen. Alle Preise verstehen sich ohne Umsatzsteuer, da ich als Kleinunternehmer gemäß § 19 UStG keine Umsatzsteuer ausweise.</p>
+      <table class="inv-items">
+        <thead><tr><th>Leistung</th><th class="r">Preis</th></tr></thead>
+        <tbody>${zeilen || '<tr><td colspan="2">Noch keine Leistungen eingetragen.</td></tr>'}</tbody>
+      </table>
+      <p class="inv-note">Für die regelmäßige Reinigung gilt das Angebot für Ihr Haus. Zusatzleistungen rechne ich nach Ihrer Freigabe ab. Zahlungsziel: ${S.zahlungsziel || 0} Tage nach Rechnungsdatum.</p>
+      ${docFooter()}
+    </article></div>
+  `, { tab: '', back: true });
+  wireDocButtons('Leistungsverzeichnis', `Guten Tag,\n\nanbei mein Leistungsverzeichnis mit den Preisen.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`);
+});
