@@ -50,6 +50,11 @@ const BASE = process.env.APP_URL || 'http://localhost:8765/';
     pruefe('Fortlaufend im selben Jahr', await nextNumber('invoices', 'RE', '2030-06-01'), 'RE-2030-003');
     pruefe('Neues Jahr beginnt wieder bei 001', await nextNumber('invoices', 'RE', '2031-01-02'), 'RE-2031-001');
 
+    pruefe('Lücke in der Rechnungsnummer wird gefunden',
+      nummernLuecken([{ nummer: 'RE-2026-001' }, { nummer: 'RE-2026-003' }, { nummer: 'RE-2026-004' }, { nummer: 'RE-2027-001' }]),
+      [{ key: 'RE-2026', fehlend: [2] }]);
+    pruefe('Lückenlose Nummern melden nichts', nummernLuecken([{ nummer: 'RE-2026-001' }, { nummer: 'RE-2026-002' }]), []);
+
     /* Kassenbon */
     pruefe('Bon mit SUMME-Zeile', parseBon('REWE\nMilch 1,29\nPutzmittel 4,99\nSUMME EUR 6,28\n02.11.2026 10:15'), { betrag: 628, datum: '2026-11-02' });
     pruefe('Bon mit Tausenderpunkt und 2-stelligem Jahr', parseBon('Bauhaus\nHochdruckreiniger 1.249,00\nGesamt 1.249,00\n05.03.26'), { betrag: 124900, datum: '2026-03-05' });

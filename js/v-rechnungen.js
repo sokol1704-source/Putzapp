@@ -21,8 +21,28 @@ async function nextNumber(store, prefix, datum, start = 1) {
   return full + String(n).padStart(3, '0');
 }
 
+// Fehlende Rechnungsnummern je Jahr (zwischen der kleinsten und größten vergebenen Nummer)
+function nummernLuecken(invoices) {
+  const jahre = {};
+  for (const i of invoices) {
+    const m = String(i.nummer || '').match(/^(.*)-(\d{4})-(\d+)$/);
+    if (!m) continue;
+    const key = `${m[1]}-${m[2]}`;
+    (jahre[key] ||= new Set()).add(Number(m[3]));
+  }
+  const luecken = [];
+  for (const [key, nums] of Object.entries(jahre)) {
+    const max = Math.max(...nums);
+    const fehlend = [];
+    for (let n = 1; n <= max; n++) if (!nums.has(n)) fehlend.push(n);
+    if (fehlend.length) luecken.push({ key, fehlend });
+  }
+  return luecken;
+}
+
 route('/rechnungen', async (_, q) => {
   const invoices = (await DB.all('invoices')).sort((a, b) => b.nummer.localeCompare(a.nummer));
+  const luecken = nummernLuecken(invoices);
   const filter = q.filter || 'alle';
   const year = new Date().getFullYear();
   const umsatz = invoices.filter((i) => i.status !== 'storniert' && i.datum.startsWith(String(year))).reduce((s, i) => s + i.summe, 0);
@@ -37,6 +57,9 @@ route('/rechnungen', async (_, q) => {
       <div class="muted small">Kleinunternehmergrenze: 25.000 € im Vorjahr, 100.000 € im laufenden Jahr (§ 19 UStG).</div>
     </div>
     ${overdue.length ? `<div class="card hint">⏰ <b>${overdue.length} Rechnung${overdue.length === 1 ? '' : 'en'} überfällig</b> – in der Rechnung auf „Zahlungserinnerung“ tippen.</div>` : ''}
+    ${luecken.length ? `<div class="card hint danger-text">⚠️ <b>Lücken in der Rechnungsnummerierung</b>
+      ${luecken.map((l) => `<div class="small mt">${esc(l.key)}: fehlt ${l.fehlend.map((n) => String(n).padStart(3, '0')).join(', ')}</div>`).join('')}
+      <div class="small mt">Eine gelöschte Rechnung hinterlässt eine Lücke. Für die Buchhaltung solltest du sie erklären können, z. B. „Fehlerhafter Entwurf, nie versendet“. Bereits versendete Rechnungen besser stornieren statt löschen.</div></div>` : ''}
     <div class="seg mt">
       ${['alle', 'offen', 'bezahlt', 'storniert'].map((f) => `<a href="#/rechnungen?filter=${f}" class="${filter === f ? 'active' : ''}">${f[0].toUpperCase() + f.slice(1)}</a>`).join('')}
     </div>
