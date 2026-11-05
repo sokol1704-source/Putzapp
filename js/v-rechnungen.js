@@ -22,6 +22,29 @@ async function nextNumber(store, prefix, datum, start = 1) {
 }
 
 // Fehlende Rechnungsnummern je Jahr (zwischen der kleinsten und größten vergebenen Nummer)
+// Ratenplan: Summe gleichmäßig auf n Monatsraten verteilen, die letzte Rate nimmt die Cent-Reste auf
+function ratenPlan(summe, n, ersteRate) {
+  const [j, mo, tag] = ersteRate.split('-').map(Number);
+  const basis = Math.floor(summe / n);
+  const rest = summe - basis * n;
+  return Array.from({ length: n }, (_, i) => {
+    const letzterTag = new Date(j, mo - 1 + i + 1, 0).getDate();
+    return {
+      nr: i + 1,
+      faellig: isoDate(new Date(j, mo - 1 + i, Math.min(tag, letzterTag))),
+      betrag: basis + (i === n - 1 ? rest : 0),
+      bezahltAm: null,
+    };
+  });
+}
+// Offener Betrag, und ob die Rechnung nach dem Zahlungsstand als bezahlt gilt
+const restBetrag = (i) => (i.raten ? i.raten.filter((r) => !r.bezahltAm).reduce((s, r) => s + r.betrag, 0) : i.summe);
+function ratenStand(inv) {
+  const offen = inv.raten.filter((r) => !r.bezahltAm);
+  if (!offen.length) return { status: 'bezahlt', bezahltAm: inv.raten.map((r) => r.bezahltAm).sort().pop(), faellig: inv.raten[inv.raten.length - 1].faellig };
+  return { status: 'offen', bezahltAm: null, faellig: offen[0].faellig };
+}
+
 function nummernLuecken(invoices) {
   const jahre = {};
   for (const i of invoices) {
@@ -387,7 +410,10 @@ function invoiceDoc(inv) {
       ? `<p class="inv-note">Im Rechnungsbetrag sind Arbeits- und Fahrtkosten in Höhe von <b>${money(inv.arbeitskosten)}</b> enthalten (haushaltsnahe Dienstleistung, § 35a EStG). Die Steuerermäßigung setzt eine Zahlung per Überweisung voraus.</p>
          <p class="inv-note small">Bitte bewahren Sie diese Rechnung zwei Jahre auf (§ 14b Abs. 1 Satz 5 UStG).</p>`
       : `<p class="inv-note">Enthaltene Arbeits- und Fahrtkosten im Sinne des § 35a EStG (z. B. für die Betriebskostenabrechnung): <b>${money(inv.arbeitskosten)}</b>.</p>`}
-    <p>Bitte überweisen Sie den Gesamtbetrag ${inv.faellig > inv.datum ? `bis zum <b>${fmtDate(inv.faellig)}</b>` : '<b>sofort ohne Abzug</b>'} unter Angabe der Rechnungsnummer auf das unten genannte Konto.</p>
+    ${inv.raten
+      ? `<p>Der Gesamtbetrag ist in ${inv.raten.length} Monatsraten zahlbar. Bitte überweisen Sie jede Rate zum genannten Termin unter Angabe der Rechnungsnummer auf das unten genannte Konto.</p>
+        <table class="inv-items small-table"><thead><tr><th>Rate</th><th>Fällig am</th><th class="r">Betrag</th></tr></thead><tbody>${inv.raten.map((r) => `<tr><td>${r.nr}</td><td>${fmtDate(r.faellig)}</td><td class="r">${money(r.betrag)}</td></tr>`).join('')}</tbody></table>`
+      : `<p>Bitte überweisen Sie den Gesamtbetrag ${inv.faellig > inv.datum ? `bis zum <b>${fmtDate(inv.faellig)}</b>` : '<b>sofort ohne Abzug</b>'} unter Angabe der Rechnungsnummer auf das unten genannte Konto.</p>`}
     ${inv.notiz ? `<p>${nl2br(inv.notiz)}</p>` : ''}
     <p>Mit freundlichen Grüßen<br>${esc(a.inhaber)}</p>
     ${docFooter(a)}
@@ -399,14 +425,17 @@ route('/rechnung/:id', async ({ id }) => {
   if (!inv) return go('#/rechnungen', true);
   const [label, cls] = STATUS[inv.status];
   const overdue = inv.status === 'offen' && inv.faellig < today();
+  const bezahlteRaten = inv.raten ? inv.raten.filter((r) => r.bezahltAm).length : 0;
   render(inv.nummer, `
     <div class="card no-print">
-      <div class="row between"><span>Status</span><span class="badge ${overdue ? 'bad' : cls}">${overdue ? `überfällig seit ${fmtDate(inv.faellig)}` : label}${inv.bezahltAm ? ` am ${fmtDate(inv.bezahltAm)}` : ''}</span></div>
+      <div class="row between"><span>Status</span><span class="badge ${overdue ? 'bad' : cls}">${overdue ? `überfällig seit ${fmtDate(inv.faellig)}` : label}${inv.raten ? ` · ${bezahlteRaten} von ${inv.raten.length} Raten` : ''}${inv.bezahltAm && !inv.raten ? ` am ${fmtDate(inv.bezahltAm)}` : ''}</span></div>
+      ${inv.raten ? `<div class="mt">${inv.raten.map((r) => `<div class="row between small mt"><span>Rate ${r.nr} · fällig ${fmtDate(r.faellig)} · <b>${money(r.betrag)}</b></span>
+        <button class="btn small ${r.bezahltAm ? 'ghost' : ''}" data-rate="${r.nr}">${r.bezahltAm ? `✓ ${fmtDate(r.bezahltAm)} · rückgängig` : '✓ bezahlt'}</button></div>`).join('')}</div>` : ''}
       <div class="quick">
         <button class="btn" id="sendPdf">📤 Als PDF senden</button>
         <button class="btn ghost" id="print">🖨️ Drucken</button>
-        ${inv.status === 'offen' ? '<button class="btn ghost" id="paid">✓ Bezahlt</button>' : ''}
-        ${inv.status === 'bezahlt' ? '<button class="btn ghost" id="unpaid">Wieder offen</button>' : ''}
+        ${inv.raten ? '' : inv.status === 'offen' ? '<button class="btn ghost" id="paid">✓ Bezahlt</button>' : ''}
+        ${inv.raten ? '' : inv.status === 'bezahlt' ? '<button class="btn ghost" id="unpaid">Wieder offen</button>' : ''}
         ${overdue ? `<button class="btn ghost" id="remind">${inv.mahnstufe ? `📨 ${inv.mahnstufe + 1}. Mahnung` : '⏰ Zahlungserinnerung'}</button>` : ''}
       </div>
       <p class="muted small">„Als PDF senden“ öffnet WhatsApp, E-Mail & Co. direkt mit der fertigen PDF.</p>
@@ -417,6 +446,14 @@ route('/rechnung/:id', async ({ id }) => {
     <p class="muted small no-print">Nur löschen, wenn die Rechnung noch nicht an den Kunden gegangen ist. Sonst bitte stornieren. Die Nummer ${esc(inv.nummer)} wird danach wieder für die nächste Rechnung vergeben, wenn es die neueste war.</p>
   `);
   wireDocButtons(`Rechnung ${inv.nummer}`, `Guten Tag${inv.kunde.ansprechpartner ? ` ${inv.kunde.ansprechpartner}` : ''},\n\nanbei erhalten Sie die Rechnung ${inv.nummer} über ${money(inv.summe)}.\n\nViele Grüße\n${inv.absender.inhaber}\n${inv.absender.firma}`);
+  document.querySelectorAll('[data-rate]').forEach((btn) => btn.addEventListener('click', async () => {
+    const r = inv.raten.find((x) => x.nr === Number(btn.dataset.rate));
+    r.bezahltAm = r.bezahltAm ? null : today();
+    Object.assign(inv, ratenStand(inv));
+    await DB.put('invoices', inv);
+    if (inv.status === 'bezahlt') { confetti(); vibrate([15, 60, 15]); toast('🎉 Alle Raten bezahlt'); }
+    router();
+  }));
   $('#paid')?.addEventListener('click', async () => {
     Object.assign(inv, { status: 'bezahlt', bezahltAm: today() });
     await DB.put('invoices', inv);
@@ -437,13 +474,13 @@ route('/rechnung/:id', async ({ id }) => {
     const konto = `${inv.absender.bank ? `${inv.absender.bank}, ` : ''}IBAN ${inv.absender.iban}`;
     const text = stufe === 0
       ? [`Zahlungserinnerung – Rechnung ${inv.nummer}`, '', anrede, '',
-        `sicher ist es Ihrer Aufmerksamkeit entgangen: Die Rechnung ${inv.nummer} vom ${fmtDate(inv.datum)} über ${money(inv.summe)} war am ${fmtDate(inv.faellig)} fällig.`,
+        `sicher ist es Ihrer Aufmerksamkeit entgangen: Die Rechnung ${inv.nummer} vom ${fmtDate(inv.datum)} über ${money(restBetrag(inv))} war am ${fmtDate(inv.faellig)} fällig.`,
         'Bitte überweisen Sie den Betrag innerhalb der nächsten 7 Tage auf folgendes Konto:',
         konto, `Verwendungszweck: ${inv.nummer}`, '',
         'Sollte sich Ihre Zahlung mit dieser Erinnerung überschnitten haben, betrachten Sie dieses Schreiben bitte als gegenstandslos.', '',
         'Mit freundlichen Grüßen', inv.absender.inhaber, inv.absender.firma].join('\n')
       : [`${stufe + 1}. Mahnung – Rechnung ${inv.nummer}`, '', anrede, '',
-        `trotz unserer bisherigen Erinnerung ist die Rechnung ${inv.nummer} vom ${fmtDate(inv.datum)} über ${money(inv.summe)} (fällig seit ${fmtDate(inv.faellig)}) noch nicht bei uns eingegangen.`,
+        `trotz unserer bisherigen Erinnerung ist die Rechnung ${inv.nummer} vom ${fmtDate(inv.datum)} über ${money(restBetrag(inv))} (fällig seit ${fmtDate(inv.faellig)}) noch nicht bei uns eingegangen.`,
         `Wir bitten Sie, den Betrag bis spätestens ${frist} auf folgendes Konto zu überweisen:`,
         konto, `Verwendungszweck: ${inv.nummer}`, '',
         'Bei Fragen zur Rechnung melden Sie sich bitte umgehend bei mir.', '',
@@ -748,8 +785,10 @@ route('/objekt/:id/jahresrechnung', async ({ id }, q) => {
     <form id="jf" class="form mt">
       <div class="grid2">
         <label>Rechnungsdatum<input type="date" name="datum" required value="${today()}"></label>
-        <label>Zahlungsziel (Tage)<input type="number" name="zahlungsziel" min="0" value="${S.zahlungsziel}"></label>
+        <label id="jziel">Zahlungsziel (Tage)<input type="number" name="zahlungsziel" min="0" value="${S.zahlungsziel}"></label>
       </div>
+      <label>Zahlung<select name="zahlung" id="jzahlung"><option value="einmal">in einer Summe</option><option value="raten">in 12 Monatsraten</option></select></label>
+      <label id="jrate" hidden>Erste Rate fällig am<input type="date" name="ersteRate" value="${isoDate(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1))}"></label>
       <div class="label">Positionen</div>
       ${positionen.length ? `<table class="inv-items"><thead><tr><th>Leistung</th><th class="r">Betrag</th></tr></thead><tbody>${positionen.map((p) => `<tr><td>${esc(p.beschreibung)}</td><td class="r">${money(Math.round((p.preis || 0) * (p.menge || 0)))}</td></tr>`).join('')}</tbody></table>` : '<div class="empty small">Im Zeitraum gibt es nichts abzurechnen.</div>'}
       <div class="total">Gesamt: <b>${money(summe)}</b> <span class="muted small">(ohne Umsatzsteuer, Kleinunternehmer)</span></div>
@@ -758,6 +797,12 @@ route('/objekt/:id/jahresrechnung', async ({ id }, q) => {
     </form>
   `, { tab: '', back: true });
 
+  $('#jzahlung').addEventListener('change', (e) => {
+    const raten = e.target.value === 'raten';
+    $('#jrate').hidden = !raten;
+    $('#jziel').hidden = raten;
+  });
+
   $('#jf').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (vorhanden && !confirm(`Für ${jahr} gibt es schon Rechnung ${vorhanden.nummer}. Trotzdem noch eine erstellen?`)) return;
@@ -765,10 +810,13 @@ route('/objekt/:id/jahresrechnung', async ({ id }, q) => {
     const fd = new FormData(e.target);
     const datum = fd.get('datum');
     const pos = positionen.map((p) => ({ ...p, betrag: Math.round((p.preis || 0) * (p.menge || 0)) }));
+    const summeNeu = pos.reduce((s, p) => s + p.betrag, 0);
+    const raten = fd.get('zahlung') === 'raten' && fd.get('ersteRate') ? ratenPlan(summeNeu, 12, fd.get('ersteRate')) : null;
     const inv = {
       nummer: await nextNumber('invoices', S.nrPrefix || 'RE', datum, S.nrStart),
       datum,
-      faellig: addDays(datum, Number(fd.get('zahlungsziel')) || 0),
+      faellig: raten ? raten[0].faellig : addDays(datum, Number(fd.get('zahlungsziel')) || 0),
+      ...(raten ? { raten } : {}),
       monat: null,
       zeitraum: jahr,
       kundeId: o.kundeId,

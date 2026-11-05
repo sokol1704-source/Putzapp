@@ -194,19 +194,28 @@ async function fahrtForm(f, q) {
 /* ---------- Finanzen / EÜR ---------- */
 async function financeData(jahr) {
   const [invoices, ausgaben, fahrten] = await Promise.all([DB.all('invoices'), DB.all('ausgaben'), DB.all('fahrten')]);
-  // Einnahmen zählen bei der EÜR, wenn das Geld da ist (Zuflussprinzip)
-  const einnahmen = invoices.filter((i) => i.status === 'bezahlt' && yearOf(i.bezahltAm || i.datum) === jahr).sort((a, b) => (a.bezahltAm || a.datum).localeCompare(b.bezahltAm || b.datum));
+  // Einnahmen zählen bei der EÜR, wenn das Geld da ist (Zuflussprinzip). Bei Ratenzahlung zählt jede Rate im Monat ihres Eingangs.
+  const zufluesse = [];
+  for (const i of invoices) {
+    if (i.status === 'storniert') continue;
+    if (i.raten) {
+      for (const r of i.raten) if (r.bezahltAm && yearOf(r.bezahltAm) === jahr) zufluesse.push({ datum: r.bezahltAm, betrag: r.betrag, nummer: `${i.nummer} Rate ${r.nr}`, kunde: i.kunde });
+    } else if (i.status === 'bezahlt' && yearOf(i.bezahltAm || i.datum) === jahr) {
+      zufluesse.push({ datum: i.bezahltAm || i.datum, betrag: i.summe, nummer: i.nummer, kunde: i.kunde });
+    }
+  }
+  const einnahmen = zufluesse.sort((a, b) => a.datum.localeCompare(b.datum));
   const aus = ausgaben.filter((a) => yearOf(a.datum) === jahr).sort((a, b) => a.datum.localeCompare(b.datum));
   const fa = fahrten.filter((f) => yearOf(f.datum) === jahr).sort((a, b) => a.datum.localeCompare(b.datum));
   const km = fa.reduce((s, f) => s + num(f.km), 0);
   const fahrtkosten = Math.round(km * KM_SATZ);
-  const sumE = einnahmen.reduce((s, i) => s + i.summe, 0);
+  const sumE = einnahmen.reduce((s, z) => s + z.betrag, 0);
   // Fahrzeug-Kosten zählen nicht, weil die km-Pauschale sie abdeckt
   const abzug = aus.filter((a) => a.kategorie !== KFZ_KATEGORIE);
   const byKat = {};
   abzug.forEach((a) => { byKat[a.kategorie] = (byKat[a.kategorie] || 0) + betrieblich(a); });
   const sumA = abzug.reduce((s, a) => s + betrieblich(a), 0) + fahrtkosten;
-  const offen = invoices.filter((i) => i.status === 'offen').reduce((s, i) => s + i.summe, 0);
+  const offen = invoices.filter((i) => i.status === 'offen').reduce((s, i) => s + restBetrag(i), 0);
   const umsatz = invoices.filter((i) => i.status !== 'storniert' && yearOf(i.datum) === jahr).reduce((s, i) => s + i.summe, 0);
   const gewinn = sumE - sumA;
   const ruecklage = Math.max(0, Math.round((gewinn * (S.steuerRuecklage ?? 25)) / 100));
@@ -261,7 +270,7 @@ route('/finanzen', async (_, q) => {
     const c = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const eur = (cents) => (cents / 100).toFixed(2).replace('.', ',');
     const rows = [[`Einnahmen-Überschuss-Rechnung ${jahr} – ${S.firma}`], [], ['Datum', 'Art', 'Kategorie', 'Beschreibung', 'Betrag (EUR)', 'Beleg']];
-    d.einnahmen.forEach((i) => rows.push([fmtDate(i.bezahltAm || i.datum), 'Einnahme', 'Betriebseinnahme (§ 19 UStG)', `${i.nummer} ${i.kunde.name}`, eur(i.summe), i.nummer]));
+    d.einnahmen.forEach((z) => rows.push([fmtDate(z.datum), 'Einnahme', 'Betriebseinnahme (§ 19 UStG)', `${z.nummer} ${z.kunde.name}`, eur(z.betrag), z.nummer]));
     d.aus.forEach((a) => rows.push([fmtDate(a.datum), 'Ausgabe', a.kategorie === KFZ_KATEGORIE ? `${a.kategorie} (nicht abgezogen, km-Pauschale)` : a.kategorie, `${a.beschreibung} (${a.zahlung})${a.privat ? ` – ${100 - a.privat} % beruflich von ${eur(a.betrag)} €` : ''}`, eur(-betrieblich(a)), a.fotoAnzahl ? 'Foto in App' : 'fehlt']));
     d.fa.forEach((f) => rows.push([fmtDate(f.datum), 'Ausgabe', 'Fahrtkosten (0,30 €/km)', `${fmtNum(f.km)} km – ${f.zweck}`, eur(-Math.round(num(f.km) * KM_SATZ)), 'Fahrtenbuch']));
     rows.push([], ['', 'Ausgaben nach Kategorie'], ...Object.entries(d.byKat).sort((a, b) => b[1] - a[1]).map(([k, v]) => ['', k, '', '', eur(-v)]));

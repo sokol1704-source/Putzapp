@@ -173,6 +173,22 @@ const anzahl = (p, store) => p.evaluate((s) => DB.all(s).then((r) => r.length), 
   if (!monatText.includes('Jährliche Abrechnung') && !monatText.includes('Jahresabrechnung')) report.push('Monatsabschluss: jährliches Haus nicht als jährlich erkannt');
   else ok.push('Monatsabschluss überspringt jährliches Haus');
 
+  // 4c) Jahresrechnung in 12 Monatsraten: erstellen, erste Rate abhaken
+  const jahrRaten = String(new Date().getFullYear() - 2);
+  await geh(`/objekt/${ids.objekt}/jahresrechnung?jahr=${jahrRaten}&modus=nach`);
+  await p.selectOption('#jzahlung', 'raten');
+  await p.fill('#jf input[name=ersteRate]', `${Number(jahrRaten) + 1}-02-01`);
+  await p.click('#jsave'); await p.waitForTimeout(700);
+  const rInv = await p.evaluate(async (j) => (await DB.all('invoices')).find((i) => i.zeitraum === j && i.raten), jahrRaten);
+  if (!rInv) report.push('Ratenrechnung: nicht erstellt');
+  else if (rInv.raten.length !== 12 || rInv.raten[0].faellig !== `${Number(jahrRaten) + 1}-02-01`) report.push(`Ratenrechnung: falscher Plan (${rInv.raten.length} Raten, erste ${rInv.raten[0].faellig})`);
+  else {
+    await p.click(`[data-rate="1"]`); await p.waitForTimeout(600);
+    const nach = await p.evaluate(async (id) => { const i = await DB.get('invoices', id); return { r1: !!i.raten[0].bezahltAm, status: i.status }; }, rInv.id);
+    if (!nach.r1 || nach.status !== 'offen') report.push(`Ratenrechnung: Rate 1 nicht als bezahlt markiert (${JSON.stringify(nach)})`);
+    else ok.push(`Ratenrechnung ${rInv.nummer}: 12 Raten, erste Rate abgehakt, Rechnung bleibt offen`);
+  }
+
   // 5) Mangel erledigen, Akquise gewonnen → Kunde
   await geh(`/mangel/${ids.mangel}`);
   const erledigtBtn = await p.$('#done');

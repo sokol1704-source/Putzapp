@@ -87,6 +87,25 @@ const BASE = process.env.APP_URL || 'http://localhost:8765/';
     const d31 = await financeData('2031');
     pruefe('Dezember-Rechnung zählt im Jahr der Zahlung', d31.sumE, 50000);
 
+    /* Ratenzahlung */
+    const plan = ratenPlan(10001, 12, '2027-01-15');
+    pruefe('Ratenplan: 12 Raten', plan.length, 12);
+    pruefe('Ratenplan: Summe bleibt exakt', plan.reduce((s, r) => s + r.betrag, 0), 10001);
+    pruefe('Ratenplan: letzte Rate nimmt den Cent-Rest auf', plan[11].betrag, Math.floor(10001 / 12) + (10001 - Math.floor(10001 / 12) * 12));
+    pruefe('Ratenplan: erste und letzte Fälligkeit', [plan[0].faellig, plan[11].faellig], ['2027-01-15', '2027-12-15']);
+    pruefe('Ratenplan: Monatsende wird geklemmt', ratenPlan(1200, 12, '2027-01-31')[1].faellig, '2027-02-28');
+    const teil = { raten: plan.map((r, i) => ({ ...r, bezahltAm: i < 2 ? '2027-02-01' : null })) };
+    pruefe('Teilzahlung: Rechnung bleibt offen, nächste Fälligkeit', [ratenStand(teil).status, ratenStand(teil).faellig], ['offen', '2027-03-15']);
+    const voll = { raten: plan.map((r) => ({ ...r, bezahltAm: '2027-06-01' })) };
+    pruefe('Alle Raten bezahlt: Rechnung bezahlt', ratenStand(voll).status, 'bezahlt');
+    for (const s of DB.stores) await DB.clear(s);
+    await DB.put('invoices', { nummer: 'RE-2030-010', status: 'offen', datum: '2030-01-01', faellig: '2030-02-01', summe: 1200, kunde: { name: 'R' }, raten: ratenPlan(1200, 12, '2030-02-01').map((r, i) => ({ ...r, bezahltAm: i < 3 ? '2030-03-0' + (i + 1) : (i === 3 ? '2031-01-05' : null) })) });
+    const rd = await financeData('2030');
+    pruefe('EÜR: jede bezahlte Rate zählt im Monat ihres Eingangs (3 Raten 2030)', rd.sumE, 300);
+    pruefe('EÜR: Rate aus 2031 zählt nicht in 2030', rd.einnahmen.length, 3);
+    pruefe('Offener Betrag = Summe der unbezahlten Raten', restBetrag({ raten: ratenPlan(1200, 12, '2030-02-01').map((r, i) => ({ ...r, bezahltAm: i < 3 ? 'x' : null })) }), 900);
+    for (const s of DB.stores) await DB.clear(s);
+
     for (const s of DB.stores) await DB.clear(s);
     return out;
   });
