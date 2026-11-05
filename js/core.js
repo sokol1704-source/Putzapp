@@ -242,6 +242,14 @@ const objLabel = (o) => (o ? o.name || o.strasse || 'Haus ohne Namen' : 'Unbekan
 const objAddress = (o) => [o?.strasse, o?.plzOrt].filter(Boolean).join(', ');
 const kundeName = (kmap, id) => kmap[id]?.name ?? 'Unbekannter Auftraggeber';
 const isMonthly = (o) => o?.abrechnung === 'monat';
+// Abrechnungsart je Haus: monatlich nachträglich (Standard), jährlich nachträglich oder jährlich im Voraus
+const ZYKLEN = {
+  monat: { label: 'monatlich nachträglich', vertrag: 'monatlich nachträglich' },
+  jahr: { label: 'jährlich nachträglich', vertrag: 'jährlich nachträglich für das vergangene Kalenderjahr' },
+  voraus: { label: 'jährlich im Voraus', vertrag: 'jährlich im Voraus für das folgende Kalenderjahr' },
+};
+const zyklusOf = (o) => o?.vertrag?.zyklus || 'monat';
+const monatlichAbgerechnet = (o) => zyklusOf(o) === 'monat';
 const priceLabel = (o) => (isMonthly(o) ? `${money(o.monatspauschale || 0)}/Monat` : `${money(o.stundensatz || 0)}/Std.`);
 const mapsUrl = (addr) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
 

@@ -55,6 +55,11 @@ const BASE = process.env.APP_URL || 'http://localhost:8765/';
       [{ key: 'RE-2026', fehlend: [2] }]);
     pruefe('Lückenlose Nummern melden nichts', nummernLuecken([{ nummer: 'RE-2026-001' }, { nummer: 'RE-2026-002' }]), []);
 
+    /* Abrechnungsart je Haus */
+    pruefe('Standard-Abrechnung ist monatlich', zyklusOf({}), 'monat');
+    pruefe('Jährlich nachträglich wird nicht monatlich abgerechnet', monatlichAbgerechnet({ vertrag: { zyklus: 'jahr' } }), false);
+    pruefe('Im Voraus wird nicht monatlich abgerechnet', monatlichAbgerechnet({ vertrag: { zyklus: 'voraus' } }), false);
+
     /* Kassenbon */
     pruefe('Bon mit SUMME-Zeile', parseBon('REWE\nMilch 1,29\nPutzmittel 4,99\nSUMME EUR 6,28\n02.11.2026 10:15'), { betrag: 628, datum: '2026-11-02' });
     pruefe('Bon mit Tausenderpunkt und 2-stelligem Jahr', parseBon('Bauhaus\nHochdruckreiniger 1.249,00\nGesamt 1.249,00\n05.03.26'), { betrag: 124900, datum: '2026-03-05' });

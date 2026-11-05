@@ -152,6 +152,27 @@ const anzahl = (p, store) => p.evaluate((s) => DB.all(s).then((r) => r.length), 
   if ((await anzahl(p, 'invoices')) !== zVorher + 1) report.push('Zusatzleistung: keine Rechnung erstellt');
   else ok.push(`Zusatzleistung abgerechnet: ${zNeu.nummer}, ${zNeu.summe / 100} €`);
 
+  // 4b) Jahresrechnung: Haus auf jährlich nachträglich stellen, Jahresrechnung erzeugen, Einsätze werden markiert
+  await geh(`/objekt/${ids.objekt}/vertrag`);
+  await p.evaluate(async (id) => { const o = await DB.get('objects', id); o.vertrag = { ...(o.vertrag || {}), zyklus: 'jahr' }; await DB.put('objects', o); }, ids.objekt);
+  const jVorher = await anzahl(p, 'invoices');
+  const jahr = String(new Date().getFullYear() - 1);
+  await geh(`/objekt/${ids.objekt}/jahresrechnung?jahr=${jahr}&modus=nach`);
+  const jsave = await p.$('#jsave');
+  if (!jsave || (await jsave.isDisabled())) report.push('Jahresrechnung: Erstellen-Knopf gesperrt oder fehlt');
+  else {
+    await jsave.click(); await p.waitForTimeout(700);
+    const jr = await p.evaluate(async (j) => (await DB.all('invoices')).find((i) => i.zeitraum === j), jahr);
+    if ((await anzahl(p, 'invoices')) !== jVorher + 1 || !jr) report.push('Jahresrechnung: keine Rechnung erstellt');
+    else if (jr.positionen.length !== 12) report.push(`Jahresrechnung: ${jr.positionen.length} statt 12 Positionen`);
+    else ok.push(`Jahresrechnung ${jr.nummer} für ${jahr}: 12 Monatspositionen, ${jr.summe / 100} €`);
+  }
+  // Monatsabschluss darf dieses Haus nicht mehr monatlich abrechnen
+  await geh(`/monatsabschluss?monat=${monat}`);
+  const monatText = await p.evaluate(() => document.body.innerText);
+  if (!monatText.includes('Jährliche Abrechnung') && !monatText.includes('Jahresabrechnung')) report.push('Monatsabschluss: jährliches Haus nicht als jährlich erkannt');
+  else ok.push('Monatsabschluss überspringt jährliches Haus');
+
   // 5) Mangel erledigen, Akquise gewonnen → Kunde
   await geh(`/mangel/${ids.mangel}`);
   const erledigtBtn = await p.$('#done');

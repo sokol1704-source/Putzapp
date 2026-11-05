@@ -8,20 +8,35 @@ route('/monatsabschluss', async (_, q) => {
   const ohneBeleg = ausgaben.filter((a) => !a.fotoAnzahl).length;
   const omap = data.omap;
 
+  // Jahresrechnungen, die in diesem Monat anstehen: nachträglich fürs Vorjahr, im Voraus ab November fürs Folgejahr
+  const jahresFaelligkeit = (o) => {
+    const [j, mm] = m.split('-').map(Number);
+    const z = zyklusOf(o);
+    if (z === 'jahr') return [{ modus: 'nach', jahr: String(j - 1) }];
+    if (z === 'voraus' && mm >= 11) return [{ modus: 'voraus', jahr: String(j + 1) }];
+    return [];
+  };
+  const jahrZeile = (j) => `<div class="small mt">📅 ${esc(objLabel(j.o))}: ${j.modus === 'voraus' ? `Vorauszahlung für ${j.jahr}` : `Jahresabrechnung ${j.jahr}, nachträglich · spätestens Mitte Juni ${Number(j.jahr) + 1}`}</div>
+    ${j.erstellt ? '<span class="badge ok">✓ Rechnung erstellt</span>' : `<a class="btn small mt" href="#/objekt/${j.o.id}/jahresrechnung?jahr=${j.jahr}&modus=${j.modus}">📅 Jahresrechnung ${j.jahr} vorbereiten</a>`}`;
+
   const rows = data.customers.map((c) => {
     const objs = data.objects.filter((o) => o.kundeId === c.id && o.aktiv !== false);
     if (!objs.length) return null;
-    const ids = objs.map((o) => o.id);
+    // Monatlich: Reinigung nur für Häuser mit monatlicher Abrechnung. Winterdienst bleibt immer monatlich.
+    const monatlich = objs.filter(monatlichAbgerechnet);
+    const jahrJobs = objs.filter((o) => !monatlichAbgerechnet(o)).flatMap((o) => jahresFaelligkeit(o).map((j) => ({ ...j, o, erstellt: data.invoices.some((i) => i.zeitraum === j.jahr && i.status !== 'storniert' && i.objekte?.some((x) => x.id === o.id)) })));
+    if (!monatlich.length && !jahrJobs.length) return null;
+    const ids = monatlich.map((o) => o.id);
     const visits = data.visits.filter((v) => ids.includes(v.objektId) && v.datum.startsWith(m) && !v.rechnungId);
-    const winter = data.winter.filter((w) => ids.includes(w.objektId) && w.datum.startsWith(m) && !w.rechnungId && omap[w.objektId]?.winterAbrechnung === 'einsatz');
+    const winter = data.winter.filter((w) => objs.some((o) => o.id === w.objektId) && w.datum.startsWith(m) && !w.rechnungId && omap[w.objektId]?.winterAbrechnung === 'einsatz');
     const rechnung = data.invoices.find((i) => i.kundeId === c.id && i.monat === m && i.status !== 'storniert');
-    const pauschal = objs.some(isMonthly);
+    const pauschal = monatlich.some(isMonthly);
     const offen = visits.length + winter.length;
     let status;
     if (rechnung) status = 'done';
     else if (pauschal || offen) status = 'ready';
     else status = 'none';
-    return { c, objs, visits, winter, rechnung, pauschal, offen, status };
+    return { c, objs, monatlich, jahrJobs, visits, winter, rechnung, pauschal, offen, status };
   }).filter(Boolean).sort((a, b) => (a.status === 'ready' ? 0 : a.status === 'none' ? 2 : 1) - (b.status === 'ready' ? 0 : b.status === 'none' ? 2 : 1));
 
   const ready = rows.filter((r) => r.status === 'ready').length;
@@ -46,8 +61,9 @@ route('/monatsabschluss', async (_, q) => {
     ${rows.map((r) => `<div class="card abschluss ${r.status}">
       <div class="row between"><b>👥 ${esc(r.c.name)}</b>
         ${r.status === 'done' ? '<span class="badge ok">✓ erstellt</span>' : r.status === 'ready' ? '<span class="badge warn">offen</span>' : '<span class="badge soft">nichts zu tun</span>'}</div>
-      <div class="muted small">${r.pauschal ? 'Monatspauschale' : 'Nach Stunden'}${r.visits.length ? ` · ${r.visits.length} Einsatz${r.visits.length === 1 ? '' : 'e'}` : ''}${r.winter.length ? ` · ❄️ ${r.winter.length} Winter` : ''} · ${r.objs.map((o) => esc(objLabel(o))).join(', ')}</div>
+      <div class="muted small">${!r.monatlich.length ? 'Jährliche Abrechnung' : r.pauschal ? 'Monatspauschale' : 'Nach Stunden'}${r.visits.length ? ` · ${r.visits.length} Einsatz${r.visits.length === 1 ? '' : 'e'}` : ''}${r.winter.length ? ` · ❄️ ${r.winter.length} Winter` : ''} · ${r.objs.map((o) => esc(objLabel(o))).join(', ')}</div>
       ${r.rechnung ? `<div class="small mt">Rechnung ${esc(r.rechnung.nummer)} · ${money(r.rechnung.summe)}</div>` : ''}
+      ${r.jahrJobs.map(jahrZeile).join('')}
       <div class="row gap mt">
         ${r.status === 'ready' ? `<a class="btn small" href="#/rechnung/neu?kunde=${r.c.id}&monat=${m}">🧾 Rechnung vorbereiten</a>` : ''}
         ${r.rechnung ? `<a class="btn small ghost" href="#/rechnung/${r.rechnung.id}">Rechnung ansehen</a>` : ''}

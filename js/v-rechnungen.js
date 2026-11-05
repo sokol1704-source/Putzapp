@@ -310,6 +310,8 @@ route('/rechnung/neu', async (_, q) => {
     const monat = items.some((p) => p.pauschale) ? fd.get('monat') : null;
     if (monat && data.invoices.some((i) => i.kundeId === k.id && i.monat === monat && i.status !== 'storniert' && i.objekte?.some((x) => objSel.has(x.id)))
       && !confirm(`Für ${monthLabel(monat)} gibt es schon eine Rechnung für dieses Haus. Trotzdem noch eine erstellen?`)) return;
+    const jaehrlich = [...objSel].map((id) => data.omap[id]).filter((o) => o && !monatlichAbgerechnet(o));
+    if (jaehrlich.length && !einsatzId && !confirm(`${jaehrlich.map((o) => objLabel(o)).join(', ')} wird jährlich abgerechnet. Trotzdem monatlich abrechnen? Sonst wird doppelt berechnet.`)) return;
     $('#save').disabled = true;
     const datum = fd.get('datum');
     const positionen = items.map(({ auto, ...p }) => ({ ...p, beschreibung: p.beschreibung.trim(), menge: num(p.menge), betrag: positionTotal(p) }));
@@ -701,5 +703,92 @@ route('/angebot/:id', async ({ id }) => {
     if (!confirm('Angebot löschen?')) return;
     await DB.del('angebote', a.id);
     go('#/angebote', true);
+  });
+});
+
+/* ---------- Jahresrechnung: Reinigung eines Hauses für ein ganzes Jahr ---------- */
+// nachträglich: Pauschale je Monat plus Einsätze (bei Stundenabrechnung) des Jahres
+// im Voraus: Pauschale für das Folgejahr (nur bei Monatspauschale)
+// Winterdienst bleibt monatlich, er wird hier nicht abgerechnet.
+route('/objekt/:id/jahresrechnung', async ({ id }, q) => {
+  const o = await DB.get('objects', id);
+  if (!o) return go('#/objekte', true);
+  const k = (await DB.get('customers', o.kundeId)) || { name: '' };
+  const modus = q.modus === 'voraus' ? 'voraus' : 'nach';
+  const jahr = String(Number(q.jahr) || (modus === 'voraus' ? new Date().getFullYear() + 1 : new Date().getFullYear() - 1));
+  const vorhanden = (await DB.all('invoices')).find((i) => i.zeitraum === jahr && i.status !== 'storniert' && i.objekte?.some((x) => x.id === o.id));
+  const positionen = [];
+  const hinweise = [];
+  if (isMonthly(o)) {
+    for (let mm = 1; mm <= 12; mm++) {
+      const m = `${jahr}-${String(mm).padStart(2, '0')}`;
+      positionen.push({ beschreibung: `Treppenhausreinigung – Monatspauschale ${monthLabel(m)}`, datum: `${m}-01`, datumBis: lastOfMonth(m), menge: 1, einheit: 'Monat', preis: priceFor(o, m), art: 'arbeit', objektId: o.id });
+    }
+  }
+  if (modus === 'nach') {
+    const visits = (await DB.all('visits')).filter((v) => v.objektId === o.id && v.datum.startsWith(jahr) && !v.rechnungId).sort((a, b) => a.datum.localeCompare(b.datum));
+    if (isMonthly(o)) {
+      // Einsätze sind durch die Pauschale abgedeckt, werden aber als abgerechnet markiert
+      if (positionen[0] && visits.length) positionen[0].visitIds = visits.map((v) => v.id);
+    } else {
+      positionen.push(...visits.map((v) => ({ ...visitToPosition(v, o), objektId: o.id, visitIds: [v.id] })));
+    }
+  } else if (!isMonthly(o)) {
+    hinweise.push('Im Voraus geht nur mit Monatspauschale. Bei Stundenabrechnung bitte nachträglich abrechnen.');
+  }
+  const gesperrt = !positionen.length || (modus === 'voraus' && !isMonthly(o));
+  const summe = positionen.reduce((s, p) => s + Math.round((p.preis || 0) * (p.menge || 0)), 0);
+  render(`Jahresrechnung ${jahr}`, `
+    <div class="card">
+      <b>${esc(objLabel(o))}</b> · ${esc(k.name)}
+      <div class="muted small">${modus === 'voraus' ? `Vorauszahlung für ${jahr}` : `Abrechnung für ${jahr}, nachträglich`}</div>
+    </div>
+    ${vorhanden ? `<div class="card hint">Für ${jahr} gibt es schon Rechnung ${esc(vorhanden.nummer)}. Trotzdem eine neue erstellen?</div>` : ''}
+    ${hinweise.map((h) => `<div class="card hint">${esc(h)}</div>`).join('')}
+    <form id="jf" class="form mt">
+      <div class="grid2">
+        <label>Rechnungsdatum<input type="date" name="datum" required value="${today()}"></label>
+        <label>Zahlungsziel (Tage)<input type="number" name="zahlungsziel" min="0" value="${S.zahlungsziel}"></label>
+      </div>
+      <div class="label">Positionen</div>
+      ${positionen.length ? `<table class="inv-items"><thead><tr><th>Leistung</th><th class="r">Betrag</th></tr></thead><tbody>${positionen.map((p) => `<tr><td>${esc(p.beschreibung)}</td><td class="r">${money(Math.round((p.preis || 0) * (p.menge || 0)))}</td></tr>`).join('')}</tbody></table>` : '<div class="empty small">Im Zeitraum gibt es nichts abzurechnen.</div>'}
+      <div class="total">Gesamt: <b>${money(summe)}</b> <span class="muted small">(ohne Umsatzsteuer, Kleinunternehmer)</span></div>
+      <p class="muted small">Winterdienst wird weiterhin monatlich abgerechnet.</p>
+      <button class="btn block" type="submit" id="jsave" ${gesperrt ? 'disabled' : ''}>Jahresrechnung erstellen</button>
+    </form>
+  `, { tab: '', back: true });
+
+  $('#jf').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (vorhanden && !confirm(`Für ${jahr} gibt es schon Rechnung ${vorhanden.nummer}. Trotzdem noch eine erstellen?`)) return;
+    $('#jsave').disabled = true;
+    const fd = new FormData(e.target);
+    const datum = fd.get('datum');
+    const pos = positionen.map((p) => ({ ...p, betrag: Math.round((p.preis || 0) * (p.menge || 0)) }));
+    const inv = {
+      nummer: await nextNumber('invoices', S.nrPrefix || 'RE', datum, S.nrStart),
+      datum,
+      faellig: addDays(datum, Number(fd.get('zahlungsziel')) || 0),
+      monat: null,
+      zeitraum: jahr,
+      kundeId: o.kundeId,
+      kunde: { name: k.name, ansprechpartner: k.ansprechpartner || '', strasse: k.strasse || '', plzOrt: k.plzOrt || '', privat: !!k.privat },
+      objekte: [{ id: o.id, name: objLabel(o), adresse: objAddress(o) }],
+      absender: absender(),
+      positionen: pos,
+      summe: pos.reduce((s, p) => s + p.betrag, 0),
+      arbeitskosten: pos.filter((p) => p.art !== 'material').reduce((s, p) => s + p.betrag, 0),
+      notiz: '',
+      status: 'offen',
+      erstellt: new Date().toISOString(),
+    };
+    await DB.put('invoices', inv);
+    for (const id of pos.flatMap((p) => p.visitIds || [])) {
+      const v = await DB.get('visits', id);
+      if (v) { v.rechnungId = inv.id; await DB.put('visits', v); }
+    }
+    vibrate(15);
+    toast(`✓ Jahresrechnung ${inv.nummer} erstellt`);
+    go(`#/rechnung/${inv.id}`, true);
   });
 });
