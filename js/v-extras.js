@@ -3,6 +3,18 @@
 /* ---------- Reinigungsvertrag ---------- */
 const DEFAULT_VERTRAG = { beginn: '', frist: 3, werktags: '07:00', sonntags: '09:00', schluessel: 1, versicherung: '', haftpflicht: false, zyklus: 'monat' };
 
+// Vergütungssatz je nach Abrechnungsart: monatlich, oder Pauschale als Jahresbetrag
+function verguetungPauschal(o, v) {
+  const monat = money(o.monatspauschale || 0);
+  const z = (v && v.zyklus) || 'monat';
+  if (z === 'monat') return `pauschal <b>${monat} pro Monat</b>`;
+  const jahr = money((o.monatspauschale || 0) * 12);
+  const zeitpunkt = z === 'voraus'
+    ? 'Die Jahresrechnung wird jeweils im Voraus für das folgende Kalenderjahr gestellt.'
+    : 'Die Jahresrechnung wird nachträglich für das vergangene Kalenderjahr gestellt.';
+  return `pauschal <b>${monat} pro Monat</b>, das sind <b>${jahr} pro Jahr</b>. ${zeitpunkt} Auf Wunsch ist die Zahlung in zwölf monatlichen Raten möglich`;
+}
+
 function vertragDoc(o, k, v, sigAG, sigAN) {
   const tl = taskList(o);
   const every = { 7: 'wöchentlich', 14: 'alle zwei Wochen', 21: 'alle drei Wochen', 28: 'alle vier Wochen' }[o.intervallTage] || 'nach Vereinbarung';
@@ -22,7 +34,7 @@ function vertragDoc(o, k, v, sigAG, sigAN) {
     ${para('Leistungsumfang und Rhythmus', `<p>Die Reinigung erfolgt <b>${every}</b>${day}. Sie umfasst:</p>
       <ul class="doc-list two-col">${tl.map((t) => `<li>${esc(t.text)}${t.alleTage > 0 ? ` <span class="doc-muted">(${freqLabel(t.alleTage)})</span>` : ''}</li>`).join('')}</ul>
       <p>Weitere Leistungen (z. B. Grundreinigung, Entfernen von Sperrmüll) werden nur nach gesonderter Beauftragung gemäß aktueller Preisliste ausgeführt. Festgestellte Mängel im Objekt meldet der Auftragnehmer dem Auftraggeber zeitnah, nach Möglichkeit mit Foto.</p>`)}
-    ${para('Vergütung', `<p>${isMonthly(o) ? `Die Vergütung beträgt pauschal <b>${money(o.monatspauschale || 0)} pro Monat</b>.` : `Die Vergütung erfolgt nach Aufwand mit <b>${money(o.stundensatz || 0)} pro Stunde</b>.`}
+    ${para('Vergütung', `<p>${isMonthly(o) ? `Die Vergütung beträgt ${verguetungPauschal(o, v)}.` : `Die Vergütung erfolgt nach Aufwand mit <b>${money(o.stundensatz || 0)} pro Stunde</b>.`}
       Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung). Die Abrechnung erfolgt ${(ZYKLEN[v.zyklus] || ZYKLEN.monat).vertrag}; Rechnungen sind innerhalb von ${S.zahlungsziel || 14} Tagen ohne Abzug zahlbar. Auf Wunsch erhält der Auftraggeber einen monatlichen Leistungsnachweis.</p>`)}
     ${winter ? para('Winterdienst', `<p>Der Auftragnehmer übernimmt das Räumen und Streuen des Gehwegs vor dem Haus, des Hauseingangs und der Zugänge sowie des Wegs zu den Mülltonnen. Geräumt und gestreut wird bei Schnee- und Eisglätte werktags ab ${esc(v.werktags)} Uhr, sonn- und feiertags ab ${esc(v.sonntags)} Uhr bis 20 Uhr, soweit die örtliche Satzung nichts anderes bestimmt. Verwendet werden abstumpfende Streumittel; jeder Einsatz wird in einem Räum- und Streuprotokoll dokumentiert.
       Vergütung: ${o.winterAbrechnung === 'einsatz' ? `<b>${money(o.winterPreis || 0)} je Einsatz</b>` : 'in der monatlichen Pauschale enthalten'}.</p>`) : ''}
