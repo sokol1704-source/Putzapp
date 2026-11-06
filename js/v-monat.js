@@ -40,10 +40,11 @@ route('/monatsabschluss', async (_, q) => {
   }).filter(Boolean).sort((a, b) => (a.status === 'ready' ? 0 : a.status === 'none' ? 2 : 1) - (b.status === 'ready' ? 0 : b.status === 'none' ? 2 : 1));
 
   // Ratenzahlungen: offen bis Monatsende (auch Altlasten) und im Monat bezahlte
-  const monatsEnde = lastOfMonth(m);
+  // Offen sind alle Raten, die bis heute oder bis Monatsende des angezeigten Monats fällig sind
+  const bisDatum = lastOfMonth(m) > today() ? lastOfMonth(m) : today();
   const zahlungen = data.invoices.filter((i) => i.raten && i.status !== 'storniert')
     .flatMap((inv) => inv.raten.map((r) => ({ inv, r })))
-    .filter(({ r }) => (!r.bezahltAm && r.faellig <= monatsEnde) || (r.bezahltAm && r.bezahltAm.startsWith(m)))
+    .filter(({ r }) => (!r.bezahltAm && r.faellig <= bisDatum) || (r.bezahltAm && r.bezahltAm.startsWith(m)))
     .sort((x, y) => (x.r.bezahltAm ? 1 : 0) - (y.r.bezahltAm ? 1 : 0) || x.r.faellig.localeCompare(y.r.faellig));
 
   const ready = rows.filter((r) => r.status === 'ready').length;

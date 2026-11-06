@@ -216,6 +216,26 @@ async function scheduleNotifications(force = false) {
       if (at <= new Date()) at.setDate(at.getDate() + 1);
       notes.push({ id: 3001, title: '⏰ Offene Punkte nachhaken', body: `${body} (Stand beim letzten Öffnen)`, schedule: { at: at.toISOString(), repeats: true, every: 'day', allowWhileIdle: true } });
     }
+    // Ratenzahlungen: am Fälligkeitstag erinnern, und am Monatsende, wenn noch Zahlungen abzuhaken sind
+    const ratenOffen = data.invoices.filter((i) => i.raten && i.status !== 'storniert')
+      .flatMap((i) => i.raten.filter((r) => !r.bezahltAm).map((r) => ({ i, r })))
+      .filter(({ r }) => r.faellig >= today() && daysBetween(today(), r.faellig) <= 60)
+      .sort((a, b) => a.r.faellig.localeCompare(b.r.faellig));
+    ratenOffen.slice(0, 40).forEach(({ i, r }, n) => {
+      const at = parseISO(r.faellig);
+      at.setHours(hh, mm, 0, 0);
+      if (at < new Date()) return;
+      notes.push({ id: 5000 + n, title: `💶 Rate fällig: ${i.kunde?.name || i.nummer}`, body: `${i.nummer} · Rate ${r.nr}/${i.raten.length} · ${money(r.betrag)}`, schedule: { at: at.toISOString(), allowWhileIdle: true } });
+    });
+    const monate = [...new Set(ratenOffen.map(({ r }) => r.faellig.slice(0, 7)))];
+    monate.forEach((ym, n) => {
+      const ende = lastOfMonth(ym);
+      const at = parseISO(ende);
+      at.setHours(hh, mm, 0, 0);
+      const anzahl = ratenOffen.filter(({ r }) => r.faellig <= ende).length;
+      if (at < new Date() || !anzahl) return;
+      notes.push({ id: 5500 + n, title: `🗓️ Monatsende: ${anzahl} Zahlungseingänge abhaken`, body: 'Im Monatsabschluss unter Buchhaltung → Zahlungseingänge', schedule: { at: at.toISOString(), allowWhileIdle: true } });
+    });
     if (notes.length) await native('LocalNotifications', 'schedule', { notifications: notes });
     S.geplanteErinnerungen = notes.length;
     await saveSettings();
