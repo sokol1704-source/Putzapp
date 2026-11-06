@@ -189,6 +189,18 @@ const anzahl = (p, store) => p.evaluate((s) => DB.all(s).then((r) => r.length), 
     else ok.push(`Ratenrechnung ${rInv.nummer}: 12 Raten, erste Rate abgehakt, Rechnung bleibt offen`);
   }
 
+  // 4d) Monatsabschluss zeigt offene Raten zum Abhaken
+  await geh('/monatsabschluss');
+  const zahlTxt = await p.evaluate(() => document.body.innerText);
+  const abhakbar = await p.$$('[data-rate-inv]');
+  if (!zahlTxt.includes('Zahlungseingänge') || !abhakbar.length) report.push('Monatsabschluss: keine offenen Raten zum Abhaken angezeigt');
+  else {
+    const ratenId = await p.evaluate(async (j) => (await DB.all('invoices')).find((i) => i.zeitraum === j && i.raten).id, jahrRaten);
+    await p.click('[data-rate-nr="2"]'); await p.waitForTimeout(600);
+    const r2 = await p.evaluate(async (id) => (await DB.get('invoices', id)).raten[1].bezahltAm, ratenId);
+    if (!r2) report.push('Monatsabschluss: Rate 2 nicht als bezahlt gespeichert'); else ok.push('Monatsabschluss: Rate abgehakt');
+  }
+
   // 5) Mangel erledigen, Akquise gewonnen → Kunde
   await geh(`/mangel/${ids.mangel}`);
   const erledigtBtn = await p.$('#done');

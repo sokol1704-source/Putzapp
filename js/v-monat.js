@@ -39,6 +39,13 @@ route('/monatsabschluss', async (_, q) => {
     return { c, objs, monatlich, jahrJobs, visits, winter, rechnung, pauschal, offen, status };
   }).filter(Boolean).sort((a, b) => (a.status === 'ready' ? 0 : a.status === 'none' ? 2 : 1) - (b.status === 'ready' ? 0 : b.status === 'none' ? 2 : 1));
 
+  // Ratenzahlungen: offen bis Monatsende (auch Altlasten) und im Monat bezahlte
+  const monatsEnde = lastOfMonth(m);
+  const zahlungen = data.invoices.filter((i) => i.raten && i.status !== 'storniert')
+    .flatMap((inv) => inv.raten.map((r) => ({ inv, r })))
+    .filter(({ r }) => (!r.bezahltAm && r.faellig <= monatsEnde) || (r.bezahltAm && r.bezahltAm.startsWith(m)))
+    .sort((x, y) => (x.r.bezahltAm ? 1 : 0) - (y.r.bezahltAm ? 1 : 0) || x.r.faellig.localeCompare(y.r.faellig));
+
   const ready = rows.filter((r) => r.status === 'ready').length;
   const done = rows.filter((r) => r.status === 'done').length;
   const total = rows.filter((r) => r.status !== 'none').length;
@@ -58,6 +65,13 @@ route('/monatsabschluss', async (_, q) => {
       <div class="muted small">${total ? `${done} von ${total} Rechnungen erstellt` : 'Für diesen Monat ist nichts abzurechnen.'}${ready ? ` · <b>${ready} ${ready === 1 ? 'fehlt' : 'fehlen'} noch</b>` : ''}</div>
     </div>
     ${ohneBeleg ? `<a class="card hint" href="#/ausgaben">🧾 <b>${ohneBeleg} Ausgabe${ohneBeleg === 1 ? '' : 'n'}</b> ohne Belegfoto in diesem Monat.</a>` : ''}
+    ${zahlungen.length ? `<h3 class="doc-h3">💶 Zahlungseingänge</h3>
+      <p class="muted small">Ratenzahlungen, die bis Monatsende fällig sind. Abhaken, sobald das Geld da ist.</p>
+      ${zahlungen.map(({ inv, r }) => `<div class="card abschluss ${r.bezahltAm ? 'done' : 'ready'}">
+        <div class="row between"><b>${esc(inv.kunde?.name || '')}</b><span class="muted small">${esc(inv.nummer)} · Rate ${r.nr}/${inv.raten.length}</span></div>
+        <div class="row between small mt"><span>fällig ${fmtDate(r.faellig)} · <b>${money(r.betrag)}</b>${r.bezahltAm ? ` · bezahlt am ${fmtDate(r.bezahltAm)}` : ''}</span>
+          <button class="btn small ${r.bezahltAm ? 'ghost' : ''}" data-rate-inv="${inv.id}" data-rate-nr="${r.nr}">${r.bezahltAm ? 'rückgängig' : '✓ bezahlt'}</button></div>
+      </div>`).join('')}` : ''}
     ${rows.map((r) => `<div class="card abschluss ${r.status}">
       <div class="row between"><b>👥 ${esc(r.c.name)}</b>
         ${r.status === 'done' ? '<span class="badge ok">✓ erstellt</span>' : r.status === 'ready' ? '<span class="badge warn">offen</span>' : '<span class="badge soft">nichts zu tun</span>'}</div>
@@ -72,4 +86,13 @@ route('/monatsabschluss', async (_, q) => {
     </div>`).join('') || '<div class="empty">Noch keine Auftraggeber mit Häusern.</div>'}
     <p class="muted small">Der Assistent erstellt nichts automatisch. Du prüfst jede Rechnung vor dem Versand.</p>
   `, { tab: '', back: true });
+  document.querySelectorAll('[data-rate-inv]').forEach((btn) => btn.addEventListener('click', async () => {
+    const inv = await DB.get('invoices', btn.dataset.rateInv);
+    const r = inv.raten.find((x) => x.nr === Number(btn.dataset.rateNr));
+    r.bezahltAm = r.bezahltAm ? null : today();
+    Object.assign(inv, ratenStand(inv));
+    await DB.put('invoices', inv);
+    if (inv.status === 'bezahlt') toast('🎉 Alle Raten bezahlt');
+    router();
+  }));
 });
