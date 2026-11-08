@@ -10,7 +10,7 @@ const { chromium, devices } = require('playwright');
 
 const BASE = process.env.APP_URL || 'http://localhost:8765/';
 const ROUTES = [
-  '/', '/abwesenheit', '/angebot/:id', '/angebot/neu', '/angebote', '/ausgabe/:id', '/ausgabe/neu', '/ausgaben',
+  '/', '/abwesenheit', '/angebot/:id', '/angebot/:id/bearbeiten', '/angebot/neu', '/angebote', '/ausgabe/:id', '/ausgabe/neu', '/ausgaben',
   '/auswertung', '/bestaetigen', '/buchhaltung', '/buchhaltung/tipps', '/einsaetze', '/einsatz/:id', '/einsatz/:id/bearbeiten', '/einsatz/neu',
   '/einstellungen', '/fahrt/:id', '/fahrt/neu', '/fahrten', '/finanzen', '/gruendung', '/kunde/:id', '/kunde/:id/bearbeiten',
   '/kunde/neu', '/kunden', '/leistungen', '/maengel', '/mangel/:id', '/mangel/:id/bearbeiten', '/mangel/neu', '/material',

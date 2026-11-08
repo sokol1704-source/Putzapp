@@ -231,6 +231,33 @@ const anzahl = (p, store) => p.evaluate((s) => DB.all(s).then((r) => r.length), 
   if (!/Vertr(ag|äge) wart/.test(startTxt)) report.push('Startseite: Hinweis auf fehlende Vertragsunterschrift fehlt');
   else ok.push('Startseite: Hinweis auf fehlende Vertragsunterschrift');
 
+  // 4g) Angebot bearbeiten: Leistungsumfang ändern, zweite Variante, dann mit Grund ablehnen
+  const angId = await p.evaluate(async () => (await DB.all('angebote'))[0]?.id);
+  const angVorher = await p.evaluate(async (id) => DB.get('angebote', id), angId);
+  const angAnzahlVorher = await anzahl(p, 'angebote');
+  await geh(`/angebot/${angId}/bearbeiten`);
+  const lohnTxt = await p.evaluate(() => document.querySelector('#calc')?.innerText || '');
+  if (!lohnTxt.includes('Stundenlohn')) report.push('Angebot: Stundenlohn-Check fehlt im Rechner');
+  await p.evaluate(() => { const f = document.querySelector('#f'); f.leistungen.value += '\nTestpunkt Fensterbänke'; f.intervall.value = '14'; f.intervall2.value = '7'; f.dispatchEvent(new Event('input', { bubbles: true })); });
+  await absenden(p); await p.waitForTimeout(700);
+  const angNach = await p.evaluate(async (id) => DB.get('angebote', id), angId);
+  const angAnzahl = await anzahl(p, 'angebote');
+  if (!angNach.leistungen.includes('Testpunkt Fensterbänke') || !angNach.varianteB || angNach.nummer !== angVorher.nummer || angAnzahl !== angAnzahlVorher) report.push(`Angebot bearbeiten: nicht korrekt gespeichert (${JSON.stringify({ l: angNach.leistungen.slice(-1), v: angNach.varianteB, n: angNach.nummer })})`);
+  else if (angNach.varianteB.monatspreis <= angNach.monatspreis) report.push('Angebot: Variante B (wöchentlich) sollte teurer sein als A (2 Wochen)');
+  else ok.push(`Angebot bearbeitet: Leistung ergänzt, Variante B ${angNach.varianteB.monatspreis / 100} € vs. A ${angNach.monatspreis / 100} €, Nummer ${angNach.nummer} gleich`);
+  await geh(`/angebot/${angId}`);
+  const docTxt = await p.evaluate(() => document.querySelector('.invoice-doc').innerText);
+  if (!docTxt.includes('Ihre Vorteile') || !docTxt.includes('Auftragserteilung') || !docTxt.includes('Zwei Varianten')) report.push('Angebots-PDF: Vorteile, Varianten oder Auftragserteilung fehlen');
+  else ok.push('Angebots-PDF: Vorteile, Varianten und Auftragserteilung enthalten');
+  await p.click('#no'); await p.waitForTimeout(200);
+  await p.click('[data-grund="Zu teuer"]'); await p.waitForTimeout(500);
+  const abg = await p.evaluate(async (id) => DB.get('angebote', id), angId);
+  if (abg.status !== 'abgelehnt' || abg.ablehnGrund !== 'Zu teuer') report.push(`Angebot ablehnen: ${abg.status}/${abg.ablehnGrund}`);
+  await geh('/angebote');
+  const listTxt = await p.evaluate(() => document.body.innerText);
+  if (!listTxt.includes('Annahmequote') || !listTxt.includes('Zu teuer 1×')) report.push('Angebote: Auswertung fehlt');
+  else ok.push('Angebot abgelehnt mit Grund, Auswertung zeigt Annahmequote und Absagegründe');
+
   // 5) Mangel erledigen, Akquise gewonnen → Kunde
   await geh(`/mangel/${ids.mangel}`);
   const erledigtBtn = await p.$('#done');

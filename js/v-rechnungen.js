@@ -533,90 +533,165 @@ const OPTIONS = [
 ];
 const perMonth = (intervall) => (52 / 12) / (intervall / 7);
 
+const RHYTHMEN = { 7: 'wöchentlich', 14: 'alle 2 Wochen', 28: 'alle 4 Wochen' };
+const rhythmusOptionen = (sel) => [7, 14, 28].map((iv) => `<option value="${iv}" ${Number(sel) === iv ? 'selected' : ''}>${RHYTHMEN[iv]}</option>`).join('');
+const ABLEHN_GRUENDE = ['Zu teuer', 'Anderer Anbieter', 'Keine Antwort', 'Sonstiges'];
+// Standard-Leistungsumfang: Grundaufgaben plus die gewählten Zusatzoptionen
+const standardLeistungen = (optionen) => [...TASK_SUGGESTIONS.slice(0, 7).map(([t]) => t), ...OPTIONS.filter(([key]) => optionen.includes(key)).map(([, , t]) => t)];
+// Grobe Zeitschätzung je Reinigung: 8 Min. je Etage und Eingang, 10 Min. Rüstzeit, je Zusatzoption 10 Min.
+const schaetzeDauer = (etagen, eing, anzahlOptionen) => Math.round(etagen * eing * 8 + 10 + anzahlOptionen * 10);
+// Monatspreis, den der Kunde tatsächlich gewählt hat (bei zwei Varianten)
+const angebotPreis = (a) => (a.angenommeneVariante === 'B' && a.varianteB ? a.varianteB.monatspreis : a.monatspreis);
+
 route('/angebote', async () => {
   const angebote = await DB.all('angebote');
   angebote.sort((a, b) => b.nummer.localeCompare(a.nummer));
+  // Auswertung: Annahmequote, Preis je Etage bei angenommenen und abgelehnten Angeboten, Ablehnungsgründe
+  const gewonnen = angebote.filter((a) => a.status === 'angenommen');
+  const verloren = angebote.filter((a) => a.status === 'abgelehnt');
+  const entschieden = gewonnen.length + verloren.length;
+  const quote = entschieden ? Math.round((gewonnen.length / entschieden) * 100) : null;
+  const jeEtage = (list) => {
+    const xs = list.filter((a) => a.objekt?.etagen).map((a) => angebotPreis(a) / (a.objekt.etagen * (a.objekt.eingaenge || 1)));
+    return xs.length ? Math.round(xs.reduce((s, x) => s + x, 0) / xs.length) : null;
+  };
+  const pG = jeEtage(gewonnen);
+  const pV = jeEtage(verloren);
+  const gruende = {};
+  verloren.forEach((a) => { const g = a.ablehnGrund || 'ohne Angabe'; gruende[g] = (gruende[g] || 0) + 1; });
+  const tipp = pG && pV && pV > pG * 1.15
+    ? `Abgelehnte Angebote lagen im Schnitt ${Math.round((pV / pG - 1) * 100)} % über den angenommenen.`
+    : (gruende['Zu teuer'] || 0) >= 2 && gruende['Zu teuer'] >= verloren.length / 2 ? 'Die meisten Absagen waren „zu teuer“ – prüfe deinen Preis je Etage.' : '';
   render('Angebote', `
     <a class="btn block" href="#/angebot/neu">+ Angebot berechnen</a>
+    ${angebote.length ? `<div class="card mt">
+      <b>📊 Auswertung</b>
+      <div class="row between small mt"><span>Angebote gesamt</span><b>${angebote.length}</b></div>
+      <div class="row between small"><span>Annahmequote</span><b>${quote != null ? `${quote} % (${gewonnen.length} von ${entschieden})` : 'noch keine Entscheidung'}</b></div>
+      <div class="row between small"><span>Ø je Etage und Monat – angenommen</span><b>${pG != null ? money(pG) : '–'}</b></div>
+      <div class="row between small"><span>Ø je Etage und Monat – abgelehnt</span><b>${pV != null ? money(pV) : '–'}</b></div>
+      ${verloren.length ? `<div class="small mt">Absagegründe: ${Object.entries(gruende).sort((x, y) => y[1] - x[1]).map(([g, n]) => `${esc(g)} ${n}×`).join(' · ')}</div>` : ''}
+      ${tipp ? `<div class="small mt">💡 ${tipp}</div>` : ''}
+    </div>` : ''}
     <div class="mt">${angebote.map((a) => {
       const [label, cls] = ANGEBOT_STATUS[a.status];
       return `<a class="card link" href="#/angebot/${a.id}">
-        <div class="row between"><b>${esc(a.nummer)}</b><span class="badge ${cls}">${label}</span></div>
-        <div class="row between small"><span class="muted">${esc(a.empfaenger.name)} · 🏢 ${esc(a.objekt.strasse)}</span><b>${money(a.monatspreis)}/Monat</b></div>
+        <div class="row between"><b>${esc(a.nummer)}</b><span class="badge ${cls}">${label}${a.ablehnGrund && a.status === 'abgelehnt' ? ` · ${esc(a.ablehnGrund)}` : ''}</span></div>
+        <div class="row between small"><span class="muted">${esc(a.empfaenger.name)} · 🏢 ${esc(a.objekt.strasse)}</span><b>${money(angebotPreis(a))}/Monat</b></div>
+        ${a.varianteB && a.status === 'offen' ? `<div class="muted small">oder ${money(a.varianteB.monatspreis)}/Monat (${RHYTHMEN[a.varianteB.intervallTage]})</div>` : ''}
         ${angebotNachfassen(a) ? `<div class="danger-text small">⏰ ohne Antwort seit ${daysBetween(a.datum, today())} Tagen</div>` : ''}
       </a>`;
     }).join('') || `<div class="empty">Noch keine Angebote.<br><span class="small">Mit dem Rechner kalkulierst du in einer Minute einen fairen Monatspreis.</span></div>`}</div>
   `);
 });
 
-route('/angebot/neu', async (_, q) => {
+route('/angebot/neu', (_, q) => angebotForm(null, q));
+route('/angebot/:id/bearbeiten', async ({ id }) => {
+  const a = await DB.get('angebote', id);
+  if (!a) return go('#/angebote', true);
+  return angebotForm(a);
+});
+
+async function angebotForm(a, q = {}) {
   const customers = (await DB.all('customers')).sort(byName);
   const K = S.kalk;
+  const isNew = !a;
+  const fotosAlt = isNew ? [] : await DB.by('photos', 'visitId', a.id);
   const angebotFotos = [];
-  render('Angebot berechnen', `
+  const v = a || { kundeId: q.kunde || '', objekt: { strasse: '', plzOrt: '', etagen: 4, eingaenge: 1 }, intervallTage: 7, optionen: [], km: 0, zusatz: [], winterPreis: 0, notiz: '' };
+  const neuerEmpfaenger = !isNew && !v.kundeId;
+  const e = neuerEmpfaenger ? v.empfaenger : {};
+  const zusatzNamen = (v.zusatz || []).map((z) => z.name);
+  const leistungenText = (v.leistungen || standardLeistungen(v.optionen || [])).join('\n');
+  render(isNew ? 'Angebot berechnen' : `${a.nummer} bearbeiten`, `
     <form id="f" class="form">
-      ${customerSelect(customers, q.kunde || '', { allowNew: true }).replace('Auftraggeber *', 'Empfänger *')}
+      ${customerSelect(customers, v.kundeId || '', { allowNew: true }).replace('Auftraggeber *', 'Empfänger *')}
       <div id="newRecipient" hidden>
-        <label>Name / Firma<input name="eName" placeholder="z. B. Hausverwaltung Schmidt GmbH"></label>
-        <label>Ansprechpartner<input name="eAnsprech"></label>
-        <div class="grid2"><label>Straße<input name="eStrasse"></label><label>PLZ & Ort<input name="ePlzOrt"></label></div>
+        <label>Name / Firma<input name="eName" value="${esc(e.name || '')}" placeholder="z. B. Hausverwaltung Schmidt GmbH"></label>
+        <label>Ansprechpartner<input name="eAnsprech" value="${esc(e.ansprechpartner || '')}"></label>
+        <div class="grid2"><label>Straße<input name="eStrasse" value="${esc(e.strasse || '')}"></label><label>PLZ & Ort<input name="ePlzOrt" value="${esc(e.plzOrt || '')}"></label></div>
       </div>
       <h3 class="section">🏢 Objekt</h3>
-      <div class="grid2"><label>Straße & Hausnr. *<input name="strasse" required></label><label>PLZ & Ort<input name="plzOrt"></label></div>
+      <div class="grid2"><label>Straße & Hausnr. *<input name="strasse" required value="${esc(v.objekt.strasse || '')}"></label><label>PLZ & Ort<input name="plzOrt" value="${esc(v.objekt.plzOrt || '')}"></label></div>
       <div class="grid3">
-        <label>Etagen<input name="etagen" type="number" min="1" inputmode="numeric" value="4"></label>
-        <label>Eingänge<input name="eingaenge" type="number" min="1" inputmode="numeric" value="1"></label>
-        <label>Rhythmus<select name="intervall"><option value="7">wöchentlich</option><option value="14">alle 2 Wochen</option><option value="28">alle 4 Wochen</option></select></label>
+        <label>Etagen<input name="etagen" type="number" min="1" inputmode="numeric" value="${v.objekt.etagen || 4}"></label>
+        <label>Eingänge<input name="eingaenge" type="number" min="1" inputmode="numeric" value="${v.objekt.eingaenge || 1}"></label>
+        <label>Rhythmus<select name="intervall">${rhythmusOptionen(v.intervallTage)}</select></label>
       </div>
-      <label>Entfernung zum Haus (km, einfach) <span class="muted small">– Anfahrt wird je Reinigung berechnet</span><input name="km" type="number" step="1" min="0" inputmode="numeric" value="0"></label>
+      <label>Zweite Variante zum Vergleich <span class="muted small">(optional, z. B. wöchentlich und alle 2 Wochen)</span><select name="intervall2"><option value="">– keine –</option>${rhythmusOptionen(v.varianteB?.intervallTage)}</select></label>
+      <label>Entfernung zum Haus (km, einfach) <span class="muted small">– Anfahrt wird je Reinigung berechnet</span><input name="km" type="number" step="1" min="0" inputmode="numeric" value="${v.km || 0}"></label>
       <div class="label">Zusätzlich je Reinigung</div>
-      <div class="chip-row">${OPTIONS.map(([key, label]) => `<label class="chip toggle"><input type="checkbox" name="opt_${key}" hidden>${label}</label>`).join('')}</div>
-      <label class="check"><input type="checkbox" name="winter"> ❄️ Winterdienst optional anbieten</label>
+      <div class="chip-row">${OPTIONS.map(([key, label]) => { const on = (v.optionen || []).includes(key); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="opt_${key}" ${on ? 'checked' : ''} hidden>${label}</label>`; }).join('')}</div>
+      <label class="check"><input type="checkbox" name="winter" ${v.winterPreis ? 'checked' : ''}> ❄️ Winterdienst optional anbieten</label>
       <div class="label">Optionale Zusatzleistungen <span class="muted small">(auf Abruf, nicht im Monatspreis)</span></div>
-      <div class="chip-row">${S.leistungen.map((l, i) => `<label class="chip toggle"><input type="checkbox" name="zus_${i}" hidden>${esc(l.name)} · ${unitPrice(l)}</label>`).join('') || '<span class="muted small">Keine Leistungen im Katalog.</span>'}</div>
+      <div class="chip-row">${S.leistungen.map((l, i) => { const on = zusatzNamen.includes(l.name); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="zus_${i}" ${on ? 'checked' : ''} hidden>${esc(l.name)} · ${unitPrice(l)}</label>`; }).join('') || '<span class="muted small">Keine Leistungen im Katalog.</span>'}</div>
       <details><summary>⚙️ Preise je Reinigung anpassen (Richtwerte)</summary>
         <div class="grid3 mt">
           <label>pro Etage (€)<input name="k_proEtage" type="number" step="0.5" min="0" value="${K.proEtage / 100}"></label>
           ${OPTIONS.map(([key, label]) => `<label>${label} (€)<input name="k_${key}" type="number" step="0.5" min="0" value="${(K[key] || 0) / 100}"></label>`).join('')}
-          <label>Winter je Einsatz (€)<input name="k_winter" type="number" step="0.5" min="0" value="${(S.leistungen.find((l) => l.id === 'winter')?.preis || 2500) / 100}"></label>
+          <label>Winter je Einsatz (€)<input name="k_winter" type="number" step="0.5" min="0" value="${(v.winterPreis || S.leistungen.find((l) => l.id === 'winter')?.preis || 2500) / 100}"></label>
         </div>
         <label class="check"><input type="checkbox" name="merken"> Diese Preise als Standard merken</label>
       </details>
+      <label>Geschätzte Zeit je Reinigung (Min.) <span class="muted small">– nur für deinen Stundenlohn, steht nicht im Angebot</span><input name="dauer" type="number" min="5" step="5" inputmode="numeric" value="${v.dauer || ''}"></label>
       <div class="calc" id="calc"></div>
-      <label>Anmerkung im Angebot (optional)<textarea name="notiz" rows="2" placeholder="z. B. Reinigungsmittel sind im Preis enthalten."></textarea></label>
+      <label>Leistungsumfang <span class="muted small">(eine Zeile je Punkt – streichen oder ergänzen)</span><textarea name="leistungen" rows="9">${esc(leistungenText)}</textarea></label>
+      <button type="button" class="btn ghost small" id="stdLeist">↺ Standard aus den Optionen übernehmen</button>
+      <label>Anmerkung im Angebot (optional)<textarea name="notiz" rows="2" placeholder="z. B. Reinigungsmittel sind im Preis enthalten.">${esc(v.notiz || '')}</textarea></label>
       <div class="label">Fotos des Hauses <span class="muted small">(erscheinen im Angebot)</span></div>
       <div id="angebotFotos"></div>
-      <button class="btn block" type="submit">Angebot erstellen</button>
+      <button class="btn block" type="submit">${isNew ? 'Angebot erstellen' : 'Änderungen speichern'}</button>
     </form>
   `);
-  photoEditor($('#angebotFotos'), [], angebotFotos, [['angebot', 'Fotos']]);
+  photoEditor($('#angebotFotos'), fotosAlt, angebotFotos, [['angebot', 'Fotos']]);
   const f = $('#f');
-  f.kundeId.addEventListener('change', () => { $('#newRecipient').hidden = f.kundeId.value !== '__neu'; });
+  if (neuerEmpfaenger) f.kundeId.value = '__neu';
+  const zeigeEmpfaenger = () => { $('#newRecipient').hidden = f.kundeId.value !== '__neu'; };
+  f.kundeId.addEventListener('change', zeigeEmpfaenger);
+  zeigeEmpfaenger();
+  const gewaehlteOptionen = () => OPTIONS.filter(([key]) => f[`opt_${key}`].checked).map(([key]) => key);
+  $('#stdLeist').addEventListener('click', () => { f.leistungen.value = standardLeistungen(gewaehlteOptionen()).join('\n'); });
+
   const calc = () => {
     const etagen = Number(f.etagen.value) || 0;
     const eing = Number(f.eingaenge.value) || 1;
     const iv = Number(f.intervall.value);
+    const iv2 = Number(f.intervall2.value) || 0;
     const km = num(f.km.value);
     const anfahrt = 2 * km * (KM_SATZ / 100);
     let perClean = etagen * eing * num(f.k_proEtage.value) + anfahrt;
-    for (const [key] of OPTIONS) if (f[`opt_${key}`].checked) perClean += num(f[`k_${key}`].value);
-    const rpm = perMonth(iv);
-    const monthly = Math.ceil((perClean * rpm) / 5) * 5;
+    const opts = gewaehlteOptionen();
+    for (const key of opts) perClean += num(f[`k_${key}`].value);
+    const monat = (intervall, jeReinigung = perClean) => Math.ceil((jeReinigung * perMonth(intervall)) / 5) * 5;
+    const monthly = monat(iv);
+    const monthly2 = iv2 && iv2 !== iv ? monat(iv2) : 0;
     const perFloor = etagen ? monthly / (etagen * eing) : 0;
     const market = iv === 7 ? '25–80 €' : iv === 14 ? 'ca. 15–45 €' : 'ca. 10–30 €';
-    $('#calc').innerHTML = `<div class="calc-row"><span>Reinigungen pro Monat</span><b>${fmtNum(Math.round(rpm * 100) / 100)}</b></div>
+    // Stundenlohn: Preis je Reinigung ohne Fahrtkostenerstattung, geteilt durch Arbeits- und Fahrzeit
+    const dauerAuto = schaetzeDauer(etagen, eing, opts.length);
+    f.dauer.placeholder = `automatisch ${dauerAuto}`;
+    const dauer = num(f.dauer.value) || dauerAuto;
+    const fahrMin = Math.round(km * 2 * 1.5);
+    const stunden = (dauer + fahrMin) / 60;
+    const lohn = stunden ? Math.round(((perClean - anfahrt) * 100) / stunden) : 0;
+    const noetig = monat(iv, 25 * stunden + anfahrt);
+    $('#calc').innerHTML = `<div class="calc-row"><span>Reinigungen pro Monat</span><b>${fmtNum(Math.round(perMonth(iv) * 100) / 100)}</b></div>
       <div class="calc-row"><span>Preis je Reinigung</span><b>${money(Math.round(perClean * 100))}</b></div>
       ${km ? `<div class="calc-row small"><span>davon Anfahrt (2 × ${fmtNum(km)} km × 0,30 €)</span><b>${money(Math.round(anfahrt * 100))}</b></div>` : ''}
-      <div class="calc-total"><span>Monatspreis</span><b>${money(monthly * 100)}</b></div>
-      <div class="muted small">= ${money(Math.round(perFloor * 100))} pro Etage und Monat · marktüblich ${market} (Firmen zzgl. 19 % USt – du bist ohne USt günstiger)</div>`;
-    return { perClean, monthly: monthly * 100, rpm };
+      <div class="calc-total"><span>Monatspreis${monthly2 ? ' (Variante A)' : ''}</span><b>${money(monthly * 100)}</b></div>
+      ${monthly2 ? `<div class="calc-row"><span>Variante B (${RHYTHMEN[iv2]})</span><b>${money(monthly2 * 100)}</b></div>` : ''}
+      <div class="muted small">= ${money(Math.round(perFloor * 100))} pro Etage und Monat · marktüblich ${market} (Firmen zzgl. 19 % USt – du bist ohne USt günstiger)</div>
+      <div class="calc-row mt"><span>Zeit je Reinigung</span><b>${dauer} Min.${fahrMin ? ` + ca. ${fahrMin} Min. Fahrt` : ''}</b></div>
+      <div class="calc-row"><span>Dein Stundenlohn</span><b class="st ${wageClass(lohn)}">${money(lohn)}/Std.</b></div>
+      ${lohn < 2500 ? `<div class="small danger-text">Unter 25 €/Std. Für 25 €/Std. wären etwa <b>${money(noetig * 100)}/Monat</b> nötig.</div>` : ''}`;
+    return { monthly: monthly * 100, monthly2: monthly2 * 100 };
   };
   f.addEventListener('input', calc);
-  f.addEventListener('change', (e) => { if (e.target.closest('.chip')) e.target.closest('.chip').classList.toggle('on', e.target.checked); calc(); });
+  f.addEventListener('change', (ev) => { if (ev.target.closest('.chip')) ev.target.closest('.chip').classList.toggle('on', ev.target.checked); calc(); });
   calc();
 
-  f.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
     const fd = new FormData(f);
     let empfaenger;
     let kundeId = fd.get('kundeId');
@@ -628,51 +703,59 @@ route('/angebot/neu', async (_, q) => {
       const c = customers.find((x) => x.id === kundeId);
       empfaenger = { name: c.name, ansprechpartner: c.ansprechpartner || '', strasse: c.strasse, plzOrt: c.plzOrt };
     }
+    const leistungen = fd.get('leistungen').split('\n').map((s) => s.trim()).filter(Boolean);
+    if (!leistungen.length) return alert('Bitte mindestens einen Punkt im Leistungsumfang angeben.');
     if (fd.has('merken')) {
       S.kalk.proEtage = toCents(fd.get('k_proEtage'));
       for (const [key] of OPTIONS) S.kalk[key] = toCents(fd.get(`k_${key}`));
       await saveSettings();
     }
-    const { monthly } = calc();
+    const { monthly, monthly2 } = calc();
     const iv = Number(fd.get('intervall'));
-    const optionen = OPTIONS.filter(([key]) => fd.has(`opt_${key}`)).map(([key]) => key);
+    const iv2 = Number(fd.get('intervall2')) || 0;
+    const etagen = Number(fd.get('etagen')) || 0;
+    const eing = Number(fd.get('eingaenge')) || 1;
     const km = num(fd.get('km'));
+    const optionen = gewaehlteOptionen();
     const zusatz = S.leistungen.filter((l, i) => fd.has(`zus_${i}`)).map((l) => ({ name: l.name, preis: l.preis, einheit: l.einheit }));
-    const rhythm = { 7: 'wöchentlich', 14: 'alle 2 Wochen', 28: 'alle 4 Wochen' }[iv];
-    const leistungen = [...TASK_SUGGESTIONS.slice(0, 7).map(([t]) => t), ...OPTIONS.filter(([key]) => optionen.includes(key)).map(([, , t]) => t)];
+    // Ein überarbeitetes Angebot bekommt das heutige Datum und eine neue Gültigkeit, die Nummer bleibt
     const datum = today();
-    const a = {
-      nummer: await nextNumber('angebote', 'AN', datum),
+    const neu = {
+      ...(a || {}),
+      nummer: isNew ? await nextNumber('angebote', 'AN', datum) : a.nummer,
       datum,
       gueltigBis: addDays(datum, 30),
       kundeId,
       empfaenger,
-      objekt: { strasse: fd.get('strasse').trim(), plzOrt: fd.get('plzOrt').trim(), etagen: Number(fd.get('etagen')) || 0, eingaenge: Number(fd.get('eingaenge')) || 1, aufzug: optionen.includes('aufzug') },
+      objekt: { strasse: fd.get('strasse').trim(), plzOrt: fd.get('plzOrt').trim(), etagen, eingaenge: eing, aufzug: optionen.includes('aufzug') },
       intervallTage: iv,
       optionen,
       leistungen,
       monatspreis: monthly,
-      positionen: [{ beschreibung: `Treppenhausreinigung ${rhythm}${Number(fd.get('etagen')) ? ` – ${fd.get('etagen')} Etagen${Number(fd.get('eingaenge')) > 1 ? `, ${fd.get('eingaenge')} Eingänge` : ''}` : ''}${km ? `\ninkl. Anfahrt (${fmtNum(km)} km einfach)` : ''}\nLeistungsumfang siehe unten`, menge: 1, einheit: 'Monat', preis: monthly, art: 'arbeit' }],
+      varianteB: monthly2 ? { intervallTage: iv2, monatspreis: monthly2 } : null,
+      positionen: [{ beschreibung: `Treppenhausreinigung ${RHYTHMEN[iv]}${etagen ? ` – ${etagen} Etagen${eing > 1 ? `, ${eing} Eingänge` : ''}` : ''}${km ? `\ninkl. Anfahrt (${fmtNum(km)} km einfach)` : ''}\nLeistungsumfang siehe unten`, menge: 1, einheit: 'Monat', preis: monthly, art: 'arbeit' }],
       km,
       zusatz,
       winterPreis: fd.has('winter') ? toCents(fd.get('k_winter')) : 0,
       notiz: fd.get('notiz').trim(),
+      dauer: num(fd.get('dauer')) || 0,
       absender: absender(),
-      status: 'offen',
+      status: isNew ? 'offen' : a.status,
     };
-    await DB.put('angebote', a);
-    await savePhotos(a.id, angebotFotos);
-    toast(`✓ Angebot ${a.nummer} erstellt`);
-    go(`#/angebot/${a.id}`, true);
+    await DB.put('angebote', neu);
+    await savePhotos(neu.id, angebotFotos);
+    toast(isNew ? `✓ Angebot ${neu.nummer} erstellt` : `✓ Angebot ${neu.nummer} gespeichert`);
+    go(`#/angebot/${neu.id}`, true);
   });
-});
+}
 
 function angebotDoc(a, fotos = []) {
   const k = a.empfaenger;
+  const ab = a.absender;
   return `<article class="invoice-doc">
-    ${docHeader(a.absender)}
+    ${docHeader(ab)}
     <div class="inv-row">
-      ${recipientBlock(k, a.absender)}
+      ${recipientBlock(k, ab)}
       <table class="inv-meta">
         <tr><td>Angebotsnr.</td><td><b>${esc(a.nummer)}</b></td></tr>
         <tr><td>Datum</td><td>${fmtDate(a.datum)}</td></tr>
@@ -682,20 +765,35 @@ function angebotDoc(a, fotos = []) {
     <h2 class="inv-title">Angebot <span>Treppenhausreinigung</span></h2>
     <p class="inv-object">🏢 <b>Objekt:</b> ${esc([a.objekt.strasse, a.objekt.plzOrt].filter(Boolean).join(', '))}</p>
     <p>vielen Dank für Ihr Interesse. Gerne biete ich Ihnen die regelmäßige Reinigung des oben genannten Objekts zu folgenden Konditionen an:</p>
-    ${itemsTable(a.positionen, a.monatspreis).replace('Gesamtbetrag', 'Monatlich')}
+    ${itemsTable(a.positionen, a.monatspreis).replace('Gesamtbetrag', a.varianteB ? 'Monatlich (Variante A)' : 'Monatlich')}
+    ${a.varianteB ? `<h3 class="doc-h3">Zwei Varianten zur Wahl</h3>
+      <table class="inv-items small-table"><thead><tr><th>Variante</th><th>Rhythmus</th><th class="r">Monatspreis</th></tr></thead><tbody>
+        <tr><td>A</td><td>${RHYTHMEN[a.intervallTage]}</td><td class="r">${money(a.monatspreis)}</td></tr>
+        <tr><td>B</td><td>${RHYTHMEN[a.varianteB.intervallTage]}</td><td class="r">${money(a.varianteB.monatspreis)}</td></tr>
+      </tbody></table>` : ''}
     ${a.zusatz?.length ? `<h3 class="doc-h3">Optionale Zusatzleistungen <span class="doc-muted">(auf Abruf, nicht im Monatspreis enthalten)</span></h3>
       <table class="inv-items small-table"><thead><tr><th>Leistung</th><th class="r">Preis</th></tr></thead>
       <tbody>${a.zusatz.map((z) => `<tr><td>${esc(z.name)}</td><td class="r">${money(z.preis)}${z.einheit === 'pauschal' ? ' pauschal' : ` / ${esc(z.einheit)}`}</td></tr>`).join('')}</tbody></table>` : ''}
     <h3 class="doc-h3">Leistungsumfang</h3>
     <ul class="doc-list">${a.leistungen.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>
     ${a.winterPreis ? `<p class="inv-note">❄️ <b>Optional Winterdienst:</b> Räumen und Streuen der Zugänge und des Gehwegs bei Schnee und Glätte, inkl. Räum- und Streuprotokoll – ${money(a.winterPreis)} je Einsatz.</p>` : ''}
-    <p class="inv-note">Nach jeder Reinigung erhalten Sie auf Wunsch einen monatlichen Leistungsnachweis mit Fotos – ideal für die Betriebskostenabrechnung. Festgestellte Mängel im Objekt melde ich Ihnen direkt mit Foto.</p>
-    <p class="inv-note">Gemäß § 19 UStG wird keine Umsatzsteuer berechnet (Kleinunternehmerregelung). Der genannte Preis ist ein Endpreis.</p>
+    <h3 class="doc-h3">Ihre Vorteile</h3>
+    <ul class="doc-list">
+      <li>Feste Ansprechperson: ${esc(ab.inhaber)}${ab.telefon ? `, Tel. ${esc(ab.telefon)}` : ''}</li>
+      <li>Monatlicher Leistungsnachweis mit Fotos – ideal für die Betriebskostenabrechnung</li>
+      <li>Festgestellte Mängel im Objekt melde ich Ihnen direkt mit Foto</li>
+      <li>Keine Umsatzsteuer (Kleinunternehmer, § 19 UStG) – der genannte Preis ist ein Endpreis</li>
+    </ul>
     ${fotos.length ? `<h3 class="doc-h3">Fotos</h3><div class="doc-photos">${fotos.map((p) => `<figure><img src="${objUrl(p.blob)}" alt=""></figure>`).join('')}</div>` : ''}
     ${a.notiz ? `<p>${nl2br(a.notiz)}</p>` : ''}
     <p>Ich freue mich auf Ihren Auftrag!</p>
-    <p>Mit freundlichen Grüßen<br>${esc(a.absender.inhaber)}</p>
-    ${docFooter(a.absender)}
+    <p>Mit freundlichen Grüßen<br>${esc(ab.inhaber)}</p>
+    <h3 class="doc-h3">Auftragserteilung</h3>
+    <p>Hiermit beauftragen wir ${esc(ab.firma || ab.inhaber)} mit der Reinigung des Objekts ${esc(a.objekt.strasse)} gemäß Angebot ${esc(a.nummer)}${a.varianteB ? ` in der angekreuzten Variante: ☐ A (${RHYTHMEN[a.intervallTage]}) ☐ B (${RHYTHMEN[a.varianteB.intervallTage]})` : ''}.</p>
+    <p>Gewünschter Beginn: ______________________</p>
+    <div class="sign-row">${signSlot(null, 'Ort, Datum')}${signSlot(null, 'Unterschrift / Stempel Auftraggeber')}</div>
+    <p class="doc-muted">Bitte unterschrieben zurücksenden – ein Foto oder Scan per E-Mail oder WhatsApp genügt.</p>
+    ${docFooter(ab)}
   </article>`;
 }
 
@@ -703,15 +801,23 @@ route('/angebot/:id', async ({ id }) => {
   const a = await DB.get('angebote', id);
   if (!a) return go('#/angebote', true);
   const [label, cls] = ANGEBOT_STATUS[a.status];
+  const statusText = `${label}${a.status === 'abgelehnt' && a.ablehnGrund ? ` · ${a.ablehnGrund}` : ''}${a.status === 'angenommen' && a.varianteB ? ` · Variante ${a.angenommeneVariante || 'A'}` : ''}`;
   render(a.nummer, `
     <div class="card no-print">
-      <div class="row between"><span>Status</span><span class="badge ${cls}">${label}</span></div>
+      <div class="row between"><span>Status</span><span class="badge ${cls}">${esc(statusText)}</span></div>
       <div class="quick">
         <button class="btn" id="sendPdf">📤 Als PDF senden</button>
         <button class="btn ghost" id="print">🖨️ Drucken</button>
-        ${a.status === 'offen' ? '<button class="btn ghost" id="yes">🎉 Angenommen</button><button class="btn ghost" id="no">Abgelehnt</button>' : ''}
+        ${a.status === 'offen' ? `<a class="btn ghost" href="#/angebot/${a.id}/bearbeiten">✏️ Bearbeiten</a>` : ''}
+        ${a.status === 'offen' ? (a.varianteB
+          ? `<button class="btn ghost" data-annehmen="A">🎉 Angenommen: A</button><button class="btn ghost" data-annehmen="B">🎉 Angenommen: B</button>`
+          : '<button class="btn ghost" data-annehmen="A">🎉 Angenommen</button>') + '<button class="btn ghost" id="no">Abgelehnt</button>' : ''}
         ${a.objektId ? `<a class="btn ghost" href="#/objekt/${a.objektId}">🏢 Zum Haus</a>` : ''}
         ${a.status === 'angenommen' && a.objektId ? `<a class="btn ghost" href="#/rechnung/neu?kunde=${a.kundeId}&objekt=${a.objektId}">🧾 Erste Rechnung vorbereiten</a><button class="btn ghost" id="willkommen">🎉 Willkommen senden</button>` : ''}
+      </div>
+      <div id="gruende" class="mt" hidden>
+        <div class="small muted">Warum abgelehnt? Hilft dir später bei der Preisfindung.</div>
+        <div class="chip-row mt">${ABLEHN_GRUENDE.map((g) => `<button type="button" class="chip" data-grund="${g}">${g}</button>`).join('')}</div>
       </div>
     </div>
     ${angebotNachfassen(a) ? `<div class="card hint no-print"><b>⏰ Seit ${daysBetween(a.datum, today())} Tagen keine Antwort</b>
@@ -723,27 +829,35 @@ route('/angebot/:id', async ({ id }) => {
   wireDocButtons(`Angebot ${a.nummer}`, `Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nanbei erhalten Sie mein Angebot für die Treppenhausreinigung ${a.objekt.strasse}. Ich freue mich auf Ihre Rückmeldung!\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`);
   $('#willkommen')?.addEventListener('click', () => shareText(`Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nvielen Dank für Ihren Auftrag. Ich freue mich auf die Zusammenarbeit für ${a.objekt.strasse}. Bei Fragen melden Sie sich jederzeit bei mir.\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`, 'Willkommen'));
   $('#nachfassen')?.addEventListener('click', () => shareText(`Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nich wollte kurz nachfragen, ob Sie mein Angebot ${a.nummer} für die Treppenhausreinigung ${a.objekt.strasse} schon prüfen konnten. Gern beantworte ich Ihre Fragen.\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`, `Nachfrage ${a.nummer}`));
-  $('#no')?.addEventListener('click', async () => { a.status = 'abgelehnt'; await DB.put('angebote', a); router(); });
-  $('#yes')?.addEventListener('click', async () => {
-    if (!confirm('Angebot angenommen? Ich lege dann Auftraggeber und Haus mit Plan und Monatspreis an.')) return;
+  $('#no')?.addEventListener('click', () => { $('#gruende').hidden = !$('#gruende').hidden; });
+  document.querySelectorAll('[data-grund]').forEach((btn) => btn.addEventListener('click', async () => {
+    Object.assign(a, { status: 'abgelehnt', ablehnGrund: btn.dataset.grund });
+    await DB.put('angebote', a);
+    router();
+  }));
+  document.querySelectorAll('[data-annehmen]').forEach((btn) => btn.addEventListener('click', async () => {
+    const variante = btn.dataset.annehmen;
+    const iv = variante === 'B' ? a.varianteB.intervallTage : a.intervallTage;
+    const preis = variante === 'B' ? a.varianteB.monatspreis : a.monatspreis;
+    if (!confirm(`Angebot angenommen${a.varianteB ? ` (Variante ${variante}: ${RHYTHMEN[iv]}, ${money(preis)}/Monat)` : ''}? Ich lege dann Auftraggeber und Haus mit Plan und Monatspreis an.`)) return;
     let kundeId = a.kundeId;
     if (!kundeId) kundeId = (await DB.put('customers', { ...a.empfaenger, telefon: '', email: '', privat: false, notizen: '' })).id;
     const tasks = a.leistungen.map((text) => ({ text, alleTage: TASK_SUGGESTIONS.find(([t]) => t === text)?.[1] ?? OPTIONS.find(([, , t]) => t === text)?.[3] ?? 0 }));
     const o = {
       kundeId, name: '', strasse: a.objekt.strasse, plzOrt: a.objekt.plzOrt, etagen: a.objekt.etagen, eingaenge: a.objekt.eingaenge, aufzug: a.objekt.aufzug,
-      zugang: '', vorOrtName: '', vorOrtTelefon: '', intervallTage: a.intervallTage, wochentag: '', uhrzeit: '',
-      abrechnung: 'monat', monatspauschale: a.monatspreis, stundensatz: S.stundensatz,
+      zugang: '', vorOrtName: '', vorOrtTelefon: '', intervallTage: iv, wochentag: '', uhrzeit: '',
+      abrechnung: 'monat', monatspauschale: preis, stundensatz: S.stundensatz,
       winterAbrechnung: a.winterPreis ? 'einsatz' : 'keiner', winterPreis: a.winterPreis || 0, notizen: `Aus Angebot ${a.nummer}`, aktiv: true, aufgaben: tasks,
     };
     assignStarts(o, [], []);
     await DB.put('objects', o);
-    Object.assign(a, { status: 'angenommen', kundeId, objektId: o.id });
+    Object.assign(a, { status: 'angenommen', kundeId, objektId: o.id, angenommeneVariante: variante });
     await DB.put('angebote', a);
     confetti();
     vibrate([15, 60, 15]);
     toast('🎉 Glückwunsch zum neuen Auftrag!');
     go(`#/objekt/${o.id}/bearbeiten`);
-  });
+  }));
   $('#del').addEventListener('click', async () => {
     if (!confirm('Angebot löschen?')) return;
     await DB.del('angebote', a.id);
