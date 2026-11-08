@@ -610,7 +610,7 @@ async function angebotForm(a, q = {}) {
     <form id="f" class="form angebot-form">
       <section class="card step">
         <h3 class="step-title"><span class="step-nr">1</span>Empfänger</h3>
-        ${customerSelect(customers, v.kundeId || '', { allowNew: true }).replace('Auftraggeber *', 'Empfänger *')}
+        ${customerSelect(customers, v.kundeId || '', { allowNew: true }).replace('Auftraggeber *', '').replace('– Auftraggeber wählen –', '– Empfänger wählen –')}
         <div id="newRecipient" hidden>
           <label>Name / Firma<input name="eName" value="${esc(e.name || '')}" placeholder="z. B. Hausverwaltung Schmidt GmbH"></label>
           <label>Ansprechpartner<input name="eAnsprech" value="${esc(e.ansprechpartner || '')}"></label>
@@ -626,7 +626,7 @@ async function angebotForm(a, q = {}) {
           <label>Eingänge<input name="eingaenge" type="number" min="1" inputmode="numeric" value="${v.objekt.eingaenge || 1}"></label>
           <label>Entfernung (km)<input name="km" type="number" step="1" min="0" inputmode="numeric" value="${v.km || 0}"></label>
         </div>
-        <p class="muted small">Entfernung einfach – die Anfahrt wird je Reinigung mit 0,30 €/km eingerechnet.</p>
+        <p class="muted small step-hint">Entfernung einfach, Anfahrt je Reinigung mit 0,30 €/km.</p>
       </section>
 
       <section class="card step">
@@ -639,13 +639,13 @@ async function angebotForm(a, q = {}) {
         <div class="chip-row">${OPTIONS.map(([key, label]) => { const on = (v.optionen || []).includes(key); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="opt_${key}" ${on ? 'checked' : ''} hidden>${label}</label>`; }).join('')}</div>
         <div class="grid2 mt">
           <label>❄️ Winterdienst<select name="winterArt"><option value="">nicht anbieten</option><option value="einsatz" ${winterArt === 'einsatz' ? 'selected' : ''}>je Einsatz</option><option value="pauschal" ${winterArt === 'pauschal' ? 'selected' : ''}>im Preis inkl.</option></select></label>
-          <label id="winterEinsBox">Einsätze pro Winter (geschätzt)<input name="winterEinsaetze" type="number" min="0" step="1" inputmode="numeric" value="${v.winterEinsaetze || 8}"></label>
+          <label id="winterEinsBox">Einsätze je Winter<input name="winterEinsaetze" type="number" min="0" step="1" inputmode="numeric" value="${v.winterEinsaetze || 8}"></label>
         </div>
       </section>
 
       <section class="card step">
         <h3 class="step-title"><span class="step-nr">4</span>Preis & Stundenlohn</h3>
-        <label>Geschätzte Zeit je Reinigung (Min.) <span class="muted small">– nur für dich, steht nicht im Angebot</span><input name="dauer" type="number" min="5" step="5" inputmode="numeric" value="${v.dauer || ''}"></label>
+        <label>Zeit je Reinigung (Min.) <span class="muted small">– nur für dich</span><input name="dauer" type="number" min="5" step="5" inputmode="numeric" value="${v.dauer || ''}"></label>
         <div class="calc" id="calc"></div>
         <details><summary>⚙️ Preise je Reinigung anpassen</summary>
           <div class="grid3 mt">
@@ -659,7 +659,7 @@ async function angebotForm(a, q = {}) {
 
       <section class="card step">
         <h3 class="step-title"><span class="step-nr">5</span>Inhalt des Angebots</h3>
-        <label>Leistungsumfang <span class="muted small">(eine Zeile je Punkt)</span><textarea name="leistungen" rows="9">${esc(leistungenText)}</textarea></label>
+        <label>Leistungsumfang <span class="muted small">(eine Zeile je Punkt)</span><textarea name="leistungen" rows="6">${esc(leistungenText)}</textarea></label>
         <button type="button" class="btn ghost small" id="stdLeist">↺ Standard aus den Optionen übernehmen</button>
         <div class="label mt">Zusatzleistungen auf Abruf <span class="muted small">(nicht im Monatspreis)</span></div>
         <div class="chip-row">${S.leistungen.map((l, i) => { const on = zusatzNamen.includes(l.name); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="zus_${i}" ${on ? 'checked' : ''} hidden>${esc(l.name)} · ${unitPrice(l)}</label>`; }).join('') || '<span class="muted small">Keine Leistungen im Katalog.</span>'}</div>

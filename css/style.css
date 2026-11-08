@@ -958,3 +958,26 @@ details.grp.gefahr > summary { color: var(--danger); }
 .leiste-preis { font-size: 20px; font-weight: 800; color: var(--brand); line-height: 1.15; }
 .leiste-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .angebot-leiste .btn { flex: none; margin: 0; }
+
+/* Angebot erstellen: kompakter, damit mehr auf einen Blick passt */
+.angebot-form .step { padding: 12px 12px 4px; margin-bottom: 8px; }
+.angebot-form .step-title { margin: 0 0 10px; font-size: 15px; gap: 8px; }
+.angebot-form .step-nr { width: 22px; height: 22px; font-size: 12px; }
+.angebot-form label, .angebot-form .label { margin-bottom: 8px; font-size: 13px; }
+.angebot-form input:not([type=checkbox]), .angebot-form select, .angebot-form textarea { padding: 7px 10px; font-size: 15px; margin-top: 3px; border-radius: 9px; }
+.angebot-form textarea { line-height: 1.35; }
+.angebot-form .grid2, .angebot-form .grid3 { gap: 8px; }
+.angebot-form .chip-row { gap: 5px; margin: 4px 0 10px; }
+.angebot-form .chip { padding: 4px 9px; font-size: 12px; }
+.angebot-form .step-hint { margin: -2px 0 8px; }
+.angebot-form .calc { padding: 10px 12px; margin: 4px 0 8px; font-size: 14px; }
+.angebot-form .calc-row { padding: 1px 0; }
+.angebot-form .calc-total { font-size: 17px; margin-top: 4px; padding-top: 6px; }
+.angebot-form .calc .muted.small { font-size: 12px; }
+.angebot-form details { margin-bottom: 8px; }
+.angebot-form .btn.small { padding: 6px 10px; font-size: 13px; }
+.angebot-form .mt { margin-top: 6px; }
+.angebot-leiste { padding: 7px 8px 7px 14px; margin-top: 10px; }
+.angebot-leiste .leiste-preis { font-size: 18px; }
+.angebot-leiste .leiste-sub { font-size: 11.5px; }
+.angebot-leiste .btn { padding: 10px 14px; font-size: 15px; }
