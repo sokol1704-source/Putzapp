@@ -126,6 +126,30 @@ let lastSchedule = 0;
 // Schlägt der Dienst fehl, bleibt die feste Benachrichtigung mit Startzeit.
 const TIMER_NOTIFICATION_ID = 4001;
 let timerUpdate = null;
+/* ---------- Knöpfe in Benachrichtigungen ---------- */
+// „Starten“ in der Erinnerung kurz vor einem Einsatz, „Fertig“ in der laufenden Zeitmessung.
+const FERTIG_KNOPF = 1;
+let aktionenBereit = false;
+async function setupNotificationActions() {
+  if (!NATIVE || aktionenBereit) return;
+  aktionenBereit = true;
+  const P = window.Capacitor?.Plugins || {};
+  try {
+    await native('LocalNotifications', 'registerActionTypes', { types: [{ id: 'EINSATZ', actions: [{ id: 'start', title: '▶️ Starten' }] }] });
+    P.LocalNotifications?.addListener('localNotificationActionPerformed', (a) => {
+      const x = a.notification?.extra || {};
+      if (a.actionId === 'start' && x.objektId && !S.timer) startTimer(x.objektId, x.terminId || '');
+    });
+  } catch (e) {
+    console.warn('Benachrichtigungs-Aktionen', e);
+  }
+  try {
+    P.ForegroundService?.addListener('buttonClicked', (e) => { if (e.buttonId === FERTIG_KNOPF && S.timer) stopTimer(); });
+  } catch (e) {
+    console.warn('Fertig-Knopf', e);
+  }
+}
+
 async function zeigeTimerBenachrichtigung(objektId) {
   if (!NATIVE) return;
   clearInterval(timerUpdate);
@@ -144,7 +168,7 @@ async function zeigeTimerBenachrichtigung(objektId) {
   };
   try {
     // serviceType 1 = Datensynchronisierung (passt zum Eintrag im Manifest)
-    const optionen = () => ({ id: TIMER_NOTIFICATION_ID, title: titel, body: text(), smallIcon: 'ic_stat_toths', silent: true, serviceType: 1 });
+    const optionen = () => ({ id: TIMER_NOTIFICATION_ID, title: titel, body: text(), smallIcon: 'ic_stat_toths', silent: true, serviceType: 1, buttons: [{ id: FERTIG_KNOPF, title: '✓ Fertig – Einsatz erfassen' }] });
     await native('ForegroundService', 'startForegroundService', optionen());
     timerUpdate = setInterval(() => native('ForegroundService', 'updateForegroundService', optionen()).catch(() => {}), 60000);
   } catch {
@@ -216,6 +240,23 @@ async function scheduleNotifications(force = false) {
       if (at <= new Date()) at.setDate(at.getDate() + 1);
       notes.push({ id: 3001, title: '⏰ Offene Punkte nachhaken', body: `${body} (Stand beim letzten Öffnen)`, schedule: { at: at.toISOString(), repeats: true, every: 'day', allowWhileIdle: true } });
     }
+    // Kurz vor jedem Reinigungseinsatz (15 Min. vor der Uhrzeit, sonst 8 Uhr) mit Knopf „Starten“
+    plan.filter((p) => p.objektId && (p.type === 'faellig' || p.typ === 'reinigung') && p.datum >= today() && daysBetween(today(), p.datum) <= 14)
+      .slice(0, 30)
+      .forEach((p, n) => {
+        const at = parseISO(p.datum);
+        const [h, mi] = (p.uhrzeit || '08:15').split(':').map(Number);
+        at.setHours(h, mi - 15, 0, 0);
+        if (at < new Date()) return;
+        notes.push({
+          id: 6000 + n,
+          title: `🧽 Gleich: ${objLabel(data.omap[p.objektId])}`,
+          body: p.uhrzeit ? `Um ${p.uhrzeit} Uhr – mit „Starten“ läuft die Zeitmessung` : 'Heute fällig – mit „Starten“ läuft die Zeitmessung',
+          actionTypeId: 'EINSATZ',
+          extra: { objektId: p.objektId, terminId: p.type === 'termin' ? p.id : '' },
+          schedule: { at: at.toISOString(), allowWhileIdle: true },
+        });
+      });
     // Ratenzahlungen: am Fälligkeitstag erinnern, und am Monatsende, wenn noch Zahlungen abzuhaken sind
     const ratenOffen = data.invoices.filter((i) => i.raten && i.status !== 'storniert')
       .flatMap((i) => i.raten.filter((r) => !r.bezahltAm).map((r) => ({ i, r })))

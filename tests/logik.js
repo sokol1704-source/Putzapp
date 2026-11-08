@@ -106,6 +106,23 @@ const BASE = process.env.APP_URL || 'http://localhost:8765/';
     pruefe('Offener Betrag = Summe der unbezahlten Raten', restBetrag({ raten: ratenPlan(1200, 12, '2030-02-01').map((r, i) => ({ ...r, bezahltAm: i < 3 ? 'x' : null })) }), 900);
     for (const s of DB.stores) await DB.clear(s);
 
+    /* Gewinn pro Haus: Fahrtkosten aus dem Fahrtenbuch, Material nach Stunden */
+    for (const s of DB.stores) await DB.clear(s);
+    const j = String(new Date().getFullYear());
+    const h1 = await DB.put('objects', { kundeId: 'k', strasse: 'A', abrechnung: 'monat', monatspauschale: 10000, aktiv: true, aufgaben: [] });
+    const h2 = await DB.put('objects', { kundeId: 'k', strasse: 'B', abrechnung: 'monat', monatspauschale: 10000, aktiv: true, aufgaben: [] });
+    await DB.put('visits', { objektId: h1.id, datum: `${j}-01-10`, stunden: 3 });
+    await DB.put('visits', { objektId: h2.id, datum: `${j}-01-11`, stunden: 1 });
+    await DB.put('fahrten', { datum: `${j}-01-10`, km: 100, objektIds: [h1.id, h2.id] });
+    await DB.put('ausgaben', { datum: `${j}-01-05`, betrag: 4000, kategorie: 'Reinigungsmittel', privat: 0 });
+    await DB.put('invoices', { nummer: `RE-${j}-001`, status: 'bezahlt', datum: `${j}-01-31`, bezahltAm: `${j}-02-05`, summe: 20000, kundeId: 'k', kunde: { name: 'K' }, positionen: [{ objektId: h1.id, betrag: 10000 }, { objektId: h2.id, betrag: 10000 }] });
+    const an = await analyticsData(j);
+    const r1 = an.houses.find((h) => h.o.id === h1.id);
+    pruefe('Gewinn pro Haus: Fahrtkosten je zur Hälfte (100 km × 0,30 € / 2)', r1.fahrt, 1500);
+    pruefe('Gewinn pro Haus: Material nach Stundenanteil (3 von 4 Std.)', r1.material, 3000);
+    pruefe('Gewinn pro Haus: Ergebnis nach Kosten', r1.ergebnis, 10000 - 1500 - 3000);
+    pruefe('Gewinn pro Haus: Stundenlohn nach Kosten', r1.wageNetto, Math.round(5500 / 3));
+
     for (const s of DB.stores) await DB.clear(s);
     return out;
   });

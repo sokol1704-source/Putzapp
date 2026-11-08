@@ -34,6 +34,19 @@ route('/', async () => {
   })());
   const maengelAlt = data.maengel.filter((m) => m.status !== 'erledigt' && daysBetween(m.datum, t) >= NACHFASS_TAGE).length;
   const angeboteAlt = data.angebote.filter(angebotNachfassen).length;
+  // Jahresrechnungen mit Frist: nachträglich bis Mitte Juni fürs Vorjahr, im Voraus ab November fürs Folgejahr
+  const jahrJetzt = new Date().getFullYear();
+  const monatJetzt = new Date().getMonth() + 1;
+  const jahresrechnungen = data.objects.filter((o) => o.aktiv !== false && !monatlichAbgerechnet(o)).map((o) => {
+    const z = zyklusOf(o);
+    const job = z === 'jahr' && monatJetzt <= 6 ? { jahr: String(jahrJetzt - 1), modus: 'nach' }
+      : z === 'voraus' && monatJetzt >= 11 ? { jahr: String(jahrJetzt + 1), modus: 'voraus' } : null;
+    if (!job || data.invoices.some((i) => i.zeitraum === job.jahr && i.status !== 'storniert' && i.objekte?.some((x) => x.id === o.id))) return null;
+    return { o, ...job };
+  }).filter(Boolean);
+  // Verträge, die vorbereitet, aber noch nicht vom Auftraggeber unterschrieben sind
+  const unterschrieben = new Set((await DB.all('unterschriften')).map((u) => u.id));
+  const vertragOffen = data.objects.filter((o) => o.aktiv !== false && o.vertrag && !unterschrieben.has(`vertrag_${o.id}_ag`));
   const hour = new Date().getHours();
   const greet = hour < 11 ? 'Guten Morgen' : hour < 17 ? 'Hallo' : 'Guten Abend';
   const firstName = (S.inhaber || '').split(' ')[0];
@@ -43,6 +56,8 @@ route('/', async () => {
   const punkte = [
     ueberfaellig.length && ['💶', `${ueberfaellig.length} ${ueberfaellig.length === 1 ? 'Rechnung ist' : 'Rechnungen sind'} überfällig`, '#/rechnungen'],
     morgenPlan.length && ['📨', `Morgen ${morgenPlan.length} ${morgenPlan.length === 1 ? 'Termin' : 'Termine'} – Auftraggeber Bescheid geben`, '#/bestaetigen'],
+    ...jahresrechnungen.map((j) => ['📅', `Jahresrechnung ${j.jahr} für ${esc(objLabel(j.o))} ${j.modus === 'nach' ? `stellen – Frist Mitte Juni ${jahrJetzt}` : 'im Voraus stellen'}`, `#/objekt/${j.o.id}/jahresrechnung?jahr=${j.jahr}&modus=${j.modus}`]),
+    vertragOffen.length && ['✍️', `${vertragOffen.length} ${vertragOffen.length === 1 ? 'Vertrag wartet' : 'Verträge warten'} auf die Unterschrift des Auftraggebers`, `#/objekt/${vertragOffen[0].id}/vertrag`],
     preisAlt.length && ['📈', `${preisAlt.length} ${preisAlt.length === 1 ? 'Haus ohne' : 'Häuser ohne'} Preisanpassung seit über einem Jahr`, '#/preise'],
     akquiseDue && ['🎯', `${akquiseDue} ${akquiseDue === 1 ? 'Interessent wartet' : 'Interessenten warten'} auf Nachfassen`, '#/akquise'],
     maengelAlt && ['⏰', `${maengelAlt} ${maengelAlt === 1 ? 'Mangel' : 'Mängel'} seit über ${NACHFASS_TAGE} Tagen offen`, '#/maengel'],

@@ -173,7 +173,7 @@ async function mangelForm(m, q) {
       <button class="btn block" type="submit" id="save">Speichern</button>
     </form>
   `);
-  photoEditor($('#photos'), existing, pending, [['mangel', 'Fotos']]);
+  photoEditor($('#photos'), existing, pending, [['mangel', 'Fotos']], { stempel: true });
   $('#f').addEventListener('submit', async (e) => {
     e.preventDefault();
     $('#save').disabled = true;
@@ -363,7 +363,7 @@ async function winterForm(w, q) {
       <button class="btn block winter-btn" type="submit" id="save">❄️ Speichern</button>
     </form>
   `);
-  photoEditor($('#photos'), existing, pending, [['winter', 'Fotos']]);
+  photoEditor($('#photos'), existing, pending, [['winter', 'Fotos']], { stempel: true });
   const f = $('#f');
   f.addEventListener('change', (e) => { const chip = e.target.closest('.chip'); if (chip) chip.classList.toggle('on', e.target.checked); });
   f.addEventListener('submit', async (e) => {

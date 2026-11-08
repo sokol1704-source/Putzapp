@@ -77,6 +77,11 @@ route('/einstellungen', async () => {
       </div>
     `)}
 
+    ${gruppe('📷 Fotos', `
+      <label class="check"><input type="checkbox" id="fotoStempel" ${S.fotoStempel !== false ? 'checked' : ''}> Datum, Uhrzeit und Haus ins Foto schreiben</label>
+      <p class="muted small">Gilt für Fotos bei Einsätzen, Mängeln und Winterdienst. Gut als Nachweis gegenüber Hausverwaltungen.</p>
+    `)}
+
     ${gruppe('🔒 Sicherheit', `
       ${NATIVE ? `<label class="check"><input type="checkbox" id="appSperre" ${S.appSperre ? 'checked' : ''}> App mit Fingerabdruck sperren</label>
       <p class="muted small">Nach 30 Sekunden im Hintergrund fragt die App nach Fingerabdruck oder Gerätesperre.</p>` : '<p class="muted small">Die Sperre gibt es in der Android-App.</p>'}
@@ -132,6 +137,7 @@ route('/einstellungen', async () => {
   $('#import').addEventListener('change', (e) => e.target.files[0] && importBackup(e.target.files[0]));
   $('#factoryReset').addEventListener('click', factoryReset);
   $('#einfZeigen').addEventListener('click', () => zeigeEinfuehrung(true));
+  $('#fotoStempel')?.addEventListener('change', async (e) => { S.fotoStempel = e.target.checked; await saveSettings(); });
   $('#appSperre')?.addEventListener('change', async (e) => { S.appSperre = e.target.checked; await saveSettings(); toast(S.appSperre ? '🔒 Sperre aktiv' : 'Sperre aus'); });
 });
 

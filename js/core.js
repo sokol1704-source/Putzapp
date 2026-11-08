@@ -137,7 +137,7 @@ function lightbox(src) {
   document.body.appendChild(box);
 }
 
-async function compressImage(file, max = 1600, quality = 0.8) {
+async function compressImage(file, max = 1600, quality = 0.8, stempel = '') {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
@@ -145,13 +145,36 @@ async function compressImage(file, max = 1600, quality = 0.8) {
     const c = document.createElement('canvas');
     c.width = Math.round(img.naturalWidth * scale);
     c.height = Math.round(img.naturalHeight * scale);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    if (stempel) fotoStempel(ctx, c.width, c.height, stempel);
     return await new Promise((res) => c.toBlob((b) => res(b || file), 'image/jpeg', quality));
   } catch {
     return file;
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+// Zeitstempel unten links ins Foto schreiben (Nachweis: Datum, Uhrzeit, Haus)
+function fotoStempel(ctx, w, h, text) {
+  const fs = Math.max(14, Math.round(w / 34));
+  const rand = Math.round(fs * 0.5);
+  ctx.font = `600 ${fs}px system-ui, sans-serif`;
+  const breite = Math.min(w, ctx.measureText(text).width + rand * 2);
+  const hoehe = fs + rand * 2;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillRect(0, h - hoehe, breite, hoehe);
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, rand, h - hoehe / 2, w - rand * 2);
+}
+// Stempeltext: Aufnahmezeit (bei Kamera jetzt, bei Galerie das Dateidatum) und das im Formular gewählte Haus
+function stempelText(file, form) {
+  const d = new Date(file.lastModified || Date.now());
+  const sel = form?.querySelector('select[name=objektId]');
+  const haus = sel?.value ? sel.selectedOptions[0].textContent.split(' · ')[0].trim() : '';
+  return `${fmtDate(isoDate(d))} ${pad(d.getHours())}:${pad(d.getMinutes())}${haus ? ` · ${haus}` : ''}${S.firma ? ` · ${S.firma}` : ''}`;
 }
 
 async function savePhotos(ownerId, pending) {
@@ -725,7 +748,7 @@ function extrasEditor(el, extras) {
 }
 
 // Fotos aufnehmen/auswählen. Neue Fotos bleiben bis zum Speichern in "pending".
-function photoEditor(el, existing, pending, groups = [['vorher', 'Vorher'], ['nachher', 'Nachher']]) {
+function photoEditor(el, existing, pending, groups = [['vorher', 'Vorher'], ['nachher', 'Nachher']], opts = {}) {
   const thumb = (p, kind) => `<div class="thumb">
     <img src="${p.url || (p.url = objUrl(p.blob))}" alt="Foto" data-view>
     <button type="button" class="thumb-del" data-${kind}="${p.id}" aria-label="Foto entfernen">✕</button></div>`;
@@ -743,7 +766,8 @@ function photoEditor(el, existing, pending, groups = [['vorher', 'Vorher'], ['na
     const input = e.target;
     if (!input.files?.length) return;
     toast('Fotos werden verarbeitet…');
-    for (const file of input.files) pending.push({ id: DB.uid(), typ: input.dataset.typ, blob: await compressImage(file) });
+    const stempeln = opts.stempel && S.fotoStempel !== false;
+    for (const file of input.files) pending.push({ id: DB.uid(), typ: input.dataset.typ, blob: await compressImage(file, 1600, 0.8, stempeln ? stempelText(file, el.closest('form')) : '') });
     draw();
   });
   el.addEventListener('click', async (e) => {

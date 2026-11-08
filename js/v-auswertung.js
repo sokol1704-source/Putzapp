@@ -66,13 +66,27 @@ async function analyticsData(jahr) {
   const openMonths = isCurrent ? umsatzM.slice(curMonth).filter((v) => !v).length : 0;
   const prognose = umsatz + openMonths * fest;
 
+  // Kosten je Haus (Schätzung): Fahrtkosten aus dem Fahrtenbuch, Material nach Stundenanteil, Streumittel nach Wintereinsätzen
+  const fahrtProHaus = {};
+  fahrten.filter((f) => yearOf(f.datum) === jahr && f.objektIds?.length).forEach((f) => {
+    const anteil = (num(f.km) * KM_SATZ) / f.objektIds.length;
+    f.objektIds.forEach((id) => { fahrtProHaus[id] = (fahrtProHaus[id] || 0) + anteil; });
+  });
+  const ausgabenY = ausgaben.filter((a) => yearOf(a.datum) === jahr);
+  const materialJahr = ausgabenY.filter((a) => ['Reinigungsmittel', 'Arbeitsmaterial & Geräte'].includes(a.kategorie)).reduce((s, a) => s + betrieblich(a), 0);
+  const streuJahr = ausgabenY.filter((a) => a.kategorie === 'Streumittel').reduce((s, a) => s + betrieblich(a), 0);
+
   const houses = data.objects.map((o) => {
     const vs = visitsY.filter((v) => v.objektId === o.id);
     const h = vs.reduce((s, v) => s + num(v.stunden), 0);
     const u = perObj[o.id] || 0;
     const months = isCurrent ? curMonth + 1 : 12;
     const hoursPerMonth = vs.length ? h / Math.max(1, new Set(vs.map((v) => v.datum.slice(0, 7))).size) : 0;
-    return { o, umsatz: u, hours: h, count: vs.length, wage: h ? Math.round(u / h) : null, hoursPerMonth, months };
+    const fahrt = Math.round(fahrtProHaus[o.id] || 0);
+    const material = stunden ? Math.round((materialJahr * h) / stunden) : 0;
+    const streu = winterY.length ? Math.round((streuJahr * winterY.filter((w) => w.objektId === o.id).length) / winterY.length) : 0;
+    const ergebnis = u - fahrt - material - streu;
+    return { o, umsatz: u, hours: h, count: vs.length, wage: h ? Math.round(u / h) : null, hoursPerMonth, months, fahrt, material: material + streu, ergebnis, wageNetto: h ? Math.round(ergebnis / h) : null };
   }).filter((r) => r.umsatz || r.count).sort((a, b) => (b.wage ?? -1) - (a.wage ?? -1));
 
   return { data, jahr, isCurrent, umsatzM, kostenM, umsatz, kosten, umsatzVJ, umsatzBisher, stunden, visitsY, visitsVJ, winterY, perKunde, fest, monthly, prognose, houses };
@@ -178,6 +192,7 @@ route('/auswertung', async (_, q) => {
     </div>` : ''}
 
     <h3 class="section">Was bringt welches Haus?</h3>
+    <p class="muted small">Fahrtkosten kommen aus dem Fahrtenbuch. Material und Streumittel werden nach Arbeitsstunden bzw. Wintereinsätzen auf die Häuser verteilt.</p>
     ${a.houses.map((r) => {
       const need = r.wage != null && r.wage < 2500 && isMonthly(r.o) && r.hoursPerMonth ? Math.ceil((r.hoursPerMonth * 2500) / 500) * 500 : 0;
       const cls = r.wage != null ? wageClass(r.wage) : '';
@@ -185,6 +200,8 @@ route('/auswertung', async (_, q) => {
         <div class="row between"><b>🏢 ${esc(objLabel(r.o))}</b><b>${r.wage != null ? `${money(r.wage)}/Std.` : '–'}</b></div>
         <div class="wbar"><span class="${cls}" style="width:${r.wage ? Math.min(100, (r.wage / maxWage) * 100) : 0}%"></span><i style="left:${(2500 / maxWage) * 100}%" title="Ziel 25 €/Std."></i></div>
         <div class="muted small">${money(r.umsatz)} Umsatz · ${r.count} Einsätze · ${fmtNum(r.hours)} Std.${cls ? ` · <span class="st ${cls}">${cls === 'ok' ? '✓ gut' : cls === 'warn' ? '◐ geht so' : '✕ zu niedrig'}</span>` : ''}</div>
+        ${r.fahrt || r.material ? `<div class="small mt">Nach Kosten: <b>${money(r.ergebnis)}</b>${r.wageNetto != null ? ` · <b>${money(r.wageNetto)}/Std.</b>` : ''}</div>
+        <div class="muted small">− Fahrt ${money(r.fahrt)} · − Material ${money(r.material)} (anteilig geschätzt)</div>` : ''}
         ${need && need > (r.o.monatspauschale || 0) ? `<div class="small mt">💡 Für 25 €/Std. wären ca. <b>${money(need)}/Monat</b> nötig (+${money(need - (r.o.monatspauschale || 0))}).</div>` : ''}
       </a>`;
     }).join('') || '<div class="empty">Noch keine Daten für dieses Jahr.</div>'}

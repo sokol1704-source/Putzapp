@@ -201,6 +201,36 @@ const anzahl = (p, store) => p.evaluate((s) => DB.all(s).then((r) => r.length), 
     if (!r2) report.push('Monatsabschluss: Rate 2 nicht als bezahlt gespeichert'); else ok.push('Monatsabschluss: Rate abgehakt');
   }
 
+  // 4e) Zeitstempel im Foto: weißes Testbild hochladen, unten links muss der dunkle Stempel sein
+  await geh(`/einsatz/neu?objekt=${ids.objekt}`);
+  await p.evaluate(() => { const s = document.querySelector('select[name=objektId]'); if (s && !s.value) s.value = [...s.options].find((o) => o.value).value; });
+  const weiss = await p.evaluate(async () => {
+    const c = document.createElement('canvas'); c.width = 800; c.height = 600;
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 800, 600);
+    return c.toDataURL('image/png').split(',')[1];
+  });
+  await p.setInputFiles('#photos input[data-typ="nachher"]:not([capture])', { name: 'test.png', mimeType: 'image/png', buffer: Buffer.from(weiss, 'base64') });
+  await p.waitForTimeout(900);
+  const pixel = await p.evaluate(async () => {
+    const img = [...document.querySelectorAll('#photos .thumb img')].pop();
+    if (!img) return null;
+    await img.decode();
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+    const unten = x.getImageData(4, c.height - 4, 1, 1).data[0];
+    const oben = x.getImageData(c.width - 4, 4, 1, 1).data[0];
+    return { unten, oben };
+  });
+  if (!pixel) report.push('Fotostempel: kein Foto im Formular');
+  else if (!(pixel.unten < 120 && pixel.oben > 230)) report.push(`Fotostempel fehlt (unten ${pixel.unten}, oben ${pixel.oben})`);
+  else ok.push('Fotostempel: Datum/Uhrzeit/Haus unten links im Foto');
+
+  // 4f) Startseite: Vertrag ohne Unterschrift des Auftraggebers wird angezeigt
+  await geh('/');
+  const startTxt = await p.evaluate(() => document.body.innerText);
+  if (!/Vertr(ag|äge) wart/.test(startTxt)) report.push('Startseite: Hinweis auf fehlende Vertragsunterschrift fehlt');
+  else ok.push('Startseite: Hinweis auf fehlende Vertragsunterschrift');
+
   // 5) Mangel erledigen, Akquise gewonnen → Kunde
   await geh(`/mangel/${ids.mangel}`);
   const erledigtBtn = await p.$('#done');

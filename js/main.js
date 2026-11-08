@@ -329,6 +329,7 @@ window.addEventListener('hashchange', router);
   sperrenWennNoetig(true);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sperrenWennNoetig(); });
   autoBackup();
+  setupNotificationActions();
   scheduleNotifications();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') scheduleNotifications(); });
   navigator.storage?.persist?.();

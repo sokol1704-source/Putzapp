@@ -275,7 +275,7 @@ async function visitForm(v, q) {
     toast('✓ Vom letzten Einsatz übernommen – bitte prüfen');
     $('#sameAsLast').remove();
   });
-  photoEditor($('#photos'), existing, pending);
+  photoEditor($('#photos'), existing, pending, undefined, { stempel: true });
   // Fotopflicht: zeigt, wie viele Nachher-Fotos noch fehlen
   const fotoPflicht = () => omap[$('#f').objektId.value]?.fotoPflicht || 0;
   const nachherCount = () => [...existing, ...pending].filter((p) => p.typ === 'nachher').length;
