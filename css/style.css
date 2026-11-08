@@ -942,3 +942,19 @@ details.grp.gefahr > summary { color: var(--danger); }
 .hinweise a.hinweis { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--border); color: var(--text); font-size: 15px; }
 .hinweise a.hinweis span:first-child { width: 26px; text-align: center; }
 .hinweise .grow { flex: 1; }
+
+/* Angebot erstellen: nummerierte Schritte und mitlaufende Preisleiste */
+.angebot-form .step { padding-top: 14px; }
+.step-title { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--text); }
+.step-nr { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 13px; font-weight: 700; }
+.angebot-form .calc { margin-bottom: 10px; }
+.angebot-form details summary { font-size: 14px; color: var(--muted); }
+.angebot-leiste {
+  position: sticky; bottom: calc(var(--tabbar-h) + 10px + env(safe-area-inset-bottom)); z-index: 20;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 14px; padding: 10px 10px 10px 16px; border-radius: var(--radius);
+  background: var(--card); border: 1px solid var(--border); box-shadow: 0 8px 28px rgba(15, 23, 42, .16);
+}
+.leiste-preis { font-size: 20px; font-weight: 800; color: var(--brand); line-height: 1.15; }
+.leiste-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.angebot-leiste .btn { flex: none; margin: 0; }

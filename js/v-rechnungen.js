@@ -607,46 +607,71 @@ async function angebotForm(a, q = {}) {
   const zusatzNamen = (v.zusatz || []).map((z) => z.name);
   const leistungenText = (v.leistungen || standardLeistungen(v.optionen || [])).join('\n');
   render(isNew ? 'Angebot berechnen' : `${a.nummer} bearbeiten`, `
-    <form id="f" class="form">
-      ${customerSelect(customers, v.kundeId || '', { allowNew: true }).replace('Auftraggeber *', 'Empfänger *')}
-      <div id="newRecipient" hidden>
-        <label>Name / Firma<input name="eName" value="${esc(e.name || '')}" placeholder="z. B. Hausverwaltung Schmidt GmbH"></label>
-        <label>Ansprechpartner<input name="eAnsprech" value="${esc(e.ansprechpartner || '')}"></label>
-        <div class="grid2"><label>Straße<input name="eStrasse" value="${esc(e.strasse || '')}"></label><label>PLZ & Ort<input name="ePlzOrt" value="${esc(e.plzOrt || '')}"></label></div>
-      </div>
-      <h3 class="section">🏢 Objekt</h3>
-      <div class="grid2"><label>Straße & Hausnr. *<input name="strasse" required value="${esc(v.objekt.strasse || '')}"></label><label>PLZ & Ort<input name="plzOrt" value="${esc(v.objekt.plzOrt || '')}"></label></div>
-      <div class="grid3">
-        <label>Etagen<input name="etagen" type="number" min="1" inputmode="numeric" value="${v.objekt.etagen || 4}"></label>
-        <label>Eingänge<input name="eingaenge" type="number" min="1" inputmode="numeric" value="${v.objekt.eingaenge || 1}"></label>
-        <label>Rhythmus<select name="intervall">${rhythmusOptionen(v.intervallTage)}</select></label>
-      </div>
-      <label>Zweite Variante zum Vergleich <span class="muted small">(optional, z. B. wöchentlich und alle 2 Wochen)</span><select name="intervall2"><option value="">– keine –</option>${rhythmusOptionen(v.varianteB?.intervallTage)}</select></label>
-      <label>Entfernung zum Haus (km, einfach) <span class="muted small">– Anfahrt wird je Reinigung berechnet</span><input name="km" type="number" step="1" min="0" inputmode="numeric" value="${v.km || 0}"></label>
-      <div class="label">Zusätzlich je Reinigung</div>
-      <div class="chip-row">${OPTIONS.map(([key, label]) => { const on = (v.optionen || []).includes(key); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="opt_${key}" ${on ? 'checked' : ''} hidden>${label}</label>`; }).join('')}</div>
-      <div class="grid2">
-        <label>❄️ Winterdienst <span class="muted small">(inklusive = im Monatspreis)</span><select name="winterArt"><option value="">nicht anbieten</option><option value="einsatz" ${winterArt === 'einsatz' ? 'selected' : ''}>je Einsatz</option><option value="pauschal" ${winterArt === 'pauschal' ? 'selected' : ''}>inklusive</option></select></label>
-        <label id="winterEinsBox">Einsätze pro Winter (geschätzt)<input name="winterEinsaetze" type="number" min="0" step="1" inputmode="numeric" value="${v.winterEinsaetze || 8}"></label>
-      </div>
-      <div class="label">Optionale Zusatzleistungen <span class="muted small">(auf Abruf, nicht im Monatspreis)</span></div>
-      <div class="chip-row">${S.leistungen.map((l, i) => { const on = zusatzNamen.includes(l.name); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="zus_${i}" ${on ? 'checked' : ''} hidden>${esc(l.name)} · ${unitPrice(l)}</label>`; }).join('') || '<span class="muted small">Keine Leistungen im Katalog.</span>'}</div>
-      <details><summary>⚙️ Preise je Reinigung anpassen (Richtwerte)</summary>
-        <div class="grid3 mt">
-          <label>pro Etage (€)<input name="k_proEtage" type="number" step="0.5" min="0" value="${K.proEtage / 100}"></label>
-          ${OPTIONS.map(([key, label]) => `<label>${label} (€)<input name="k_${key}" type="number" step="0.5" min="0" value="${(K[key] || 0) / 100}"></label>`).join('')}
-          <label>Winter je Einsatz (€)<input name="k_winter" type="number" step="0.5" min="0" value="${(v.winterPreis || S.leistungen.find((l) => l.id === 'winter')?.preis || 2500) / 100}"></label>
+    <form id="f" class="form angebot-form">
+      <section class="card step">
+        <h3 class="step-title"><span class="step-nr">1</span>Empfänger</h3>
+        ${customerSelect(customers, v.kundeId || '', { allowNew: true }).replace('Auftraggeber *', 'Empfänger *')}
+        <div id="newRecipient" hidden>
+          <label>Name / Firma<input name="eName" value="${esc(e.name || '')}" placeholder="z. B. Hausverwaltung Schmidt GmbH"></label>
+          <label>Ansprechpartner<input name="eAnsprech" value="${esc(e.ansprechpartner || '')}"></label>
+          <div class="grid2"><label>Straße<input name="eStrasse" value="${esc(e.strasse || '')}"></label><label>PLZ & Ort<input name="ePlzOrt" value="${esc(e.plzOrt || '')}"></label></div>
         </div>
-        <label class="check"><input type="checkbox" name="merken"> Diese Preise als Standard merken</label>
-      </details>
-      <label>Geschätzte Zeit je Reinigung (Min.) <span class="muted small">– nur für deinen Stundenlohn, steht nicht im Angebot</span><input name="dauer" type="number" min="5" step="5" inputmode="numeric" value="${v.dauer || ''}"></label>
-      <div class="calc" id="calc"></div>
-      <label>Leistungsumfang <span class="muted small">(eine Zeile je Punkt – streichen oder ergänzen)</span><textarea name="leistungen" rows="9">${esc(leistungenText)}</textarea></label>
-      <button type="button" class="btn ghost small" id="stdLeist">↺ Standard aus den Optionen übernehmen</button>
-      <label>Anmerkung im Angebot (optional)<textarea name="notiz" rows="2" placeholder="z. B. Reinigungsmittel sind im Preis enthalten.">${esc(v.notiz || '')}</textarea></label>
-      <div class="label">Fotos des Hauses <span class="muted small">(erscheinen im Angebot)</span></div>
-      <div id="angebotFotos"></div>
-      <button class="btn block" type="submit">${isNew ? 'Angebot erstellen' : 'Änderungen speichern'}</button>
+      </section>
+
+      <section class="card step">
+        <h3 class="step-title"><span class="step-nr">2</span>Objekt</h3>
+        <div class="grid2"><label>Straße & Hausnr. *<input name="strasse" required value="${esc(v.objekt.strasse || '')}"></label><label>PLZ & Ort<input name="plzOrt" value="${esc(v.objekt.plzOrt || '')}"></label></div>
+        <div class="grid3">
+          <label>Etagen<input name="etagen" type="number" min="1" inputmode="numeric" value="${v.objekt.etagen || 4}"></label>
+          <label>Eingänge<input name="eingaenge" type="number" min="1" inputmode="numeric" value="${v.objekt.eingaenge || 1}"></label>
+          <label>Entfernung (km)<input name="km" type="number" step="1" min="0" inputmode="numeric" value="${v.km || 0}"></label>
+        </div>
+        <p class="muted small">Entfernung einfach – die Anfahrt wird je Reinigung mit 0,30 €/km eingerechnet.</p>
+      </section>
+
+      <section class="card step">
+        <h3 class="step-title"><span class="step-nr">3</span>Reinigung</h3>
+        <div class="grid2">
+          <label>Rhythmus<select name="intervall">${rhythmusOptionen(v.intervallTage)}</select></label>
+          <label>Variante B <span class="muted small">(optional)</span><select name="intervall2"><option value="">– keine –</option>${rhythmusOptionen(v.varianteB?.intervallTage)}</select></label>
+        </div>
+        <div class="label">Zusätzlich bei jeder Reinigung</div>
+        <div class="chip-row">${OPTIONS.map(([key, label]) => { const on = (v.optionen || []).includes(key); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="opt_${key}" ${on ? 'checked' : ''} hidden>${label}</label>`; }).join('')}</div>
+        <div class="grid2 mt">
+          <label>❄️ Winterdienst<select name="winterArt"><option value="">nicht anbieten</option><option value="einsatz" ${winterArt === 'einsatz' ? 'selected' : ''}>je Einsatz</option><option value="pauschal" ${winterArt === 'pauschal' ? 'selected' : ''}>im Preis inkl.</option></select></label>
+          <label id="winterEinsBox">Einsätze pro Winter (geschätzt)<input name="winterEinsaetze" type="number" min="0" step="1" inputmode="numeric" value="${v.winterEinsaetze || 8}"></label>
+        </div>
+      </section>
+
+      <section class="card step">
+        <h3 class="step-title"><span class="step-nr">4</span>Preis & Stundenlohn</h3>
+        <label>Geschätzte Zeit je Reinigung (Min.) <span class="muted small">– nur für dich, steht nicht im Angebot</span><input name="dauer" type="number" min="5" step="5" inputmode="numeric" value="${v.dauer || ''}"></label>
+        <div class="calc" id="calc"></div>
+        <details><summary>⚙️ Preise je Reinigung anpassen</summary>
+          <div class="grid3 mt">
+            <label>pro Etage (€)<input name="k_proEtage" type="number" step="0.5" min="0" value="${K.proEtage / 100}"></label>
+            ${OPTIONS.map(([key, label]) => `<label>${label} (€)<input name="k_${key}" type="number" step="0.5" min="0" value="${(K[key] || 0) / 100}"></label>`).join('')}
+            <label>Winter je Einsatz (€)<input name="k_winter" type="number" step="0.5" min="0" value="${(v.winterPreis || S.leistungen.find((l) => l.id === 'winter')?.preis || 2500) / 100}"></label>
+          </div>
+          <label class="check"><input type="checkbox" name="merken"> Diese Preise als Standard merken</label>
+        </details>
+      </section>
+
+      <section class="card step">
+        <h3 class="step-title"><span class="step-nr">5</span>Inhalt des Angebots</h3>
+        <label>Leistungsumfang <span class="muted small">(eine Zeile je Punkt)</span><textarea name="leistungen" rows="9">${esc(leistungenText)}</textarea></label>
+        <button type="button" class="btn ghost small" id="stdLeist">↺ Standard aus den Optionen übernehmen</button>
+        <div class="label mt">Zusatzleistungen auf Abruf <span class="muted small">(nicht im Monatspreis)</span></div>
+        <div class="chip-row">${S.leistungen.map((l, i) => { const on = zusatzNamen.includes(l.name); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="zus_${i}" ${on ? 'checked' : ''} hidden>${esc(l.name)} · ${unitPrice(l)}</label>`; }).join('') || '<span class="muted small">Keine Leistungen im Katalog.</span>'}</div>
+        <label class="mt">Anmerkung (optional)<textarea name="notiz" rows="2" placeholder="z. B. Reinigungsmittel sind im Preis enthalten.">${esc(v.notiz || '')}</textarea></label>
+        <div class="label">Fotos des Hauses <span class="muted small">(erscheinen im Angebot)</span></div>
+        <div id="angebotFotos"></div>
+      </section>
+
+      <div class="angebot-leiste">
+        <div><div class="leiste-preis" id="lPreis"></div><div class="leiste-sub" id="lSub"></div></div>
+        <button class="btn" type="submit">${isNew ? 'Angebot erstellen' : 'Speichern'}</button>
+      </div>
     </form>
   `);
   photoEditor($('#angebotFotos'), fotosAlt, angebotFotos, [['angebot', 'Fotos']]);
@@ -656,7 +681,10 @@ async function angebotForm(a, q = {}) {
   f.kundeId.addEventListener('change', zeigeEmpfaenger);
   zeigeEmpfaenger();
   const gewaehlteOptionen = () => OPTIONS.filter(([key]) => f[`opt_${key}`].checked).map(([key]) => key);
-  $('#stdLeist').addEventListener('click', () => { f.leistungen.value = standardLeistungen(gewaehlteOptionen()).join('\n'); });
+  let leistungenVonHand = !isNew;
+  f.leistungen.addEventListener('input', () => { leistungenVonHand = true; });
+  $('#stdLeist').addEventListener('click', () => { f.leistungen.value = standardLeistungen(gewaehlteOptionen()).join('\n'); leistungenVonHand = false; });
+  f.addEventListener('change', (ev) => { if (ev.target.name?.startsWith('opt_') && !leistungenVonHand) f.leistungen.value = standardLeistungen(gewaehlteOptionen()).join('\n'); });
 
   const calc = () => {
     const etagen = Number(f.etagen.value) || 0;
@@ -696,6 +724,8 @@ async function angebotForm(a, q = {}) {
       <div class="calc-row mt"><span>Zeit je Reinigung</span><b>${dauer} Min.${fahrMin ? ` + ca. ${fahrMin} Min. Fahrt` : ''}</b></div>
       <div class="calc-row"><span>Dein Stundenlohn</span><b class="st ${wageClass(lohn)}">${money(lohn)}/Std.</b></div>
       ${lohn < 2500 ? `<div class="small danger-text">Unter 25 €/Std. Für 25 €/Std. wären etwa <b>${money(noetig * 100)}/Monat</b> nötig.</div>` : ''}`;
+    $('#lPreis').textContent = money(monthly * 100);
+    $('#lSub').innerHTML = `pro Monat · <span class="st ${wageClass(lohn)}">${money(lohn)}/Std.</span>${monthly2 ? ` · B: ${money(monthly2 * 100)}` : ''}`;
     return { monthly: monthly * 100, monthly2: monthly2 * 100, aufschlag: aufschlag * 100 };
   };
   f.addEventListener('input', calc);
