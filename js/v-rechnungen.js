@@ -68,16 +68,24 @@ route('/rechnungen', async (_, q) => {
   const luecken = nummernLuecken(invoices);
   const filter = q.filter || 'alle';
   const year = new Date().getFullYear();
-  const umsatz = invoices.filter((i) => i.status !== 'storniert' && i.datum.startsWith(String(year))).reduce((s, i) => s + i.summe, 0);
-  const pct = Math.min(100, (umsatz / 2500000) * 100);
+  // Kleinunternehmergrenze nach Zahlungseingang (§ 19 UStG: vereinnahmte Entgelte)
+  const zu = zufluesse(invoices);
+  const umsatz = summeIn(zu, String(year));
+  const umsatzVJ = summeIn(zu, String(year - 1));
+  const pct = Math.min(100, (umsatz / KU_GRENZE_VORJAHR) * 100);
+  const pctL = Math.min(100, (umsatz / KU_GRENZE_LAUFEND) * 100);
   const shown = invoices.filter((i) => filter === 'alle' || i.status === filter);
   const overdue = invoices.filter((i) => i.status === 'offen' && i.faellig < today());
   render('Rechnungen', `
     <a class="btn block" href="#/rechnung/neu">+ Rechnung erstellen</a>
     <div class="card mt">
-      <div class="row between"><span>Umsatz ${year}</span><b data-count="${umsatz}" data-money>${money(umsatz)}</b></div>
+      <div class="row between"><span>Einnahmen ${year}</span><b data-count="${umsatz}" data-money>${money(umsatz)}</b></div>
+      <div class="muted small">Nach Zahlungseingang gezählt, so wie bei der Kleinunternehmergrenze (§ 19 UStG).</div>
+      <div class="row between small mt"><span>Grenze für ${year + 1}</span><span>${money(umsatz)} von 25.000 €</span></div>
       <div class="bar"><div style="width:${pct}%" class="${pct > 80 ? 'warn' : ''}"></div></div>
-      <div class="muted small">Kleinunternehmergrenze: 25.000 € im Vorjahr, 100.000 € im laufenden Jahr (§ 19 UStG).</div>
+      <div class="row between small mt"><span>Grenze im laufenden Jahr</span><span>${money(umsatz)} von 100.000 €</span></div>
+      <div class="bar"><div style="width:${pctL}%" class="${pctL > 80 ? 'warn' : ''}"></div></div>
+      <div class="muted small mt">Vorjahr ${year - 1}: ${money(umsatzVJ)} – ${umsatzVJ <= KU_GRENZE_VORJAHR ? `unter 25.000 €, damit bist du ${year} Kleinunternehmer.` : `über 25.000 €, damit giltst du ${year} nicht mehr als Kleinunternehmer.`}</div>
     </div>
     ${overdue.length ? `<div class="card hint">⏰ <b>${overdue.length} Rechnung${overdue.length === 1 ? '' : 'en'} überfällig</b> – in der Rechnung auf „Zahlungserinnerung“ tippen.</div>` : ''}
     ${luecken.length ? `<div class="card hint danger-text">⚠️ <b>Lücken in der Rechnungsnummerierung</b>

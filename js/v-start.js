@@ -12,7 +12,7 @@ route('/', async () => {
   const offenSumme = offen.reduce((s, i) => s + restBetrag(i), 0);
   const maengelOffen = data.maengel.filter((m) => m.status !== 'erledigt').length;
   const fastLeer = (await DB.all('material')).filter(isLow);
-  const umsatzMonat = data.invoices.filter((i) => i.status !== 'storniert' && i.datum.startsWith(t.slice(0, 7))).reduce((s, i) => s + i.summe, 0);
+  const umsatzMonat = summeIn(zufluesse(data.invoices), t.slice(0, 7));
   // Kennzahlen des laufenden Monats (aus den gespeicherten Einsätzen und Rechnungen)
   const einsaetzeMonat = data.visits.filter((v) => v.datum.startsWith(t.slice(0, 7)));
   const stundenMonat = einsaetzeMonat.reduce((s, v) => s + num(v.stunden), 0);
@@ -88,7 +88,7 @@ route('/', async () => {
     </div>
     <h3 class="section">Dein Überblick</h3>
     <div class="kpi-grid">
-      <a class="kpi" href="#/rechnungen"><span class="kpi-label">Umsatz ${new Date().toLocaleDateString('de-DE', { month: 'long' })}</span><b data-count="${umsatzMonat}" data-money>${money(umsatzMonat)}</b></a>
+      <a class="kpi" href="#/rechnungen"><span class="kpi-label">Einnahmen ${new Date().toLocaleDateString('de-DE', { month: 'long' })}</span><b data-count="${umsatzMonat}" data-money>${money(umsatzMonat)}</b></a>
       <a class="kpi" href="#/rechnungen?filter=offen"><span class="kpi-label">Offen</span><b data-count="${offenSumme}" data-money>${money(offenSumme)}</b><small>${offen.length} Rechnung${offen.length === 1 ? '' : 'en'}</small></a>
       <a class="kpi" href="#/einsaetze"><span class="kpi-label">Einsätze diesen Monat</span><b data-count="${einsaetzeMonat.length}">${einsaetzeMonat.length}</b></a>
       <a class="kpi" href="#/einsaetze"><span class="kpi-label">Arbeitszeit</span><b>${fmtNum(stundenMonat)} h</b></a>

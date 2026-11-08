@@ -82,7 +82,7 @@ const BASE = process.env.APP_URL || 'http://localhost:8765/';
     pruefe('Ausgaben: privater Anteil abgezogen, Tanken nicht doppelt, km × 0,30 €', d.sumA, 10000 + 10000 + 3000);
     pruefe('Gewinn', d.gewinn, 30000 - 23000);
     pruefe('Steuer-Rücklage 25 %', d.ruecklage, 1750);
-    pruefe('Umsatz ohne Storno (für Kleinunternehmergrenze)', d.umsatz, 50000 + 30000 + 20000);
+    pruefe('Kleinunternehmergrenze nach Zahlungseingang (nicht nach Rechnungsdatum)', d.umsatz, 30000);
     pruefe('Offene Rechnungen', d.offen, 20000);
     const d31 = await financeData('2031');
     pruefe('Dezember-Rechnung zählt im Jahr der Zahlung', d31.sumE, 50000);

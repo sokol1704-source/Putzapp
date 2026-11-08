@@ -195,16 +195,7 @@ async function fahrtForm(f, q) {
 async function financeData(jahr) {
   const [invoices, ausgaben, fahrten] = await Promise.all([DB.all('invoices'), DB.all('ausgaben'), DB.all('fahrten')]);
   // Einnahmen zählen bei der EÜR, wenn das Geld da ist (Zuflussprinzip). Bei Ratenzahlung zählt jede Rate im Monat ihres Eingangs.
-  const zufluesse = [];
-  for (const i of invoices) {
-    if (i.status === 'storniert') continue;
-    if (i.raten) {
-      for (const r of i.raten) if (r.bezahltAm && yearOf(r.bezahltAm) === jahr) zufluesse.push({ datum: r.bezahltAm, betrag: r.betrag, nummer: `${i.nummer} Rate ${r.nr}`, kunde: i.kunde });
-    } else if (i.status === 'bezahlt' && yearOf(i.bezahltAm || i.datum) === jahr) {
-      zufluesse.push({ datum: i.bezahltAm || i.datum, betrag: i.summe, nummer: i.nummer, kunde: i.kunde });
-    }
-  }
-  const einnahmen = zufluesse.sort((a, b) => a.datum.localeCompare(b.datum));
+  const einnahmen = zufluesse(invoices).filter((z) => yearOf(z.datum) === jahr);
   const aus = ausgaben.filter((a) => yearOf(a.datum) === jahr).sort((a, b) => a.datum.localeCompare(b.datum));
   const fa = fahrten.filter((f) => yearOf(f.datum) === jahr).sort((a, b) => a.datum.localeCompare(b.datum));
   const km = fa.reduce((s, f) => s + num(f.km), 0);
@@ -216,7 +207,8 @@ async function financeData(jahr) {
   abzug.forEach((a) => { byKat[a.kategorie] = (byKat[a.kategorie] || 0) + betrieblich(a); });
   const sumA = abzug.reduce((s, a) => s + betrieblich(a), 0) + fahrtkosten;
   const offen = invoices.filter((i) => i.status === 'offen').reduce((s, i) => s + restBetrag(i), 0);
-  const umsatz = invoices.filter((i) => i.status !== 'storniert' && yearOf(i.datum) === jahr).reduce((s, i) => s + i.summe, 0);
+  // Kleinunternehmergrenze: nach Zahlungseingang (vereinnahmte Entgelte)
+  const umsatz = sumE;
   const gewinn = sumE - sumA;
   const ruecklage = Math.max(0, Math.round((gewinn * (S.steuerRuecklage ?? 25)) / 100));
   return { einnahmen, aus, abzug, fa, km, fahrtkosten, sumE, sumA, byKat, gewinn, ruecklage, offen, umsatz };
@@ -263,7 +255,7 @@ route('/finanzen', async (_, q) => {
     <div class="card">
       <p class="small">Die Datei enthält alle Einnahmen, Ausgaben und Fahrten ${jahr} – öffnet sich in Excel, Numbers oder Google Tabellen. Ideal für die Anlage EÜR oder dein Steuerbüro.</p>
       <div class="quick"><button class="btn" id="csv">📊 Excel-Datei (CSV) teilen</button><button class="btn ghost" id="belege">🧾 Alle Belege teilen</button></div>
-      <p class="muted small">Kleinunternehmergrenze: ${money(d.umsatz)} von 25.000 € Umsatz (Rechnungen ${jahr}). Vereinfachte Übersicht – ersetzt keine Steuerberatung.</p>
+      <p class="muted small">Kleinunternehmergrenze: ${money(d.umsatz)} Einnahmen ${jahr} nach Zahlungseingang. Grenze im laufenden Jahr 100.000 €, für ${Number(jahr) + 1} zählen 25.000 €. Vereinfachte Übersicht – ersetzt keine Steuerberatung.</p>
     </div>
   `);
   $('#csv').addEventListener('click', () => {

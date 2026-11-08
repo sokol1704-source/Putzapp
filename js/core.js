@@ -250,6 +250,24 @@ const ZYKLEN = {
 };
 const zyklusOf = (o) => o?.vertrag?.zyklus || 'monat';
 const monatlichAbgerechnet = (o) => zyklusOf(o) === 'monat';
+
+// Zahlungseingänge (Zufluss): bezahlte Rechnungen, bei Ratenzahlung jede bezahlte Rate einzeln.
+// Grundlage für EÜR und Kleinunternehmergrenze (§ 19 UStG rechnet nach vereinnahmten Entgelten).
+function zufluesse(invoices) {
+  const out = [];
+  for (const i of invoices) {
+    if (i.status === 'storniert') continue;
+    if (i.raten) {
+      for (const r of i.raten) if (r.bezahltAm) out.push({ datum: r.bezahltAm, betrag: r.betrag, nummer: `${i.nummer} Rate ${r.nr}`, kunde: i.kunde, inv: i });
+    } else if (i.status === 'bezahlt') {
+      out.push({ datum: i.bezahltAm || i.datum, betrag: i.summe, nummer: i.nummer, kunde: i.kunde, inv: i });
+    }
+  }
+  return out.sort((a, b) => a.datum.localeCompare(b.datum));
+}
+const summeIn = (zu, prefix) => zu.filter((z) => z.datum.startsWith(prefix)).reduce((s, z) => s + z.betrag, 0);
+const KU_GRENZE_VORJAHR = 2500000; // 25.000 € Einnahmen im Vorjahr
+const KU_GRENZE_LAUFEND = 10000000; // 100.000 € Einnahmen im laufenden Jahr
 const priceLabel = (o) => (isMonthly(o) ? `${money(o.monatspauschale || 0)}/Monat` : `${money(o.stundensatz || 0)}/Std.`);
 const mapsUrl = (addr) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
 

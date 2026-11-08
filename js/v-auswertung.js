@@ -31,7 +31,9 @@ async function analyticsData(jahr) {
 
   const umsatzM = Array(12).fill(0);
   const kostenM = Array(12).fill(0);
-  invY.forEach((i) => { umsatzM[Number(i.datum.slice(5, 7)) - 1] += i.summe; });
+  const zuAlle = zufluesse(data.invoices);
+  const zuY = zuAlle.filter((z) => yearOf(z.datum) === jahr);
+  zuY.forEach((z) => { umsatzM[Number(z.datum.slice(5, 7)) - 1] += z.betrag; });
   ausgaben.filter((a) => yearOf(a.datum) === jahr).forEach((a) => { kostenM[Number(a.datum.slice(5, 7)) - 1] += betrieblich(a); });
   fahrten.filter((f) => yearOf(f.datum) === jahr).forEach((f) => { kostenM[Number(f.datum.slice(5, 7)) - 1] += Math.round(num(f.km) * KM_SATZ); });
   const umsatz = umsatzM.reduce((s, v) => s + v, 0);
@@ -39,7 +41,7 @@ async function analyticsData(jahr) {
 
   // Vorjahr im gleichen Zeitraum (bei laufendem Jahr nur bis zum aktuellen Monat)
   const upTo = isCurrent ? curMonth : 11;
-  const umsatzVJ = inv.filter((i) => yearOf(i.datum) === String(y - 1) && Number(i.datum.slice(5, 7)) - 1 <= upTo).reduce((s, i) => s + i.summe, 0);
+  const umsatzVJ = zuAlle.filter((z) => yearOf(z.datum) === String(y - 1) && Number(z.datum.slice(5, 7)) - 1 <= upTo).reduce((s, z) => s + z.betrag, 0);
   const umsatzBisher = umsatzM.slice(0, upTo + 1).reduce((s, v) => s + v, 0);
 
   const visitsY = data.visits.filter((v) => yearOf(v.datum) === jahr);
@@ -47,11 +49,11 @@ async function analyticsData(jahr) {
   const stunden = visitsY.reduce((s, v) => s + num(v.stunden), 0);
   const visitsVJ = data.visits.filter((v) => yearOf(v.datum) === String(y - 1) && Number(v.datum.slice(5, 7)) - 1 <= upTo);
 
-  // Umsatz je Haus und je Auftraggeber
+  // Umsatz je Haus (aus Rechnungspositionen) und je Auftraggeber (nach Zahlungseingang)
   const perObj = {};
   const perKunde = {};
+  zuY.forEach((z) => { perKunde[z.inv.kundeId] = (perKunde[z.inv.kundeId] || 0) + z.betrag; });
   for (const i of invY) {
-    perKunde[i.kundeId] = (perKunde[i.kundeId] || 0) + i.summe;
     for (const p of i.positionen) {
       const oid = p.objektId || vmap[p.visitId]?.objektId || (i.objekte?.length === 1 ? i.objekte[0].id : '?');
       perObj[oid] = (perObj[oid] || 0) + (p.betrag ?? 0);
@@ -145,17 +147,17 @@ route('/auswertung', async (_, q) => {
     </div>
 
     ${a.isCurrent ? `<div class="card ku ${a.prognose > KU_GRENZE ? 'over' : ''}">
-      <div class="row between"><b>Kleinunternehmergrenze</b><span class="muted small">25.000 €</span></div>
+      <div class="row between"><b>Kleinunternehmergrenze für ${Number(jahr) + 1}</b><span class="muted small">25.000 €</span></div>
       <div class="ku-bar"><span class="ku-now" style="width:${grenze}%"></span><span class="ku-prog" style="width:${prog}%"></span><i style="left:100%"></i></div>
-      <div class="small">Bisher <b>${money(a.umsatz)}</b> · grobe Hochrechnung bis Dezember <b>${money(a.prognose)}</b></div>
+      <div class="small">Bisher <b>${money(a.umsatz)}</b> Einnahmen (nach Zahlungseingang) · grobe Hochrechnung bis Dezember <b>${money(a.prognose)}</b></div>
       ${a.prognose > KU_GRENZE
         ? `<div class="status-note critical">⚠️ <b>Achtung:</b> Liegt dein Umsatz ${jahr} über 25.000 €, gilt ab ${Number(jahr) + 1} die Kleinunternehmerregelung nicht mehr – dann musst du Umsatzsteuer berechnen. Sprich rechtzeitig mit deinem Steuerbüro.</div>`
         : `<div class="status-note good">✓ Noch ${money(KU_GRENZE - a.prognose)} Luft bis zur Grenze.</div>`}
     </div>` : ''}
 
     <div class="card chart-card">
-      <div class="row between"><b>Umsatz & Kosten pro Monat</b></div>
-      <div class="legend"><span><i class="sw s1"></i>Umsatz</span><span><i class="sw s2"></i>Kosten</span>${avg ? '<span><i class="sw avg"></i>Ø Umsatz</span>' : ''}</div>
+      <div class="row between"><b>Einnahmen & Kosten pro Monat</b></div>
+      <div class="legend"><span><i class="sw s1"></i>Einnahmen</span><span><i class="sw s2"></i>Kosten</span>${avg ? '<span><i class="sw avg"></i>Ø Umsatz</span>' : ''}</div>
       <div class="readout" id="readout">Tippe auf einen Monat für Details.</div>
       <div class="chart2">
         <div class="yaxis">${[max, max / 2, 0].map((v) => `<span>${shortEuro(v)}</span>`).join('')}</div>
