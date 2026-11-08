@@ -9,7 +9,7 @@ route('/', async () => {
   const heute = plan.filter((p) => p.datum === t);
   const unbilled = data.visits.filter((v) => !v.rechnungId).length;
   const offen = data.invoices.filter((i) => i.status === 'offen');
-  const offenSumme = offen.reduce((s, i) => s + i.summe, 0);
+  const offenSumme = offen.reduce((s, i) => s + restBetrag(i), 0);
   const maengelOffen = data.maengel.filter((m) => m.status !== 'erledigt').length;
   const fastLeer = (await DB.all('material')).filter(isLow);
   const umsatzMonat = data.invoices.filter((i) => i.status !== 'storniert' && i.datum.startsWith(t.slice(0, 7))).reduce((s, i) => s + i.summe, 0);

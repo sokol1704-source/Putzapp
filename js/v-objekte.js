@@ -325,7 +325,7 @@ route('/kunden', async () => {
       const objs = data.objects.filter((o) => o.kundeId === c.id);
       const offen = data.invoices.filter((i) => i.kundeId === c.id && i.status === 'offen');
       return `<a class="card link" href="#/kunde/${c.id}">
-        <div class="row between"><b>👥 ${esc(c.name)}</b>${offen.length ? `<span class="badge warn">${money(offen.reduce((s, i) => s + i.summe, 0))} offen</span>` : ''}</div>
+        <div class="row between"><b>👥 ${esc(c.name)}</b>${offen.length ? `<span class="badge warn">${money(offen.reduce((s, i) => s + restBetrag(i), 0))} offen</span>` : ''}</div>
         <div class="muted small">${objs.length} ${objs.length === 1 ? 'Haus' : 'Häuser'}${c.ansprechpartner ? ` · ${esc(c.ansprechpartner)}` : ''}</div>
       </a>`;
     }).join('') || '<div class="empty">Noch keine Auftraggeber.<br><span class="small">Lege zuerst die Hausverwaltung oder den Eigentümer an, danach das Haus.</span><br><a class="btn small mt" href="#/kunde/neu">+ Auftraggeber anlegen</a></div>'}</div>
@@ -398,7 +398,7 @@ route('/kunde/:id', async ({ id }) => {
     <div class="stats mt">
       <div class="stat"><b>${objs.length}</b><span>Häuser</span></div>
       <div class="stat"><b data-money>${money(pauschale)}</b><span>Pauschale im Monat</span></div>
-      <div class="stat"><b data-money>${money(offen.reduce((s, i) => s + i.summe, 0))}</b><span>${offen.length} offen</span></div>
+      <div class="stat"><b data-money>${money(offen.reduce((s, i) => s + restBetrag(i), 0))}</b><span>${offen.length} offen</span></div>
       <div class="stat"><b>${letzterEinsatz ? fmtDate(letzterEinsatz) : '–'}</b><span>letzter Einsatz${maengelOffen ? ` · ${maengelOffen} Mängel offen` : ''}</span></div>
     </div>
     <div class="quick">
