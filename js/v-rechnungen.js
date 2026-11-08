@@ -626,7 +626,7 @@ async function angebotForm(a, q = {}) {
       <div class="label">Zusätzlich je Reinigung</div>
       <div class="chip-row">${OPTIONS.map(([key, label]) => { const on = (v.optionen || []).includes(key); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="opt_${key}" ${on ? 'checked' : ''} hidden>${label}</label>`; }).join('')}</div>
       <div class="grid2">
-        <label>❄️ Winterdienst<select name="winterArt"><option value="">nicht anbieten</option><option value="einsatz" ${winterArt === 'einsatz' ? 'selected' : ''}>optional je Einsatz</option><option value="pauschal" ${winterArt === 'pauschal' ? 'selected' : ''}>im Monatspreis enthalten</option></select></label>
+        <label>❄️ Winterdienst <span class="muted small">(inklusive = im Monatspreis)</span><select name="winterArt"><option value="">nicht anbieten</option><option value="einsatz" ${winterArt === 'einsatz' ? 'selected' : ''}>je Einsatz</option><option value="pauschal" ${winterArt === 'pauschal' ? 'selected' : ''}>inklusive</option></select></label>
         <label id="winterEinsBox">Einsätze pro Winter (geschätzt)<input name="winterEinsaetze" type="number" min="0" step="1" inputmode="numeric" value="${v.winterEinsaetze || 8}"></label>
       </div>
       <div class="label">Optionale Zusatzleistungen <span class="muted small">(auf Abruf, nicht im Monatspreis)</span></div>
