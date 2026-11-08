@@ -594,8 +594,9 @@ route('/angebot/:id/bearbeiten', async ({ id }) => {
 
 async function angebotForm(a, q = {}) {
   const customers = (await DB.all('customers')).sort(byName);
-  const K = S.kalk;
   const isNew = !a;
+  // Beim Bearbeiten die im Angebot verwendeten Preise nehmen, sonst die Richtwerte
+  const K = { ...S.kalk, ...(a?.kalk || {}) };
   const fotosAlt = isNew ? [] : await DB.by('photos', 'visitId', a.id);
   const angebotFotos = [];
   const v = a || { kundeId: q.kunde || '', objekt: { strasse: '', plzOrt: '', etagen: 4, eingaenge: 1 }, intervallTage: 7, optionen: [], km: 0, zusatz: [], winterPreis: 0, notiz: '' };
@@ -739,6 +740,7 @@ async function angebotForm(a, q = {}) {
       winterPreis: fd.has('winter') ? toCents(fd.get('k_winter')) : 0,
       notiz: fd.get('notiz').trim(),
       dauer: num(fd.get('dauer')) || 0,
+      kalk: Object.fromEntries([['proEtage', toCents(fd.get('k_proEtage'))], ...OPTIONS.map(([key]) => [key, toCents(fd.get(`k_${key}`))])]),
       absender: absender(),
       status: isNew ? 'offen' : a.status,
     };
