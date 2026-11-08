@@ -601,6 +601,8 @@ async function angebotForm(a, q = {}) {
   const angebotFotos = [];
   const v = a || { kundeId: q.kunde || '', objekt: { strasse: '', plzOrt: '', etagen: 4, eingaenge: 1 }, intervallTage: 7, optionen: [], km: 0, zusatz: [], winterPreis: 0, notiz: '' };
   const neuerEmpfaenger = !isNew && !v.kundeId;
+  // Winterdienst: nicht anbieten, optional je Einsatz oder im Monatspreis enthalten (alte Angebote: je Einsatz)
+  const winterArt = v.winterArt ?? (v.winterPreis ? 'einsatz' : '');
   const e = neuerEmpfaenger ? v.empfaenger : {};
   const zusatzNamen = (v.zusatz || []).map((z) => z.name);
   const leistungenText = (v.leistungen || standardLeistungen(v.optionen || [])).join('\n');
@@ -623,7 +625,10 @@ async function angebotForm(a, q = {}) {
       <label>Entfernung zum Haus (km, einfach) <span class="muted small">– Anfahrt wird je Reinigung berechnet</span><input name="km" type="number" step="1" min="0" inputmode="numeric" value="${v.km || 0}"></label>
       <div class="label">Zusätzlich je Reinigung</div>
       <div class="chip-row">${OPTIONS.map(([key, label]) => { const on = (v.optionen || []).includes(key); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="opt_${key}" ${on ? 'checked' : ''} hidden>${label}</label>`; }).join('')}</div>
-      <label class="check"><input type="checkbox" name="winter" ${v.winterPreis ? 'checked' : ''}> ❄️ Winterdienst optional anbieten</label>
+      <div class="grid2">
+        <label>❄️ Winterdienst<select name="winterArt"><option value="">nicht anbieten</option><option value="einsatz" ${winterArt === 'einsatz' ? 'selected' : ''}>optional je Einsatz</option><option value="pauschal" ${winterArt === 'pauschal' ? 'selected' : ''}>im Monatspreis enthalten</option></select></label>
+        <label id="winterEinsBox">Einsätze pro Winter (geschätzt)<input name="winterEinsaetze" type="number" min="0" step="1" inputmode="numeric" value="${v.winterEinsaetze || 8}"></label>
+      </div>
       <div class="label">Optionale Zusatzleistungen <span class="muted small">(auf Abruf, nicht im Monatspreis)</span></div>
       <div class="chip-row">${S.leistungen.map((l, i) => { const on = zusatzNamen.includes(l.name); return `<label class="chip toggle ${on ? 'on' : ''}"><input type="checkbox" name="zus_${i}" ${on ? 'checked' : ''} hidden>${esc(l.name)} · ${unitPrice(l)}</label>`; }).join('') || '<span class="muted small">Keine Leistungen im Katalog.</span>'}</div>
       <details><summary>⚙️ Preise je Reinigung anpassen (Richtwerte)</summary>
@@ -664,8 +669,13 @@ async function angebotForm(a, q = {}) {
     const opts = gewaehlteOptionen();
     for (const key of opts) perClean += num(f[`k_${key}`].value);
     const monat = (intervall, jeReinigung = perClean) => Math.ceil((jeReinigung * perMonth(intervall)) / 5) * 5;
-    const monthly = monat(iv);
-    const monthly2 = iv2 && iv2 !== iv ? monat(iv2) : 0;
+    // Winterdienst-Pauschale: erwartete Einsätze × Preis je Einsatz, auf 12 Monate verteilt
+    const winterJe = num(f.k_winter.value);
+    const winterEins = num(f.winterEinsaetze.value);
+    const aufschlag = f.winterArt.value === 'pauschal' ? Math.ceil((winterEins * winterJe) / 12 / 5) * 5 : 0;
+    $('#winterEinsBox').hidden = f.winterArt.value !== 'pauschal';
+    const monthly = monat(iv) + aufschlag;
+    const monthly2 = iv2 && iv2 !== iv ? monat(iv2) + aufschlag : 0;
     const perFloor = etagen ? monthly / (etagen * eing) : 0;
     const market = iv === 7 ? '25–80 €' : iv === 14 ? 'ca. 15–45 €' : 'ca. 10–30 €';
     // Stundenlohn: Preis je Reinigung ohne Fahrtkostenerstattung, geteilt durch Arbeits- und Fahrzeit
@@ -675,17 +685,18 @@ async function angebotForm(a, q = {}) {
     const fahrMin = Math.round(km * 2 * 1.5);
     const stunden = (dauer + fahrMin) / 60;
     const lohn = stunden ? Math.round(((perClean - anfahrt) * 100) / stunden) : 0;
-    const noetig = monat(iv, 25 * stunden + anfahrt);
+    const noetig = monat(iv, 25 * stunden + anfahrt) + aufschlag;
     $('#calc').innerHTML = `<div class="calc-row"><span>Reinigungen pro Monat</span><b>${fmtNum(Math.round(perMonth(iv) * 100) / 100)}</b></div>
       <div class="calc-row"><span>Preis je Reinigung</span><b>${money(Math.round(perClean * 100))}</b></div>
       ${km ? `<div class="calc-row small"><span>davon Anfahrt (2 × ${fmtNum(km)} km × 0,30 €)</span><b>${money(Math.round(anfahrt * 100))}</b></div>` : ''}
+      ${aufschlag ? `<div class="calc-row small"><span>+ Winterdienst-Pauschale (${fmtNum(winterEins)} × ${money(Math.round(winterJe * 100))} ÷ 12)</span><b>${money(aufschlag * 100)}/Monat</b></div>` : ''}
       <div class="calc-total"><span>Monatspreis${monthly2 ? ' (Variante A)' : ''}</span><b>${money(monthly * 100)}</b></div>
       ${monthly2 ? `<div class="calc-row"><span>Variante B (${RHYTHMEN[iv2]})</span><b>${money(monthly2 * 100)}</b></div>` : ''}
       <div class="muted small">= ${money(Math.round(perFloor * 100))} pro Etage und Monat · marktüblich ${market} (Firmen zzgl. 19 % USt – du bist ohne USt günstiger)</div>
       <div class="calc-row mt"><span>Zeit je Reinigung</span><b>${dauer} Min.${fahrMin ? ` + ca. ${fahrMin} Min. Fahrt` : ''}</b></div>
       <div class="calc-row"><span>Dein Stundenlohn</span><b class="st ${wageClass(lohn)}">${money(lohn)}/Std.</b></div>
       ${lohn < 2500 ? `<div class="small danger-text">Unter 25 €/Std. Für 25 €/Std. wären etwa <b>${money(noetig * 100)}/Monat</b> nötig.</div>` : ''}`;
-    return { monthly: monthly * 100, monthly2: monthly2 * 100 };
+    return { monthly: monthly * 100, monthly2: monthly2 * 100, aufschlag: aufschlag * 100 };
   };
   f.addEventListener('input', calc);
   f.addEventListener('change', (ev) => { if (ev.target.closest('.chip')) ev.target.closest('.chip').classList.toggle('on', ev.target.checked); calc(); });
@@ -711,7 +722,8 @@ async function angebotForm(a, q = {}) {
       for (const [key] of OPTIONS) S.kalk[key] = toCents(fd.get(`k_${key}`));
       await saveSettings();
     }
-    const { monthly, monthly2 } = calc();
+    const { monthly, monthly2, aufschlag } = calc();
+    const winterArtS = fd.get('winterArt') || '';
     const iv = Number(fd.get('intervall'));
     const iv2 = Number(fd.get('intervall2')) || 0;
     const etagen = Number(fd.get('etagen')) || 0;
@@ -734,10 +746,13 @@ async function angebotForm(a, q = {}) {
       leistungen,
       monatspreis: monthly,
       varianteB: monthly2 ? { intervallTage: iv2, monatspreis: monthly2 } : null,
-      positionen: [{ beschreibung: `Treppenhausreinigung ${RHYTHMEN[iv]}${etagen ? ` – ${etagen} Etagen${eing > 1 ? `, ${eing} Eingänge` : ''}` : ''}${km ? `\ninkl. Anfahrt (${fmtNum(km)} km einfach)` : ''}\nLeistungsumfang siehe unten`, menge: 1, einheit: 'Monat', preis: monthly, art: 'arbeit' }],
+      positionen: [{ beschreibung: `Treppenhausreinigung ${RHYTHMEN[iv]}${etagen ? ` – ${etagen} Etagen${eing > 1 ? `, ${eing} Eingänge` : ''}` : ''}${km ? `\ninkl. Anfahrt (${fmtNum(km)} km einfach)` : ''}${winterArtS === 'pauschal' ? '\ninkl. Winterdienst (Räumen & Streuen)' : ''}\nLeistungsumfang siehe unten`, menge: 1, einheit: 'Monat', preis: monthly, art: 'arbeit' }],
       km,
       zusatz,
-      winterPreis: fd.has('winter') ? toCents(fd.get('k_winter')) : 0,
+      winterArt: winterArtS,
+      winterPreis: winterArtS ? toCents(fd.get('k_winter')) : 0,
+      winterEinsaetze: num(fd.get('winterEinsaetze')) || 0,
+      winterAufschlag: aufschlag,
       notiz: fd.get('notiz').trim(),
       dauer: num(fd.get('dauer')) || 0,
       kalk: Object.fromEntries([['proEtage', toCents(fd.get('k_proEtage'))], ...OPTIONS.map(([key]) => [key, toCents(fd.get(`k_${key}`))])]),
@@ -778,7 +793,8 @@ function angebotDoc(a, fotos = []) {
       <tbody>${a.zusatz.map((z) => `<tr><td>${esc(z.name)}</td><td class="r">${money(z.preis)}${z.einheit === 'pauschal' ? ' pauschal' : ` / ${esc(z.einheit)}`}</td></tr>`).join('')}</tbody></table>` : ''}
     <h3 class="doc-h3">Leistungsumfang</h3>
     <ul class="doc-list">${a.leistungen.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>
-    ${a.winterPreis ? `<p class="inv-note">❄️ <b>Optional Winterdienst:</b> Räumen und Streuen der Zugänge und des Gehwegs bei Schnee und Glätte, inkl. Räum- und Streuprotokoll – ${money(a.winterPreis)} je Einsatz.</p>` : ''}
+    ${a.winterArt === 'pauschal' ? '<p class="inv-note">❄️ <b>Winterdienst inklusive:</b> Räumen und Streuen der Zugänge und des Gehwegs bei Schnee und Glätte, inkl. Räum- und Streuprotokoll. Der Winterdienst ist unabhängig von der Anzahl der Einsätze im Monatspreis enthalten.</p>' : ''}
+    ${a.winterArt !== 'pauschal' && a.winterPreis ? `<p class="inv-note">❄️ <b>Optional Winterdienst:</b> Räumen und Streuen der Zugänge und des Gehwegs bei Schnee und Glätte, inkl. Räum- und Streuprotokoll – ${money(a.winterPreis)} je Einsatz.</p>` : ''}
     <h3 class="doc-h3">Ihre Vorteile</h3>
     <ul class="doc-list">
       <li>Feste Ansprechperson: ${esc(ab.inhaber)}${ab.telefon ? `, Tel. ${esc(ab.telefon)}` : ''}</li>
@@ -849,7 +865,7 @@ route('/angebot/:id', async ({ id }) => {
       kundeId, name: '', strasse: a.objekt.strasse, plzOrt: a.objekt.plzOrt, etagen: a.objekt.etagen, eingaenge: a.objekt.eingaenge, aufzug: a.objekt.aufzug,
       zugang: '', vorOrtName: '', vorOrtTelefon: '', intervallTage: iv, wochentag: '', uhrzeit: '',
       abrechnung: 'monat', monatspauschale: preis, stundensatz: S.stundensatz,
-      winterAbrechnung: a.winterPreis ? 'einsatz' : 'keiner', winterPreis: a.winterPreis || 0, notizen: `Aus Angebot ${a.nummer}`, aktiv: true, aufgaben: tasks,
+      winterAbrechnung: a.winterArt === 'pauschal' ? 'pauschal' : a.winterPreis ? 'einsatz' : 'keiner', winterPreis: a.winterPreis || 0, notizen: `Aus Angebot ${a.nummer}`, aktiv: true, aufgaben: tasks,
     };
     assignStarts(o, [], []);
     await DB.put('objects', o);

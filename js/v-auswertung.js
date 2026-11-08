@@ -95,7 +95,7 @@ async function analyticsData(jahr) {
 function insights(a) {
   const out = [];
   const best = a.umsatzM.indexOf(Math.max(...a.umsatzM));
-  if (a.umsatz) out.push(['🏆', `Stärkster Monat war der <b>${MONTHS[best]}</b> mit ${money(a.umsatzM[best])} Umsatz.`]);
+  if (a.umsatz) out.push(['🏆', `Stärkster Monat war der <b>${MONTHS[best]}</b> mit ${money(a.umsatzM[best])} Einnahmen.`]);
   const rated = a.houses.filter((h) => h.wage != null);
   if (rated.length > 1) {
     out.push(['⭐', `Am meisten bringt <b>${esc(objLabel(rated[0].o))}</b> mit ${money(rated[0].wage)} pro Stunde.`]);
@@ -105,14 +105,14 @@ function insights(a) {
   const shares = Object.values(a.perKunde).sort((x, y) => y - x);
   if (shares.length > 1 && shares[0] / a.umsatz > 0.5) {
     const kid = Object.keys(a.perKunde).find((k) => a.perKunde[k] === shares[0]);
-    out.push(['⚖️', `${Math.round((shares[0] / a.umsatz) * 100)} % deines Umsatzes kommt von <b>${esc(kundeName(a.data.kmap, kid))}</b>. Ein, zwei weitere Auftraggeber machen dich unabhängiger.`]);
+    out.push(['⚖️', `${Math.round((shares[0] / a.umsatz) * 100)} % deiner Einnahmen kommen von <b>${esc(kundeName(a.data.kmap, kid))}</b>. Ein, zwei weitere Auftraggeber machen dich unabhängiger.`]);
   }
   const overdue = a.data.invoices.filter((i) => i.status === 'offen' && i.faellig < today());
   if (overdue.length) out.push(['⏰', `${overdue.length} Rechnung${overdue.length === 1 ? '' : 'en'} über ${money(overdue.reduce((s, i) => s + i.summe, 0))} sind überfällig – <a href="#/rechnungen?filter=offen">jetzt erinnern</a>.`]);
   const winterUmsatz = a.data.invoices.filter((i) => i.status !== 'storniert' && yearOf(i.datum) === a.jahr)
     .flatMap((i) => i.positionen).filter((p) => p.winterIds?.length).reduce((s, p) => s + (p.betrag || 0), 0);
   if (winterUmsatz) out.push(['❄️', `Der Winterdienst hat ${money(winterUmsatz)} eingebracht.`]);
-  if (a.kosten && a.umsatz) out.push(['🧾', `Deine Kosten liegen bei ${Math.round((a.kosten / a.umsatz) * 100)} % vom Umsatz.`]);
+  if (a.kosten && a.umsatz) out.push(['🧾', `Deine Kosten liegen bei ${Math.round((a.kosten / a.umsatz) * 100)} % der Einnahmen.`]);
   return out;
 }
 
@@ -151,9 +151,9 @@ route('/auswertung', async (_, q) => {
     ${yearSeg('#/auswertung', jahr, lastYears())}
 
     <div class="kpis mt">
-      <div class="kpi hero-kpi"><span>Umsatz ${jahr}</span><b data-count="${a.umsatz}" data-money>${money(a.umsatz)}</b>${a.isCurrent ? delta(a.umsatzBisher, a.umsatzVJ) : delta(a.umsatz, a.umsatzVJ)}</div>
-      <div class="kpi"><span>Ergebnis</span><b class="${gewinn < 0 ? 'neg' : ''}" ${gewinn > 0 ? `data-count="${gewinn}" data-money` : ''}>${money(gewinn)}</b><small>Umsatz − Kosten</small></div>
-      <div class="kpi"><span>Ø Stundenlohn</span><b ${wage ? `data-count="${wage}" data-money` : ''}>${wage ? money(wage) : '–'}</b>${wageVJ ? delta(wage, wageVJ) : '<small>Umsatz ÷ Arbeitsstunden</small>'}</div>
+      <div class="kpi hero-kpi"><span>Einnahmen ${jahr}</span><b data-count="${a.umsatz}" data-money>${money(a.umsatz)}</b>${a.isCurrent ? delta(a.umsatzBisher, a.umsatzVJ) : delta(a.umsatz, a.umsatzVJ)}</div>
+      <div class="kpi"><span>Ergebnis</span><b class="${gewinn < 0 ? 'neg' : ''}" ${gewinn > 0 ? `data-count="${gewinn}" data-money` : ''}>${money(gewinn)}</b><small>Einnahmen − Kosten</small></div>
+      <div class="kpi"><span>Ø Stundenlohn</span><b ${wage ? `data-count="${wage}" data-money` : ''}>${wage ? money(wage) : '–'}</b>${wageVJ ? delta(wage, wageVJ) : '<small>Einnahmen ÷ Arbeitsstunden</small>'}</div>
       <div class="kpi"><span>Arbeitsstunden</span><b data-count="${Math.round(a.stunden)}">${fmtNum(Math.round(a.stunden))}</b><small>${a.visitsY.length} Reinigungen · ${a.winterY.length} × Winter</small></div>
       <div class="kpi"><span>Fester Monatsumsatz</span><b data-count="${a.fest}" data-money>${money(a.fest)}</b><small>${a.monthly.length} ${a.monthly.length === 1 ? 'Haus' : 'Häuser'} mit Pauschale</small></div>
       <div class="kpi"><span>Ø pro Woche</span><b>${fmtNum(Math.round((a.stunden / Math.max(1, weeks)) * 10) / 10)} Std.</b><small>Arbeitszeit vor Ort</small></div>
@@ -165,20 +165,20 @@ route('/auswertung', async (_, q) => {
       <div class="ku-bar"><span class="ku-now" style="width:${grenze}%"></span><span class="ku-prog" style="width:${prog}%"></span><i style="left:100%"></i></div>
       <div class="small">Bisher <b>${money(a.umsatz)}</b> Einnahmen (nach Zahlungseingang) · grobe Hochrechnung bis Dezember <b>${money(a.prognose)}</b></div>
       ${a.prognose > KU_GRENZE
-        ? `<div class="status-note critical">⚠️ <b>Achtung:</b> Liegt dein Umsatz ${jahr} über 25.000 €, gilt ab ${Number(jahr) + 1} die Kleinunternehmerregelung nicht mehr – dann musst du Umsatzsteuer berechnen. Sprich rechtzeitig mit deinem Steuerbüro.</div>`
+        ? `<div class="status-note critical">⚠️ <b>Achtung:</b> Liegen deine Einnahmen ${jahr} über 25.000 €, gilt ab ${Number(jahr) + 1} die Kleinunternehmerregelung nicht mehr – dann musst du Umsatzsteuer berechnen. Sprich rechtzeitig mit deinem Steuerbüro.</div>`
         : `<div class="status-note good">✓ Noch ${money(KU_GRENZE - a.prognose)} Luft bis zur Grenze.</div>`}
     </div>` : ''}
 
     <div class="card chart-card">
       <div class="row between"><b>Einnahmen & Kosten pro Monat</b></div>
-      <div class="legend"><span><i class="sw s1"></i>Einnahmen</span><span><i class="sw s2"></i>Kosten</span>${avg ? '<span><i class="sw avg"></i>Ø Umsatz</span>' : ''}</div>
+      <div class="legend"><span><i class="sw s1"></i>Einnahmen</span><span><i class="sw s2"></i>Kosten</span>${avg ? '<span><i class="sw avg"></i>Ø Einnahmen</span>' : ''}</div>
       <div class="readout" id="readout">Tippe auf einen Monat für Details.</div>
       <div class="chart2">
         <div class="yaxis">${[max, max / 2, 0].map((v) => `<span>${shortEuro(v)}</span>`).join('')}</div>
         <div class="plot">
           <div class="grid-lines"><i></i><i></i><i></i></div>
           ${avg ? `<div class="avg-line" style="bottom:calc(18px + (100% - 18px) * ${pct(avg) / 100})"><span>Ø ${shortEuro(avg)}</span></div>` : ''}
-          ${a.umsatzM.map((u, i) => `<button class="mcol ${a.isCurrent && i === new Date().getMonth() ? 'current' : ''}" style="--n:${i}" data-m="${i}" aria-label="${MONTHS[i]}: Umsatz ${money(u)}, Kosten ${money(a.kostenM[i])}">
+          ${a.umsatzM.map((u, i) => `<button class="mcol ${a.isCurrent && i === new Date().getMonth() ? 'current' : ''}" style="--n:${i}" data-m="${i}" aria-label="${MONTHS[i]}: Einnahmen ${money(u)}, Kosten ${money(a.kostenM[i])}">
             <span class="b s1" style="height:${u ? Math.max(1.5, pct(u)) : 0}%"></span><span class="b s2" style="height:${a.kostenM[i] ? Math.max(1.5, pct(a.kostenM[i])) : 0}%"></span>
             <em>${MONTHS[i][0]}</em></button>`).join('')}
         </div>
@@ -186,7 +186,7 @@ route('/auswertung', async (_, q) => {
     </div>
 
     ${shares.length ? `<div class="card">
-      <b>Umsatz nach Auftraggeber</b>
+      <b>Einnahmen nach Auftraggeber</b>
       <div class="share-bar">${shares.map((s, i) => `<span class="s${i + 1}" style="flex:${s.v}" title="${esc(s.name)}"></span>`).join('')}</div>
       <ul class="share-list">${shares.map((s, i) => `<li><i class="sw s${i + 1}"></i><span>${esc(s.name)}</span><b>${money(s.v)}</b><small>${Math.round((s.v / a.umsatz) * 100)} %</small></li>`).join('')}</ul>
     </div>` : ''}
@@ -199,7 +199,7 @@ route('/auswertung', async (_, q) => {
       return `<a class="card link wage-row" href="#/objekt/${r.o.id}">
         <div class="row between"><b>🏢 ${esc(objLabel(r.o))}</b><b>${r.wage != null ? `${money(r.wage)}/Std.` : '–'}</b></div>
         <div class="wbar"><span class="${cls}" style="width:${r.wage ? Math.min(100, (r.wage / maxWage) * 100) : 0}%"></span><i style="left:${(2500 / maxWage) * 100}%" title="Ziel 25 €/Std."></i></div>
-        <div class="muted small">${money(r.umsatz)} Umsatz · ${r.count} Einsätze · ${fmtNum(r.hours)} Std.${cls ? ` · <span class="st ${cls}">${cls === 'ok' ? '✓ gut' : cls === 'warn' ? '◐ geht so' : '✕ zu niedrig'}</span>` : ''}</div>
+        <div class="muted small">${money(r.umsatz)} berechnet · ${r.count} Einsätze · ${fmtNum(r.hours)} Std.${cls ? ` · <span class="st ${cls}">${cls === 'ok' ? '✓ gut' : cls === 'warn' ? '◐ geht so' : '✕ zu niedrig'}</span>` : ''}</div>
         ${r.fahrt || r.material ? `<div class="small mt">Nach Kosten: <b>${money(r.ergebnis)}</b>${r.wageNetto != null ? ` · <b>${money(r.wageNetto)}/Std.</b>` : ''}</div>
         <div class="muted small">− Fahrt ${money(r.fahrt)} · − Material ${money(r.material)} (anteilig geschätzt)</div>` : ''}
         ${need && need > (r.o.monatspauschale || 0) ? `<div class="small mt">💡 Für 25 €/Std. wären ca. <b>${money(need)}/Monat</b> nötig (+${money(need - (r.o.monatspauschale || 0))}).</div>` : ''}
@@ -216,7 +216,7 @@ route('/auswertung', async (_, q) => {
     const i = Number(col.dataset.m);
     $$('.mcol').forEach((c) => c.classList.toggle('active', c === col));
     const erg = a.umsatzM[i] - a.kostenM[i];
-    readout.innerHTML = `<b>${MONTHS[i]} ${jahr}</b> · Umsatz <b>${money(a.umsatzM[i])}</b> · Kosten <b>${money(a.kostenM[i])}</b> · Ergebnis <b class="${erg < 0 ? 'neg' : ''}">${money(erg)}</b>`;
+    readout.innerHTML = `<b>${MONTHS[i]} ${jahr}</b> · Einnahmen <b>${money(a.umsatzM[i])}</b> · Kosten <b>${money(a.kostenM[i])}</b> · Ergebnis <b class="${erg < 0 ? 'neg' : ''}">${money(erg)}</b>`;
   };
   $('.plot').addEventListener('click', (e) => { const c = e.target.closest('.mcol'); if (c) show(c); });
   $('.plot').addEventListener('pointerover', (e) => { const c = e.target.closest('.mcol'); if (c && e.pointerType === 'mouse') show(c); });
