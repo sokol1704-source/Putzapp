@@ -444,7 +444,7 @@ route('/rechnung/:id', async ({ id }) => {
         <button class="btn ghost" id="print">🖨️ Drucken</button>
         ${inv.raten ? '' : inv.status === 'offen' ? '<button class="btn ghost" id="paid">✓ Bezahlt</button>' : ''}
         ${inv.raten ? '' : inv.status === 'bezahlt' ? '<button class="btn ghost" id="unpaid">Wieder offen</button>' : ''}
-        ${overdue ? `<button class="btn ghost" id="remind">${inv.mahnstufe ? `📨 ${inv.mahnstufe + 1}. Mahnung` : '⏰ Zahlungserinnerung'}</button>` : ''}
+        ${overdue ? `<button class="btn ghost" id="remind">${inv.mahnstufe ? `📨 ${inv.mahnstufe + 1}. Mahnung` : '⏰ Erinnerung'}</button>` : ''}
       </div>
       <p class="muted small">„Als PDF senden“ öffnet WhatsApp, E-Mail & Co. direkt mit der fertigen PDF.</p>
     </div>

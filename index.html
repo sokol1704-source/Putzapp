@@ -19,8 +19,8 @@
     <button class="back" id="backBtn" aria-label="Zurück" hidden>‹</button>
     <img class="brand-logo" id="brandLogo" src="icons/icon.svg" alt="">
     <h1 id="title">PURE TOTH</h1>
-    <a class="gear" href="#/suche" aria-label="Suche">🔎</a>
-    <a class="gear" href="#/einstellungen" aria-label="Einstellungen">⚙️</a>
+    <a class="gear" href="#/suche" aria-label="Suche" data-icon="search"></a>
+    <a class="gear" href="#/einstellungen" aria-label="Einstellungen" data-icon="settings"></a>
   </header>
 
   <main id="view" class="view"></main>
@@ -28,17 +28,18 @@
   <button class="timer-pill" id="timerPill" hidden aria-label="Zeitmessung beenden"></button>
 
   <nav class="tabbar" id="tabbar">
-    <a href="#/" data-tab="start"><span class="ico">🏠</span>Start</a>
-    <a href="#/objekte" data-tab="objekte"><span class="ico">🏢</span>Häuser</a>
-    <a href="#/termine" data-tab="termine"><span class="ico">📅</span>Termine</a>
-    <a href="#/rechnungen" data-tab="rechnungen"><span class="ico">🧾</span>Rechnungen</a>
-    <a href="#/mehr" data-tab="mehr"><span class="ico">✨</span>Mehr</a>
+    <a href="#/" data-tab="start"><span class="ico" data-icon="home"></span>Start</a>
+    <a href="#/objekte" data-tab="objekte"><span class="ico" data-icon="building"></span>Häuser</a>
+    <a href="#/termine" data-tab="termine"><span class="ico" data-icon="calendar"></span>Termine</a>
+    <a href="#/rechnungen" data-tab="rechnungen"><span class="ico" data-icon="receipt"></span>Rechnungen</a>
+    <a href="#/mehr" data-tab="mehr"><span class="ico" data-icon="grid"></span>Mehr</a>
   </nav>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="js/db.js"></script>
   <script src="js/core.js"></script>
+  <script src="js/icons.js"></script>
   <script src="js/service.js"></script>
   <script src="js/v-start.js"></script>
   <script src="js/v-objekte.js"></script>

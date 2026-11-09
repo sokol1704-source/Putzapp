@@ -981,3 +981,98 @@ details.grp.gefahr > summary { color: var(--danger); }
 .angebot-leiste .leiste-preis { font-size: 18px; }
 .angebot-leiste .leiste-sub { font-size: 11.5px; }
 .angebot-leiste .btn { padding: 10px 14px; font-size: 15px; }
+
+/* =====================================================================
+   Design 3 – ruhiger, professioneller Auftritt
+   Linien-Icons statt Emojis, flache Flächen, einheitliche Abstände.
+   ===================================================================== */
+:root {
+  --bg: #f3f5f6; --card: #ffffff; --text: #111827; --muted: #6b7280; --border: #e3e8eb;
+  --brand-soft: #e4f2ef; --radius: 14px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0e1416; --card: #172024; --text: #e5e7eb; --muted: #9aa5ab; --border: #26323a; --brand-soft: #123a36; }
+}
+
+/* Icons */
+.ic { width: 1.15em; height: 1.15em; flex: none; vertical-align: -.2em; }
+.btn .ic { width: 18px; height: 18px; }
+
+/* Kopfzeile: flach in Markenfarbe, ohne Glanz */
+.topbar { background: var(--brand) !important; animation: none !important; box-shadow: 0 1px 0 rgba(0, 0, 0, .08); }
+.topbar::after { display: none; }
+.topbar h1 { font-size: 17px; font-weight: 600; letter-spacing: .005em; }
+.topbar .gear { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; color: #fff; opacity: .92; }
+.topbar .gear .ic { width: 22px; height: 22px; }
+.topbar .back { color: #fff; }
+
+/* Untere Navigation */
+.tabbar { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; border-top: 1px solid var(--border); }
+.tabbar a { color: var(--muted); font-size: 11px; font-weight: 500; }
+.tabbar a .ico { filter: none !important; opacity: 1 !important; animation: none !important; font-size: 0; width: 56px; height: 30px; }
+.tabbar a .ico .ic { width: 23px; height: 23px; stroke-width: 1.8; }
+.tabbar a.active { color: var(--brand); font-weight: 600; }
+.tabbar a.active .ico { background: var(--brand-soft) !important; transform: none; }
+.tab-indicator::before { background: var(--brand); }
+
+/* Knöpfe: flach, klare Hierarchie */
+.btn { border-radius: 10px; font-weight: 600; letter-spacing: .005em; }
+.btn:not(.ghost):not(.light):not(.glass) { background: var(--brand); border-color: var(--brand); box-shadow: none; }
+.btn:not(.ghost):not(.light):not(.glass):active { background: var(--brand-dark); }
+.btn.ghost { background: var(--card); border-color: var(--border); color: var(--brand); }
+.btn.ghost:active { background: var(--brand-soft); }
+.btn.danger, .btn.danger.ghost { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+.quick .btn, .quick .btn.ghost { box-shadow: none; }
+.quick .btn:not(.ghost)::after { display: none; }
+
+/* Karten und Überschriften */
+.card, .kpi, .qa > *, .tile, .aktion { box-shadow: var(--shadow); border: 1px solid var(--border); }
+.view .section { font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 22px 4px 8px; }
+.empty:not(.small)::before { content: none; }
+.badge { animation: none; font-weight: 600; }
+
+/* Startseite */
+.hero { background: var(--brand) !important; box-shadow: none !important; border-radius: var(--radius); }
+.hero-bubbles { display: none; }
+.hero-title { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.hero-sub { font-size: 14.5px; }
+.kpi span { font-size: 11px; font-weight: 600; letter-spacing: .05em; }
+.kpi b { font-size: 22px; font-weight: 700; }
+.kpi.hero-kpi { background: var(--brand); box-shadow: none; }
+.hinweise a.hinweis span:first-child { color: var(--brand); }
+.hinweise a.hinweis span:first-child .ic { width: 20px; height: 20px; }
+
+/* Schnellaktionen (Startseite, Haus) */
+.qa > * { color: var(--text); font-weight: 600; border-radius: 12px; }
+.qa span { font-size: 0; line-height: 1; color: var(--brand); display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; border-radius: 10px; background: var(--brand-soft); }
+.qa span .ic { width: 21px; height: 21px; }
+.qa.qa-6 span { width: 34px; height: 34px; }
+.qa.qa-6 span .ic { width: 19px; height: 19px; }
+
+/* Kacheln (Mehr, Buchhaltung) */
+.tile-icon, .tiles .tile .tile-icon { background: var(--brand-soft) !important; color: var(--brand); font-size: 0; }
+.tile-icon .ic { width: 22px; height: 22px; }
+.tile b { font-weight: 700; }
+
+/* Aktionen (Termine) */
+.aktion { box-shadow: var(--shadow); border-radius: var(--radius); font-weight: 600; }
+.aktion span { color: var(--brand); font-size: 0; }
+.aktion span .ic { width: 24px; height: 24px; }
+.aktion.primary { background: var(--brand); border-color: var(--brand); }
+.aktion.primary span { color: #fff; font-size: 24px; }
+
+/* Inline-Icons in Listen und Infozeilen dezent in Markenfarbe */
+.card .ic, .row .ic { color: var(--brand); }
+.btn:not(.ghost):not(.light) .ic, .aktion.primary .ic, .badge .ic { color: currentColor; }
+.danger-text .ic, .btn.danger .ic { color: currentColor; }
+
+/* Gruppen in den Einstellungen: Titel bündig neben dem Icon */
+details.grp > summary { justify-content: flex-start; gap: 12px; color: var(--text); font-size: 15.5px; padding: 15px 16px; }
+details.grp > summary::after { margin-left: auto; }
+details.grp > summary .ic { width: 20px; height: 20px; }
+details.grp.gefahr > summary { color: var(--danger); }
+details.grp.gefahr { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+
+/* Aktionsknöpfe in Karten: lange Beschriftungen umbrechen statt abschneiden */
+.quick .btn { white-space: normal; line-height: 1.2; font-size: 15px; padding: 10px 12px; }

@@ -7,6 +7,7 @@ const FILES = [
   'css/style.css',
   'js/db.js',
   'js/core.js',
+  'js/icons.js',
   'js/service.js',
   'js/v-finanzen.js',
   'js/v-extras.js',
