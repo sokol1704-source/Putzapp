@@ -70,6 +70,8 @@ const ICON_PFADE = {
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
   coffee: '<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>',
   droplet: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+  elevator: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 9.5l3-3 3 3M9 14.5l3 3 3-3"/>',
+  archive: '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5" rx="1"/><line x1="10" y1="12" x2="14" y2="12"/>',
   qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>',
 };
 
@@ -102,6 +104,7 @@ const EMOJI_ICON = {
   '🏆': 'star', '⭐': 'star', '🏷️': 'tag', '🔔': 'bell', '✖️': 'x',
   '💻': 'monitor', '🛡️': 'shield', '🦺': 'shield', '🏥': 'shield',
   '🗑️': 'trash', '☕': 'coffee', '🏖️': 'sun',
+  '📸': 'camera', '🚪': 'home', '🏚️': 'archive', '🛗': 'elevator', '🧹': 'spark',
 };
 
 const EMOJI_RE = /\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic}️?)*️?/gu;

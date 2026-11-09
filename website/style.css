@@ -206,3 +206,18 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--b
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .reveal { opacity: 1; transform: none; }
 }
+
+/* Linien-Icons statt Emojis – passend zur App */
+.ic { width: 1.15em; height: 1.15em; flex: none; vertical-align: -.2em; }
+.card .ico, .float-card .ico, .why-list .num { color: var(--brand); background: var(--brand-soft) !important; font-size: 0; }
+.card .ico .ic { width: 26px; height: 26px; }
+.float-card .ico .ic, .why-list .num .ic { width: 21px; height: 21px; }
+.btn .ic { width: 18px; height: 18px; margin-right: 2px; }
+.chip .ic { width: 15px; height: 15px; margin-right: 2px; color: var(--brand); }
+li > .ic { color: currentColor; opacity: .9; margin-right: 4px; }
+
+/* Flach wie in der App: kein Verlauf, keine Deko-Kreise */
+.hero { background: var(--brand); }
+.bubbles { display: none; }
+.btn-primary { background: var(--brand); box-shadow: none; }
+.btn-primary:hover { background: var(--brand-dark); box-shadow: none; }

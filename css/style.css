@@ -1120,3 +1120,18 @@ details.grp.gefahr { border-color: color-mix(in srgb, var(--danger) 45%, var(--b
 .qr-doc .qr-box { display: grid; place-items: center; margin: 18px 0 10px; }
 .qr-doc .qr-box img { width: 62%; max-width: 320px; image-rendering: pixelated; }
 .qr-doc .qr-text { text-align: center; font-weight: 700; color: #134e4a; margin: 6px 0 2px; }
+
+/* Abstand nach den Haus-Aktionen */
+.view .qa.qa-3 ~ .section { margin-top: 26px; }
+
+/* Dunkelmodus: hellere Akzentfarbe für Text und Icons (Flächen bleiben in Markenfarbe) */
+@media (prefers-color-scheme: dark) {
+  :root { --akzent: #5eead4; }
+  a { color: var(--akzent); }
+  .card, .card.link, .tile, .qa > *, .kpi { color: var(--text); }
+  .btn.ghost, .chip.static, .badge, .tabbar a.active, .hinweise a.hinweis span:first-child { color: var(--akzent); }
+  .card .ic, .row .ic, .qa span, .tile-icon, .aktion span, .hinweise .ic { color: var(--akzent); }
+  .btn:not(.ghost):not(.light) .ic, .aktion.primary span, .badge .ic { color: currentColor; }
+  .tabbar a.active .ico { background: #134e4a !important; }
+}
+@media (prefers-color-scheme: dark) { .tiles .tile .tile-icon { color: var(--akzent); } }
