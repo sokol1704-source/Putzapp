@@ -226,6 +226,8 @@ async function visitForm(v, q) {
       id: DB.uid(), objektId, datum, von: q.von || termin?.uhrzeit || '', bis: q.bis || '',
       stunden: q.von && q.bis ? hoursBetween(q.von, q.bis) : '',
       aufgaben: vorlage.map((text) => ({ text, erledigt: true })), extras: [], notiz: '', rechnungId: null,
+      // Beginn per QR-Code am Haus bestätigt
+      qrCheckin: q.qr === '1',
     };
   }
   const tasks = v.aufgaben.map((t) => ({ ...t }));
@@ -356,6 +358,7 @@ route('/einsatz/:id', async ({ id }) => {
       <div class="row between"><a class="strong" href="#/objekt/${v.objektId}">🏢 ${esc(objLabel(o))}</a>
         ${inv ? `<a class="badge ok" href="#/rechnung/${inv.id}">Rechnung ${esc(inv.nummer)}</a>` : '<span class="badge warn">nicht abgerechnet</span>'}</div>
       <div class="muted">${fmtDateLong(v.datum)}${v.von ? ` · ${esc(v.von)}${v.bis ? '–' + esc(v.bis) : ''} Uhr` : ''}${v.stunden ? ` · ${fmtNum(v.stunden)} Std.` : ''}</div>
+      ${v.qrCheckin ? `<div class="small mt">${icon('qr')} Vor Ort per QR-Code bestätigt${v.von ? ` (Beginn ${esc(v.von)} Uhr)` : ''}</div>` : ''}
       <ul class="done-list mt">${(v.aufgaben || []).map((t) => `<li class="${t.erledigt ? 'ok' : 'no'}">${t.erledigt ? '✓' : '✗'} ${esc(t.text)}</li>`).join('')}</ul>
       ${v.extras?.length ? `<div class="small muted mt">Zusatzleistungen</div><ul class="done-list">${v.extras.map((x) => `<li class="ok">➕ ${esc(x.name)} · ${fmtNum(x.menge)} ${esc(x.einheit)} à ${money(x.preis)}</li>`).join('')}</ul>` : ''}
       ${v.notiz ? `<div class="mt">📝 ${nl2br(v.notiz)}</div>` : ''}

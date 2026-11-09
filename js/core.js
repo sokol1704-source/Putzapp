@@ -436,9 +436,9 @@ function whenLabel(datum) {
 }
 
 /* ---------- Stoppuhr ---------- */
-async function startTimer(objektId, terminId = '') {
+async function startTimer(objektId, terminId = '', extra = {}) {
   if (S.timer && !confirm('Es läuft schon eine Zeitmessung. Neu starten?')) return;
-  S.timer = { objektId, terminId, start: new Date().toISOString() };
+  S.timer = { objektId, terminId, start: new Date().toISOString(), ...extra };
   await saveSettings();
   zeigeTimerBenachrichtigung(objektId);
   vibrate(20);
@@ -456,7 +456,7 @@ async function stopTimer() {
   updateTimerPill();
   vibrate([20, 60, 20]);
   const von = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
-  go(`#/einsatz/neu?objekt=${t.objektId}${t.terminId ? `&termin=${t.terminId}` : ''}&datum=${isoDate(start)}&von=${von}&bis=${nowTime()}`);
+  go(`#/einsatz/neu?objekt=${t.objektId}${t.terminId ? `&termin=${t.terminId}` : ''}&datum=${isoDate(start)}&von=${von}&bis=${nowTime()}${t.qr ? '&qr=1' : ''}`);
 }
 
 function timerText() {
@@ -470,8 +470,14 @@ async function updateTimerPill() {
   clearInterval(timerTick);
   if (!S.timer) { pill.hidden = true; return; }
   const o = await DB.get('objects', S.timer.objektId);
+  // Während des Wartens kann die Zeitmessung schon beendet worden sein
+  clearInterval(timerTick);
+  if (!S.timer) { pill.hidden = true; return; }
   pill.hidden = false;
-  const draw = () => { pill.innerHTML = `<span class="dot"></span><b>${timerText()}</b><span class="where">${esc(objLabel(o))}</span><span class="stop">⏹ Fertig</span>`; };
+  const draw = () => {
+    if (!S.timer) { clearInterval(timerTick); pill.hidden = true; return; }
+    pill.innerHTML = `<span class="dot"></span><b>${timerText()}</b><span class="where">${esc(objLabel(o))}</span><span class="stop">⏹ Fertig</span>`;
+  };
   draw();
   timerTick = setInterval(draw, 1000);
 }

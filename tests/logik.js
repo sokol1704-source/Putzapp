@@ -60,6 +60,15 @@ const BASE = process.env.APP_URL || 'http://localhost:8765/';
     pruefe('Jährlich nachträglich wird nicht monatlich abgerechnet', monatlichAbgerechnet({ vertrag: { zyklus: 'jahr' } }), false);
     pruefe('Im Voraus wird nicht monatlich abgerechnet', monatlichAbgerechnet({ vertrag: { zyklus: 'voraus' } }), false);
 
+    /* Angebote nachfassen in zwei Stufen */
+    const vor = (n) => addDays(today(), -n);
+    pruefe('Nachfassen: nach 6 Tagen noch nicht', angebotNachfassen({ status: 'offen', datum: vor(6) }), false);
+    pruefe('Nachfassen: erste Nachfrage nach 7 Tagen', angebotNachfassen({ status: 'offen', datum: vor(7) }), true);
+    pruefe('Nachfassen: zweite erst 7 Tage nach der ersten', angebotNachfassen({ status: 'offen', datum: vor(20), nachfassStufe: 1, letzteNachfrage: vor(3) }), false);
+    pruefe('Nachfassen: zweite Nachfrage fällig', angebotNachfassen({ status: 'offen', datum: vor(20), nachfassStufe: 1, letzteNachfrage: vor(7) }), true);
+    pruefe('Nachfassen: nach zwei Nachfragen Schluss', angebotNachfassen({ status: 'offen', datum: vor(40), nachfassStufe: 2, letzteNachfrage: vor(20) }), false);
+    pruefe('Dialoge ohne Emojis', ohneEmoji('🎉 Angebot angenommen? ☐ A'), 'Angebot angenommen? ☐ A');
+
     /* Kassenbon */
     pruefe('Bon mit SUMME-Zeile', parseBon('REWE\nMilch 1,29\nPutzmittel 4,99\nSUMME EUR 6,28\n02.11.2026 10:15'), { betrag: 628, datum: '2026-11-02' });
     pruefe('Bon mit Tausenderpunkt und 2-stelligem Jahr', parseBon('Bauhaus\nHochdruckreiniger 1.249,00\nGesamt 1.249,00\n05.03.26'), { betrag: 124900, datum: '2026-03-05' });

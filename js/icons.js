@@ -70,6 +70,7 @@ const ICON_PFADE = {
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
   coffee: '<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>',
   droplet: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>',
 };
 
 // Emoji → Icon. Nicht aufgeführte Emojis werden entfernt.
@@ -174,6 +175,13 @@ function iconsIn(root) {
 function festeIcons() {
   document.querySelectorAll('[data-icon]').forEach((el) => { if (!el.querySelector('svg')) el.innerHTML = icon(el.dataset.icon); });
 }
+
+// Reiner Text ohne Emojis (Dialoge, Benachrichtigungen)
+const ohneEmoji = (t) => String(t ?? '').replace(EMOJI_RE, (e) => (KEIN_EMOJI.has(e) ? e : '')).replace(/[ \t]{2,}/g, ' ').replace(/^[ \t]+/gm, '').trim();
+['alert', 'confirm', 'prompt'].forEach((fn) => {
+  const original = window[fn].bind(window);
+  window[fn] = (msg, ...rest) => original(ohneEmoji(msg), ...rest);
+});
 
 (function iconsStarten() {
   festeIcons();

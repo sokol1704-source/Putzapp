@@ -133,23 +133,13 @@ document.addEventListener('pointerdown', (e) => {
 });
 
 /* ---------- Konfetti, wenn eine Rechnung bezahlt ist ---------- */
+// Erfolg dezent bestätigen (früher Konfetti): kurzer Haken in der Bildschirmmitte
 function confetti() {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const colors = ['#14b8a6', '#0f766e', '#fcd34d', '#f472b6', '#60a5fa', '#ffffff'];
-  for (let i = 0; i < 70; i++) {
-    const c = document.createElement('div');
-    c.className = 'confetti';
-    c.style.background = colors[i % colors.length];
-    c.style.left = `${50 + (Math.random() - 0.5) * 20}vw`;
-    document.body.appendChild(c);
-    const angle = (Math.random() - 0.5) * Math.PI * 0.9;
-    const power = 300 + Math.random() * 350;
-    c.animate([
-      { transform: 'translate(0, 0) rotate(0)', opacity: 1 },
-      { transform: `translate(${Math.sin(angle) * power}px, ${-Math.cos(angle) * power * 0.9}px) rotate(${Math.random() * 720}deg)`, opacity: 1, offset: 0.45 },
-      { transform: `translate(${Math.sin(angle) * power * 1.3}px, ${window.innerHeight * 0.6}px) rotate(${Math.random() * 1440}deg)`, opacity: 0 },
-    ], { duration: 1600 + Math.random() * 900, easing: 'cubic-bezier(.2, .6, .4, 1)' }).onfinish = () => c.remove();
-  }
+  const el = document.createElement('div');
+  el.className = 'erfolg';
+  el.innerHTML = icon('check');
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
 }
 
 /* ---------- Stoppuhr-Knöpfe & Zeitanzeige ---------- */

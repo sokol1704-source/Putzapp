@@ -259,6 +259,20 @@ const anzahl = (p, store) => p.evaluate((s) => DB.all(s).then((r) => r.length), 
   if (!listTxt.includes('Annahmequote') || !listTxt.includes('Zu teuer 1×')) report.push('Angebote: Auswertung fehlt');
   else ok.push('Angebot abgelehnt mit Grund, Auswertung zeigt Annahmequote und Absagegründe');
 
+  // 4h) QR-Check-in: Zeitmessung mit QR-Kennzeichen → Einsatz wird als vor Ort bestätigt gespeichert
+  await geh(`/objekt/${ids.objekt}`);
+  const visitsVorQr = await anzahl(p, 'visits');
+  await p.evaluate(async (id) => { await startTimer(id, '', { qr: true }); await stopTimer(); }, ids.objekt);
+  await p.waitForTimeout(800);
+  await absenden(p); await p.waitForTimeout(800);
+  const qrVisit = await p.evaluate(async () => (await DB.all('visits')).find((v) => v.qrCheckin));
+  if ((await anzahl(p, 'visits')) !== visitsVorQr + 1 || !qrVisit) report.push('QR-Check-in: Einsatz nicht als vor Ort bestätigt gespeichert');
+  else {
+    await geh(`/einsatz/${qrVisit.id}`);
+    const t = await p.evaluate(() => document.body.innerText);
+    if (!t.includes('per QR-Code bestätigt')) report.push('QR-Check-in: Hinweis im Einsatz fehlt'); else ok.push('QR-Check-in: Einsatz als vor Ort bestätigt gespeichert und angezeigt');
+  }
+
   // 5) Mangel erledigen, Akquise gewonnen → Kunde
   await geh(`/mangel/${ids.mangel}`);
   const erledigtBtn = await p.$('#done');
@@ -316,7 +330,7 @@ const anzahl = (p, store) => p.evaluate((s) => DB.all(s).then((r) => r.length), 
   // 10) PDFs: Rechnung, Vertrag, Zusatz-Katalog, Leistungsverzeichnis, Leistungsnachweis
   const rechnungId = await p.evaluate(async () => (await DB.all('invoices'))[0]?.id);
   const angebotId = await p.evaluate(async () => (await DB.all('angebote'))[0]?.id);
-  for (const r of [`/rechnung/${rechnungId}`, `/angebot/${angebotId}`, `/objekt/${ids.objekt}/aushang`, `/objekt/${ids.objekt}/jahr`, `/objekt/${ids.objekt}/vertrag`, `/objekt/${ids.objekt}/zusatz`, '/leistungsverzeichnis', `/objekt/${ids.objekt}/nachweis`, `/winter/protokoll/${ids.objekt}`]) {
+  for (const r of [`/rechnung/${rechnungId}`, `/angebot/${angebotId}`, `/objekt/${ids.objekt}/aushang`, `/objekt/${ids.objekt}/jahr`, `/objekt/${ids.objekt}/vertrag`, `/objekt/${ids.objekt}/zusatz`, '/leistungsverzeichnis', `/objekt/${ids.objekt}/nachweis`, `/winter/protokoll/${ids.objekt}`, `/objekt/${ids.objekt}/qr`]) {
     await geh(r);
     const res = await p.evaluate(async () => {
       const doc = document.querySelector('.invoice-doc');

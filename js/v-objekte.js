@@ -214,17 +214,21 @@ route('/objekt/:id', async ({ id }) => {
       ${o.notizen ? `<div class="small mt">📝 ${nl2br(o.notizen)}</div>` : ''}
       <a class="btn small ghost mt" href="#/objekt/${id}/bearbeiten">Bearbeiten</a>
     </div>
-    <div class="qa qa-6">
+    <div class="qa qa-3">
       <button data-start="${id}"><span>▶️</span>Start</button>
       <a href="#/einsatz/neu?objekt=${id}"><span>🧽</span>Einsatz</a>
       <a href="#/mangel/neu?objekt=${id}"><span>⚠️</span>Mangel</a>
-      <a href="#/winter/neu?objekt=${id}"><span>❄️</span>Winter</a>
       <a href="#/objekt/${id}/plan"><span>🗓️</span>Plan</a>
+      ${(o.vorOrtTelefon || k?.telefon) ? `<a href="tel:${esc((o.vorOrtTelefon || k.telefon).replace(/\s/g, ''))}"><span>📞</span>Anrufen</a>` : `<a href="#/objekt/${id}/bearbeiten"><span>📞</span>Nummer</a>`}
+      <button type="button" id="qaMehr"><span>${icon('grid')}</span>Mehr</button>
+    </div>
+    <div class="qa qa-3" id="qaWeitere" hidden>
+      <a href="#/winter/neu?objekt=${id}"><span>❄️</span>Winter</a>
       <a href="#/objekt/${id}/nachweis"><span>📄</span>Nachweis</a>
-      <a href="#/objekt/${id}/aushang"><span>📌</span>Aushang</a>
       <a href="#/objekt/${id}/vertrag"><span>📜</span>Vertrag</a>
       <a href="#/rechnung/neu?kunde=${o.kundeId}&objekt=${id}"><span>🧾</span>Rechnung</a>
-      ${(o.vorOrtTelefon || k?.telefon) ? `<a href="tel:${esc((o.vorOrtTelefon || k.telefon).replace(/\s/g, ''))}"><span>📞</span>Anrufen</a>` : `<a href="#/objekt/${id}/bearbeiten"><span>📞</span>Nummer</a>`}
+      <a href="#/objekt/${id}/aushang"><span>📌</span>Aushang</a>
+      <a href="#/objekt/${id}/qr"><span>${icon('qr')}</span>QR-Code</a>
     </div>
     ${o.aktiv === false ? `<button class="btn ghost block" id="danke">💌 Dankeschön an ${esc(k?.ansprechpartner || k?.name || 'den Auftraggeber')}</button>` : ''}
     <h3 class="section">Anstehend</h3>
@@ -236,6 +240,11 @@ route('/objekt/:id', async ({ id }) => {
     <h3 class="section">Einsätze (${visits.length})</h3>
     ${visits.slice(0, 15).map((v) => visitCard(v, data, false)).join('') || '<div class="empty small">Noch keine Einsätze.</div>'}
   `);
+  $('#qaMehr')?.addEventListener('click', () => {
+    const w = $('#qaWeitere');
+    w.hidden = !w.hidden;
+    $('#qaMehr').lastChild.textContent = w.hidden ? 'Mehr' : 'Weniger';
+  });
   $('#danke')?.addEventListener('click', () => shareText(`Guten Tag${k?.ansprechpartner ? ` ${k.ansprechpartner}` : ''},\n\nich möchte mich herzlich für die gute Zusammenarbeit bedanken. Die Reinigung von ${objLabel(o)} endet hiermit. Vielen Dank für Ihr Vertrauen.\n\nSollten Sie jemanden kennen, der eine zuverlässige Reinigung sucht, würde ich mich über eine Empfehlung freuen.\n\nViele Grüße\n${S.inhaber}\n${S.firma}`, 'Dankeschön'));
 });
 
@@ -490,3 +499,25 @@ async function akquiseForm(a) {
     go('#/akquise', true);
   });
 }
+
+/* ---------- QR-Aufkleber für den Check-in am Haus ---------- */
+route('/objekt/:id/qr', async ({ id }) => {
+  const o = await DB.get('objects', id);
+  if (!o) return go('#/objekte', true);
+  await loadScript('js/vendor/qrcode.js');
+  const qr = window.qrcode(0, 'M');
+  qr.addData(QR_PREFIX + id);
+  qr.make();
+  render('QR-Code', `
+    ${docButtons()}
+    <div class="doc-wrap"><article class="invoice-doc qr-doc">
+      ${docHeader()}
+      <h2 class="inv-title">Check-in <span>${esc(objLabel(o))}</span></h2>
+      <div class="qr-box"><img src="${qr.createDataURL(10, 2)}" alt="QR-Code für ${esc(objLabel(o))}"></div>
+      <p class="qr-text">Reinigungsdienst ${esc(S.firma)} – bitte nicht entfernen.</p>
+      <p class="doc-muted center">${esc(objAddress(o))}</p>
+    </article></div>
+    <div class="card no-print"><p class="small">Ausdrucken und geschützt im Haus anbringen, z. B. im Hausflur oder am Kellerabgang. Beim Ankommen tippst du auf der Startseite auf „QR-Check-in“ und scannst den Code. Dann läuft die Zeitmessung, und der Einsatz wird als „vor Ort per QR-Code bestätigt“ gespeichert.</p></div>
+  `);
+  wireDocButtons(`QR-Code ${objLabel(o)}`);
+});

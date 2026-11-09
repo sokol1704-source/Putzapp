@@ -98,7 +98,7 @@ route('/', async () => {
     <div class="qa">
       <a href="#/mangel/neu"><span>⚠️</span>Mangel melden</a>
       <a href="#/winter/neu"><span>❄️</span>Winterdienst</a>
-      <a href="#/objekt/neu"><span>🏢</span>Neues Haus</a>
+      <button type="button" id="qrCheckin"><span>${icon('qr')}</span>QR-Check-in</button>
       <a href="#/angebot/neu"><span>📝</span>Angebot</a>
     </div>
     <h3 class="section">Dein Überblick</h3>
@@ -129,6 +129,7 @@ route('/', async () => {
     </div>`}
   `, { tab: 'start', back: false });
   fillWeatherCard($('#weather'), data.objects);
+  $('#qrCheckin')?.addEventListener('click', qrCheckin);
 });
 
 /* ---------- Mehr ---------- */

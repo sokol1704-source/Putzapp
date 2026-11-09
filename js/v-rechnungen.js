@@ -523,7 +523,9 @@ route('/rechnung/:id', async ({ id }) => {
 /* ---------- Angebote ---------- */
 const ANGEBOT_STATUS = { offen: ['offen', 'warn'], angenommen: ['angenommen', 'ok'], abgelehnt: ['abgelehnt', 'soft'] };
 // Offene Angebote, auf die seit NACHFASS_TAGE keine Antwort kam
-const angebotNachfassen = (a) => a.status === 'offen' && daysBetween(a.datum, today()) >= NACHFASS_TAGE;
+// Nachfassen in zwei Stufen: erste Nachfrage 7 Tage nach dem Angebot, zweite 7 Tage nach der ersten
+const NACHFASS_ABSTAND = 7;
+const angebotNachfassen = (a) => a.status === 'offen' && (a.nachfassStufe || 0) < 2 && daysBetween(a.letzteNachfrage || a.datum, today()) >= NACHFASS_ABSTAND;
 const OPTIONS = [
   ['aufzug', 'Aufzug reinigen', 'Aufzug reinigen (Kabine & Türen)', 0],
   ['keller', 'Kellergänge', 'Kellergänge fegen & wischen', 28],
@@ -579,7 +581,7 @@ route('/angebote', async () => {
         <div class="row between"><b>${esc(a.nummer)}</b><span class="badge ${cls}">${label}${a.ablehnGrund && a.status === 'abgelehnt' ? ` · ${esc(a.ablehnGrund)}` : ''}</span></div>
         <div class="row between small"><span class="muted">${esc(a.empfaenger.name)} · 🏢 ${esc(a.objekt.strasse)}</span><b>${money(angebotPreis(a))}/Monat</b></div>
         ${a.varianteB && a.status === 'offen' ? `<div class="muted small">oder ${money(a.varianteB.monatspreis)}/Monat (${RHYTHMEN[a.varianteB.intervallTage]})</div>` : ''}
-        ${angebotNachfassen(a) ? `<div class="danger-text small">⏰ ohne Antwort seit ${daysBetween(a.datum, today())} Tagen</div>` : ''}
+        ${angebotNachfassen(a) ? `<div class="danger-text small">⏰ ohne Antwort seit ${daysBetween(a.datum, today())} Tagen · ${(a.nachfassStufe || 0) + 1}. Nachfrage fällig</div>` : ''}
       </a>`;
     }).join('') || `<div class="empty">Noch keine Angebote.<br><span class="small">Mit dem Rechner kalkulierst du in einer Minute einen fairen Monatspreis.</span></div>`}</div>
   `);
@@ -861,7 +863,7 @@ route('/angebot/:id', async ({ id }) => {
           ? `<button class="btn ghost" data-annehmen="A">🎉 Angenommen: A</button><button class="btn ghost" data-annehmen="B">🎉 Angenommen: B</button>`
           : '<button class="btn ghost" data-annehmen="A">🎉 Angenommen</button>') + '<button class="btn ghost" id="no">Abgelehnt</button>' : ''}
         ${a.objektId ? `<a class="btn ghost" href="#/objekt/${a.objektId}">🏢 Zum Haus</a>` : ''}
-        ${a.status === 'angenommen' && a.objektId ? `<a class="btn ghost" href="#/rechnung/neu?kunde=${a.kundeId}&objekt=${a.objektId}">🧾 Erste Rechnung vorbereiten</a><button class="btn ghost" id="willkommen">🎉 Willkommen senden</button>` : ''}
+        ${a.status === 'angenommen' && a.objektId ? `<a class="btn" href="#/objekt/${a.objektId}/vertrag">📜 Vertrag vorbereiten</a><a class="btn ghost" href="#/rechnung/neu?kunde=${a.kundeId}&objekt=${a.objektId}">🧾 Erste Rechnung vorbereiten</a><button class="btn ghost" id="willkommen">🎉 Willkommen senden</button>` : ''}
       </div>
       <div id="gruende" class="mt" hidden>
         <div class="small muted">Warum abgelehnt? Hilft dir später bei der Preisfindung.</div>
@@ -869,14 +871,24 @@ route('/angebot/:id', async ({ id }) => {
       </div>
     </div>
     ${angebotNachfassen(a) ? `<div class="card hint no-print"><b>⏰ Seit ${daysBetween(a.datum, today())} Tagen keine Antwort</b>
-      <div class="muted small">Eine kurze Nachfrage bringt oft die Entscheidung.</div>
-      <button class="btn small mt" id="nachfassen">✉️ Nachfrage senden</button></div>` : ''}
+      <div class="muted small">${a.nachfassStufe ? 'Die erste Nachfrage ist eine Woche her. Eine zweite, freundliche Erinnerung bringt oft die Entscheidung.' : 'Eine kurze Nachfrage bringt oft die Entscheidung.'}</div>
+      <button class="btn small mt" id="nachfassen">✉️ ${a.nachfassStufe ? 'Zweite Nachfrage senden' : 'Nachfrage senden'}</button></div>` : ''}
     <div class="doc-wrap">${angebotDoc(a, await DB.by('photos', 'visitId', a.id))}</div>
     <button class="btn danger ghost block no-print" id="del">Angebot löschen</button>
   `);
   wireDocButtons(`Angebot ${a.nummer}`, `Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nanbei erhalten Sie mein Angebot für die Treppenhausreinigung ${a.objekt.strasse}. Ich freue mich auf Ihre Rückmeldung!\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`);
   $('#willkommen')?.addEventListener('click', () => shareText(`Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nvielen Dank für Ihren Auftrag. Ich freue mich auf die Zusammenarbeit für ${a.objekt.strasse}. Bei Fragen melden Sie sich jederzeit bei mir.\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`, 'Willkommen'));
-  $('#nachfassen')?.addEventListener('click', () => shareText(`Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},\n\nich wollte kurz nachfragen, ob Sie mein Angebot ${a.nummer} für die Treppenhausreinigung ${a.objekt.strasse} schon prüfen konnten. Gern beantworte ich Ihre Fragen.\n\nViele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`, `Nachfrage ${a.nummer}`));
+  $('#nachfassen')?.addEventListener('click', async () => {
+    const anrede = `Guten Tag${a.empfaenger.ansprechpartner ? ` ${a.empfaenger.ansprechpartner}` : ''},`;
+    const gruss = `Viele Grüße\n${a.absender.inhaber}\n${a.absender.firma}`;
+    const text = a.nachfassStufe
+      ? `${anrede}\n\ndarf ich Sie noch einmal an mein Angebot ${a.nummer} für die Treppenhausreinigung ${a.objekt.strasse} erinnern? Es ist gültig bis ${fmtDate(a.gueltigBis)}. Wenn etwas angepasst werden soll, etwa Umfang oder Rhythmus, sagen Sie mir gern Bescheid.\n\n${gruss}`
+      : `${anrede}\n\nich wollte kurz nachfragen, ob Sie mein Angebot ${a.nummer} für die Treppenhausreinigung ${a.objekt.strasse} schon prüfen konnten. Gern beantworte ich Ihre Fragen.\n\n${gruss}`;
+    shareText(text, `Nachfrage ${a.nummer}`);
+    Object.assign(a, { nachfassStufe: (a.nachfassStufe || 0) + 1, letzteNachfrage: today() });
+    await DB.put('angebote', a);
+    router();
+  });
   $('#no')?.addEventListener('click', () => { $('#gruende').hidden = !$('#gruende').hidden; });
   document.querySelectorAll('[data-grund]').forEach((btn) => btn.addEventListener('click', async () => {
     Object.assign(a, { status: 'abgelehnt', ablehnGrund: btn.dataset.grund });
@@ -896,6 +908,8 @@ route('/angebot/:id', async ({ id }) => {
       zugang: '', vorOrtName: '', vorOrtTelefon: '', intervallTage: iv, wochentag: '', uhrzeit: '',
       abrechnung: 'monat', monatspauschale: preis, stundensatz: S.stundensatz,
       winterAbrechnung: a.winterArt === 'pauschal' ? 'pauschal' : a.winterPreis ? 'einsatz' : 'keiner', winterPreis: a.winterPreis || 0, notizen: `Aus Angebot ${a.nummer}`, aktiv: true, aufgaben: tasks,
+      // Vertrag gleich vormerken: erscheint auf der Startseite, bis der Auftraggeber unterschrieben hat
+      vertrag: { zyklus: 'monat' },
     };
     assignStarts(o, [], []);
     await DB.put('objects', o);

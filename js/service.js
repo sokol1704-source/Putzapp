@@ -126,6 +126,28 @@ let lastSchedule = 0;
 // Schlägt der Dienst fehl, bleibt die feste Benachrichtigung mit Startzeit.
 const TIMER_NOTIFICATION_ID = 4001;
 let timerUpdate = null;
+/* ---------- QR-Check-in am Haus ---------- */
+// Aufkleber im Haus (Haus → Mehr → QR-Code) scannen: startet die Zeitmessung und markiert den Einsatz als vor Ort bestätigt
+const QR_PREFIX = 'PURETOTH:HAUS:';
+async function qrCheckin() {
+  if (!NATIVE) return toast('Scannen funktioniert in der Android-App');
+  try {
+    const { available } = await native('BarcodeScanner', 'isGoogleBarcodeScannerModuleAvailable', {});
+    if (!available) {
+      await native('BarcodeScanner', 'installGoogleBarcodeScannerModule', {});
+      return toast('Scanner wird installiert – bitte gleich nochmal tippen');
+    }
+    const { barcodes } = await native('BarcodeScanner', 'scan', {});
+    const code = barcodes?.[0]?.rawValue || '';
+    const haus = code.startsWith(QR_PREFIX) ? await DB.get('objects', code.slice(QR_PREFIX.length)) : null;
+    if (!haus) return toast('Kein Haus-Code von PURE TOTH erkannt');
+    await startTimer(haus.id, '', { qr: true });
+    go(`#/objekt/${haus.id}`);
+  } catch {
+    toast('Scannen nicht möglich');
+  }
+}
+
 /* ---------- Knöpfe in Benachrichtigungen ---------- */
 // „Starten“ in der Erinnerung kurz vor einem Einsatz, „Fertig“ in der laufenden Zeitmessung.
 const FERTIG_KNOPF = 1;
@@ -161,7 +183,7 @@ async function zeigeTimerBenachrichtigung(objektId) {
   }
   const o = await DB.get('objects', objektId || S.timer.objektId);
   const start = new Date(S.timer.start);
-  const titel = '⏱️ Zeitmessung läuft';
+  const titel = 'Zeitmessung läuft';
   const text = () => {
     const min = Math.max(0, Math.floor((Date.now() - start) / 60000));
     return `${objLabel(o)} · seit ${pad(start.getHours())}:${pad(start.getMinutes())} · ${min} Min.`;
@@ -277,6 +299,7 @@ async function scheduleNotifications(force = false) {
       if (at < new Date() || !anzahl) return;
       notes.push({ id: 5500 + n, title: `🗓️ Monatsende: ${anzahl} Zahlungseingänge abhaken`, body: 'Im Monatsabschluss unter Buchhaltung → Zahlungseingänge', schedule: { at: at.toISOString(), allowWhileIdle: true } });
     });
+    notes.forEach((n) => { n.title = ohneEmoji(n.title); n.body = ohneEmoji(n.body); });
     if (notes.length) await native('LocalNotifications', 'schedule', { notifications: notes });
     S.geplanteErinnerungen = notes.length;
     await saveSettings();
@@ -287,7 +310,7 @@ async function scheduleNotifications(force = false) {
 
 async function testNotification() {
   if (!(await notificationsAllowed())) return toast('Benachrichtigungen sind nicht erlaubt (Android-Einstellungen → Apps → PURE TOTH)');
-  await native('LocalNotifications', 'schedule', { notifications: [{ id: 99, title: '✨ PURE TOTH', body: 'So sehen deine Erinnerungen aus.', schedule: { at: new Date(Date.now() + 3000).toISOString() } }] });
+  await native('LocalNotifications', 'schedule', { notifications: [{ id: 99, title: 'PURE TOTH', body: 'So sehen deine Erinnerungen aus.', schedule: { at: new Date(Date.now() + 3000).toISOString() } }] });
   toast('Test kommt in 3 Sekunden');
 }
 

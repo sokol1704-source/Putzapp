@@ -18,6 +18,7 @@ const FILES = [
   'js/v-monat.js',
   'js/vendor/jspdf.umd.min.js',
   'js/vendor/html2canvas.min.js',
+  'js/vendor/qrcode.js',
   'js/v-start.js',
   'js/v-objekte.js',
   'js/v-einsaetze.js',
