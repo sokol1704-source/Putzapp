@@ -69,7 +69,7 @@ const anzahl = (p, store) => p.evaluate((s) => DB.all(s).then((r) => r.length), 
   await p.waitForTimeout(300);
   await p.evaluate(async () => {
     for (const s of DB.stores) await DB.clear(s);
-    await DB.put('settings', { id: 'main', firma: 'PURE TOTH', inhaber: 'Tobias Toth', strasse: 'X 1', plzOrt: '67105 Schifferstadt', steuernummer: '1/2/3', iban: 'DE02120300000000202051', bank: 'Sparkasse', kalkV3: true, einfuehrung: true });
+    await DB.put('settings', { id: 'main', firma: 'PURE TOTH', inhaber: 'Tobias Toth', strasse: 'X 1', plzOrt: '67105 Schifferstadt', steuernummer: '1/2/3', iban: 'DE02120300000000202051', bank: 'Sparkasse', kalkV3: true, einfuehrung: true, einfuehrungVersion: 99 });
   });
   await p.reload();
   await p.waitForTimeout(300);

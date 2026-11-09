@@ -217,12 +217,17 @@ function setupBackButton() {
 }
 
 /* ---------- Einführung: beim ersten Start und nach den Werkseinstellungen ---------- */
+// Bei neuen Inhalten erhöhen: die Einführung erscheint dann einmal erneut
+const EINFUEHRUNG_VERSION = 2;
 const EINFUEHRUNG = [
-  ['🧽', 'Willkommen bei PURE TOTH', 'Die App begleitet dich durch den Tag: Häuser, Einsätze, Fotos, Rechnungen und Buchhaltung. Alles bleibt auf diesem Handy.'],
-  ['▶️', 'Zeit messen und erfassen', 'Tippe bei einem Haus auf „Start“. Die Zeit läuft weiter, auch wenn du die App schließt. Mit „Fertig“ übernimmst du sie in den Einsatz.'],
-  ['📷', 'Fotos und Checkliste', 'Mach Fotos vorher und nachher und hake die Aufgaben ab. Manche Häuser verlangen eine feste Anzahl Fotos.'],
-  ['🧾', 'Rechnungen und Monat', 'Der Monatsabschluss zeigt, was abzurechnen ist. Du prüfst jede Rechnung, bevor du sie verschickst.'],
-  ['💾', 'Sicherung nicht vergessen', 'Alle Daten liegen nur auf diesem Handy. Mach regelmäßig eine Sicherung in den Einstellungen und speichere sie z. B. in Google Drive.'],
+  ['home', 'Willkommen bei PURE TOTH', 'Häuser, Einsätze, Angebote, Rechnungen und Buchhaltung an einem Ort. Alle Daten bleiben auf diesem Handy.'],
+  ['qr', 'Ankommen und loslegen', 'Scanne beim Haus den QR-Aufkleber (Startseite → QR-Check-in) oder tippe beim Haus auf „Start“. Die Zeit läuft im Hintergrund weiter, „Fertig“ geht auch direkt in der Benachrichtigung.'],
+  ['camera', 'Fotos als Nachweis', 'Mach Fotos vorher und nachher – Datum, Uhrzeit und Haus stehen automatisch im Bild. Aufgaben hakst du ab, Mängel meldest du mit Foto an den Auftraggeber.'],
+  ['fileEdit', 'Angebote und Verträge', 'Das Angebot entsteht in fünf Schritten, mit Stundenlohn-Check und auf Wunsch zwei Varianten. Die App erinnert dich ans Nachfassen. Nach der Zusage legst du Haus und Vertrag mit einem Tipp an.'],
+  ['receipt', 'Rechnungen', 'Der Monatsabschluss zeigt, was abzurechnen ist. Häuser mit Jahresvertrag bekommen eine Jahresrechnung, auf Wunsch in zwölf Raten. Zahlungseingänge hakst du dort ab.'],
+  ['barChart', 'Buchhaltung', 'Einnahmen zählen nach Zahlungseingang. Ausgaben erfasst du mit Foto vom Bon, Fahrten mit 0,30 €/km. Die Übersicht passt zur Anlage EÜR für ELSTER, und die Kleinunternehmergrenze hast du im Blick.'],
+  ['bell', 'Nichts vergessen', 'Unter „Zu erledigen“ auf der Startseite stehen überfällige Rechnungen, Fristen und offene Angebote. Vor jedem Einsatz erinnert dich die App, mit Knopf zum Starten.'],
+  ['download', 'Sicherung nicht vergessen', 'Die App sichert jede Woche automatisch in den Dokumente-Ordner. Schick dir die Sicherung zusätzlich regelmäßig selbst zu (E-Mail oder Google Drive) – sonst sind die Daten weg, wenn das Handy verloren geht.'],
 ];
 function zeigeEinfuehrung(erneut = false) {
   let i = 0;
@@ -231,10 +236,10 @@ function zeigeEinfuehrung(erneut = false) {
   huelle.setAttribute('role', 'dialog');
   huelle.setAttribute('aria-modal', 'true');
   const zeichne = () => {
-    const [icon, titel, text] = EINFUEHRUNG[i];
+    const [symbol, titel, text] = EINFUEHRUNG[i];
     const letzte = i === EINFUEHRUNG.length - 1;
     huelle.innerHTML = `<div class="einf-card">
-      <div class="einf-icon">${icon}</div>
+      <div class="einf-icon">${window.icon ? window.icon(symbol) : ''}</div>
       <h2>${titel}</h2>
       <p>${text}</p>
       <div class="einf-dots">${EINFUEHRUNG.map((_, k) => `<span class="${k === i ? 'on' : ''}"></span>`).join('')}</div>
@@ -246,7 +251,7 @@ function zeigeEinfuehrung(erneut = false) {
   };
   const schliessen = async () => {
     huelle.remove();
-    if (!erneut) { S.einfuehrung = true; await saveSettings(); }
+    if (!erneut) { S.einfuehrung = true; S.einfuehrungVersion = EINFUEHRUNG_VERSION; await saveSettings(); }
   };
   huelle.addEventListener('click', (e) => {
     if (e.target.closest('[data-skip]')) return schliessen();
@@ -314,7 +319,7 @@ window.addEventListener('hashchange', router);
   router();
   updateTimerPill();
   setupBackButton();
-  if (!S.einfuehrung) zeigeEinfuehrung();
+  if (!S.einfuehrung || (S.einfuehrungVersion || 1) < EINFUEHRUNG_VERSION) zeigeEinfuehrung();
   if (S.timer) zeigeTimerBenachrichtigung(S.timer.objektId);
   sperrenWennNoetig(true);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sperrenWennNoetig(); });

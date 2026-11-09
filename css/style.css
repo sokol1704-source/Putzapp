@@ -1135,3 +1135,8 @@ details.grp.gefahr { border-color: color-mix(in srgb, var(--danger) 45%, var(--b
   .tabbar a.active .ico { background: #134e4a !important; }
 }
 @media (prefers-color-scheme: dark) { .tiles .tile .tile-icon { color: var(--akzent); } }
+
+/* Einführung: Icon in Markenfarbe auf ruhiger Fläche */
+.einf-icon { width: 64px; height: 64px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 18px; background: var(--brand-soft); color: var(--brand); font-size: 0; }
+.einf-icon .ic { width: 32px; height: 32px; }
+@media (prefers-color-scheme: dark) { .einf-icon { color: var(--akzent); } }

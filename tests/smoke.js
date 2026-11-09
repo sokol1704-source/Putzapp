@@ -37,7 +37,7 @@ async function seed(p) {
   return p.evaluate(async () => {
     for (const s of DB.stores) await DB.clear(s);
     const d = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
-    await DB.put('settings', { id: 'main', firma: 'PURE TOTH', inhaber: 'Tobias Toth', strasse: 'X 1', plzOrt: '1 A', steuernummer: '1/2/3', iban: 'DE02120300000000202051', bank: 'Sparkasse', kalkV3: true, einfuehrung: true });
+    await DB.put('settings', { id: 'main', firma: 'PURE TOTH', inhaber: 'Tobias Toth', strasse: 'X 1', plzOrt: '1 A', steuernummer: '1/2/3', iban: 'DE02120300000000202051', bank: 'Sparkasse', kalkV3: true, einfuehrung: true, einfuehrungVersion: 99 });
     const k = await DB.put('customers', { name: 'Hausverwaltung Test', ansprechpartner: 'Frau Meier', strasse: 'A 1', plzOrt: '1 B', privat: false, notizen: '' });
     const o = await DB.put('objects', { kundeId: k.id, name: '', strasse: 'Musterweg 5', plzOrt: '12345 Musterstadt', etagen: 3, eingaenge: 1, aufzug: false, abrechnung: 'monat', monatspauschale: 25000, stundensatz: 2500, aufgaben: [{ text: 'Treppenaufgang', alleTage: 14 }], aktiv: true, winterAbrechnung: 'einsatz', winterPreis: 2500, fotoPflicht: 2, uhrzeit: '09:00', wochentag: 6, intervallTage: 14, vorOrtName: 'Hausmeister', zugang: 'Schlüsselbox 1234', neuerPreis: { ab: d(40), betrag: 27000, alt: 25000 } });
     const v = await DB.put('visits', { objektId: o.id, kundeId: k.id, datum: d(-7), von: '09:00', bis: '11:00', stunden: 2, aufgaben: [{ text: 'Treppenaufgang', erledigt: true }], extras: [], rechnungId: null, notiz: 'ok' });
