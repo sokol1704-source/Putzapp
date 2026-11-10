@@ -87,7 +87,7 @@ route('/rechnungen', async (_, q) => {
       <div class="bar"><div style="width:${pctL}%" class="${pctL > 80 ? 'warn' : ''}"></div></div>
       <div class="muted small mt">Vorjahr ${year - 1}: ${money(umsatzVJ)} – ${umsatzVJ <= KU_GRENZE_VORJAHR ? `unter 25.000 €, damit bist du ${year} Kleinunternehmer.` : `über 25.000 €, damit giltst du ${year} nicht mehr als Kleinunternehmer.`}</div>
     </div>
-    ${overdue.length ? `<div class="card hint">⏰ <b>${overdue.length} Rechnung${overdue.length === 1 ? '' : 'en'} überfällig</b> – in der Rechnung auf „Zahlungserinnerung“ tippen.</div>` : ''}
+    ${overdue.length ? `<div class="card hint">⏰ <b>${overdue.length} Rechnung${overdue.length === 1 ? '' : 'en'} überfällig</b> – in der Rechnung auf „Erinnerung“ tippen.</div>` : ''}
     ${luecken.length ? `<div class="card hint danger-text">⚠️ <b>Lücken in der Rechnungsnummerierung</b>
       ${luecken.map((l) => `<div class="small mt">${esc(l.key)}: fehlt ${l.fehlend.map((n) => String(n).padStart(3, '0')).join(', ')}</div>`).join('')}
       <div class="small mt">Eine gelöschte Rechnung hinterlässt eine Lücke. Für die Buchhaltung solltest du sie erklären können, z. B. „Fehlerhafter Entwurf, nie versendet“. Bereits versendete Rechnungen besser stornieren statt löschen.</div></div>` : ''}

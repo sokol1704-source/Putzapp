@@ -139,7 +139,7 @@ function confetti() {
   el.className = 'erfolg';
   el.innerHTML = icon('check');
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1100);
+  setTimeout(() => el.remove(), 1350);
 }
 
 /* ---------- Stoppuhr-Knöpfe & Zeitanzeige ---------- */
@@ -332,3 +332,6 @@ window.addEventListener('hashchange', router);
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 })();
+
+// Startanimation nach dem Ausblenden aus dem Dokument nehmen
+setTimeout(() => document.getElementById('splash')?.remove(), 1700);

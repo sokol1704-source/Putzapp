@@ -12,9 +12,16 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preload" href="fonts/manrope.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <div class="splash" id="splash" aria-hidden="true"><div>
+    <img src="icons/icon.svg" alt="">
+    <div class="splash-name">PURE TOTH</div>
+    <div class="splash-linie"></div>
+    <div class="splash-slogan">Sauberkeit mit Anspruch</div>
+  </div></div>
   <header class="topbar">
     <button class="back" id="backBtn" aria-label="Zurück" hidden>‹</button>
     <img class="brand-logo" id="brandLogo" src="icons/icon.svg" alt="">

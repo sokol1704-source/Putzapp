@@ -6,6 +6,7 @@ const FILES = [
   'index.html',
   'css/style.css',
   'js/db.js',
+  'fonts/manrope.woff2',
   'js/core.js',
   'js/icons.js',
   'js/service.js',
