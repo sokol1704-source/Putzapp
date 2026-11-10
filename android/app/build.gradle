@@ -14,8 +14,8 @@ android {
         applicationId "de.toths.reinigung"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 66
-        versionName "2.60"
+        versionCode 67
+        versionName "2.61"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // Nur Prozessoren echter Handys, keine Emulator-Bibliotheken (x86) – spart rund 35 MB
